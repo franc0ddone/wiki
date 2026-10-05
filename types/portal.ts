@@ -62,7 +62,15 @@ export const DEPARTMENT_LABELS: Record<Department, string> = {
 /** Item count per department for filter-bar badges. */
 export type DepartmentCounts = Partial<Record<Department, number>>;
 
-export type KnowledgeArticleStatus = "draft" | "published";
+/**
+ * Article lifecycle.
+ *
+ * `in_review` is the optional human-review step between writing and publishing
+ * (added with the backend phase; the phase-1 union was `draft | published`).
+ * Mirrors the Prisma `ArticleStatus` enum — keep the two in step.
+ */
+export type KnowledgeArticleStatus = "draft" | "in_review" | "published";
+
 
 /** A standard operating procedure / reference document in the knowledge base. */
 export interface KnowledgeArticle {

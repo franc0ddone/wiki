@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/" version="0.11" xml:lang="en">
+  <siteinfo>
+    <sitename>Eastside Emergency Veterinary Wiki</sitename>
+    <namespaces>
+      <namespace key="0" case="first-letter" />
+      <namespace key="1" case="first-letter">Talk</namespace>
+    </namespaces>
+  </siteinfo>
+
+  <page>
+    <title>Feline urethral obstruction</title>
+    <ns>0</ns>
+    <id>18</id>
+    <revision>
+      <id>1042</id>
+      <timestamp>2025-03-14T09:12:00Z</timestamp>
+      <text xml:space="preserve">A '''urethral obstruction''' is a life-threatening emergency in male cats.
+
+== Presentation ==
+* Straining to urinate
+* Vocalising, often in the litter box
+* A hard, distended bladder on palpation
+
+== Immediate actions ==
+# Place an IV catheter and start fluids.
+# Draw a blood gas &amp; biochemistry panel &mdash; hyperkalaemia kills first.
+# Decompress the bladder by cystocentesis if the patient is unstable.
+
+&gt; '''Warning:''' do not attempt catheterisation before the patient has been stabilised.
+
+See also [[Hyperkalaemia management]].</text>
+    </revision>
+  </page>
+
+  <page>
+    <title>Hyperkalaemia management</title>
+    <ns>0</ns>
+    <id>22</id>
+    <revision>
+      <id>1088</id>
+      <timestamp>2025-04-02T14:40:00Z</timestamp>
+      <text xml:space="preserve">Potassium above 7 mmol/L requires immediate treatment.
+
+{| class="wikitable"
+! ECG finding !! Action
+|-
+| Peak&#8230; T waves || Calcium gluconate 10%, 0.5 mL/kg slow IV
+|-
+| Absent P waves || Insulin 0.1 U/kg with dextrose
+|}</text>
+    </revision>
+  </page>
+
+  <page>
+    <title>Old catheterisation policy</title>
+    <ns>0</ns>
+    <id>9</id>
+    <revision>
+      <id>610</id>
+      <timestamp>2019-01-05T08:00:00Z</timestamp>
+      <text xml:space="preserve">#REDIRECT [[Feline urethral obstruction]]</text>
+    </revision>
+  </page>
+
+  <page>
+    <title>Talk:Feline urethral obstruction</title>
+    <ns>1</ns>
+    <id>23</id>
+    <revision>
+      <id>1090</id>
+      <timestamp>2025-03-15T10:00:00Z</timestamp>
+      <text xml:space="preserve">Can we add the 2019 RECOVER reference? ~~~~</text>
+    </revision>
+  </page>
+</mediawiki>

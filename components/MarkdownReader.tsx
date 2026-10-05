@@ -65,7 +65,11 @@ const FENCE_RE = /^\s*```/;
 const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
 const TABLE_DIVIDER_RE = /^\s*\|?[\s:|-]+\|?\s*$/;
 
-function slugify(text: string): string {
+/**
+ * Heading/anchor slug. Exported so `lib/links.ts` can validate internal links
+ * against the exact ids this reader emits — the two must never disagree.
+ */
+export function slugify(text: string): string {
   return text
     .toLowerCase()
     .replace(/[`*_]/g, "")

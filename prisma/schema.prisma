@@ -1,0 +1,250 @@
+// Operations Hub ("Dove Wiki") data model.
+//
+// Prisma ORM 7 · PostgreSQL. The client is generated as TypeScript into
+// `generated/prisma` (see prisma.config.ts for CLI configuration and
+// lib/db.ts for the runtime client + driver adapter).
+//
+// Naming: model fields are camelCase and mapped to the snake_case column names
+// the phase-1 types already assumed (`body_markdown`, `updated_at`, ...), so the
+// data-access layer in `lib/data/*` can hand the frontend the exact shapes that
+// `lib/mock-data.ts` exposes today.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --------------------------------------------------------------------- enums
+
+/// Who a person is in the portal. Ordered by authority in `lib/auth.ts`
+/// (`ROLE_RANK`) — `readonly` sees everything and changes nothing, `admin`
+/// administers users on top of everything a clinical lead can do.
+enum Role {
+  admin
+  clinical_lead
+  author
+  staff
+  readonly
+}
+
+/// Article lifecycle. Extends the phase-1 `draft | published` union with the
+/// optional review step; `types/portal.ts` mirrors this.
+enum ArticleStatus {
+  draft
+  in_review
+  published
+}
+
+enum BulletinPriority {
+  urgent
+  pinned
+  normal
+}
+
+/// Which surface a search log row came from — drives the weekly dead-search
+/// review (queries that returned nothing are turned into synonyms).
+enum SearchSurface {
+  articles
+  bulletins
+  staff
+}
+
+enum ShiftPreference {
+  Day
+  Swing
+  Overnight
+}
+
+// --------------------------------------------------------------------- users
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  email String @unique
+  /// Display name exactly as the portal renders it in `author_name`
+  /// ("Trevor Lindqvist"). Combined with `title` by `lib/data/*` to reproduce
+  /// the phase-1 "Name, Role" author string byte for byte.
+  name  String
+  /// Professional title shown after the name, e.g. "ICU Technician II".
+  /// Nullable: administrative/service accounts have none.
+  title String?
+
+  role Role @default(staff)
+
+  /// bcrypt hash for the dev Credentials provider. Nullable because
+  /// IdP-authenticated accounts (OIDC/SAML) never get a local password.
+  passwordHash String? @map("password_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  authoredArticles Article[]        @relation("ArticleAuthor")
+  reviewedArticles Article[]        @relation("ArticleReviewer")
+  authoredBulletins Bulletin[]
+  articleVersions  ArticleVersion[]
+  bulletinAcks     BulletinAck[]
+
+  @@map("users")
+}
+
+// ------------------------------------------------------------------ articles
+
+model Article {
+  id String @id @default(uuid()) @db.Uuid
+
+  slug String @unique
+  title String
+  bodyMarkdown String @map("body_markdown")
+
+  /// Multi-tag: a procedure routinely belongs to several departments.
+  departments String[]
+
+  status ArticleStatus @default(draft)
+
+  authorId   String  @map("author_id") @db.Uuid
+  reviewerId String? @map("reviewer_id") @db.Uuid
+
+  /// Required to publish (enforced in the API, not just the UI).
+  effectiveDate DateTime? @map("effective_date")
+
+  /// Import provenance (see scripts/import-mediawiki). Populated only by the
+  /// MediaWiki import; null for hand-authored articles.
+  sourceTitle String?   @map("source_title")
+  importedAt  DateTime? @map("imported_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  /// Managed explicitly by `lib/data/articles.ts` on every write rather than by
+  /// Prisma's `@updatedAt`, so the seed can preserve the phase-1 fixture
+  /// timestamps and the API can be explicit about when a row changed.
+  updatedAt DateTime @map("updated_at")
+
+  author   User   @relation("ArticleAuthor", fields: [authorId], references: [id])
+  reviewer User?  @relation("ArticleReviewer", fields: [reviewerId], references: [id])
+  versions ArticleVersion[]
+  bulletins Bulletin[]
+
+  @@index([status])
+  @@index([updatedAt(sort: Desc)])
+  @@map("articles")
+}
+
+/// Immutable publish history. A row is written on every transition to
+/// `published` and is never updated or deleted — a database trigger
+/// (see prisma/migrations) enforces that in addition to the API never
+/// exposing an update/delete path.
+model ArticleVersion {
+  id        String @id @default(uuid()) @db.Uuid
+  articleId String @map("article_id") @db.Uuid
+
+  /// Sequential per article, starting at 1.
+  version Int
+
+  title         String
+  bodyMarkdown  String @map("body_markdown")
+  changeSummary String @map("change_summary")
+
+  changedById String   @map("changed_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  changedBy User    @relation(fields: [changedById], references: [id])
+
+  @@unique([articleId, version])
+  @@index([articleId, createdAt(sort: Desc)])
+  @@map("article_versions")
+}
+
+// ----------------------------------------------------------------- bulletins
+
+model Bulletin {
+  id String @id @default(uuid()) @db.Uuid
+
+  title        String
+  bodyMarkdown String @map("body_markdown")
+  departments  String[]
+
+  priority BulletinPriority @default(normal)
+
+  linkedArticleId String? @map("linked_article_id") @db.Uuid
+
+  authorId String @map("author_id") @db.Uuid
+
+  /// When the notice went up. Exposed to the frontend as `created_at`.
+  publishedAt DateTime @map("published_at")
+
+  /// Pinned and urgent notices age out; nothing accumulates forever. The API
+  /// applies a default window per priority when the client omits one.
+  expiresAt DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  linkedArticle Article? @relation(fields: [linkedArticleId], references: [id], onDelete: SetNull)
+  author        User     @relation(fields: [authorId], references: [id])
+  acks          BulletinAck[]
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([expiresAt])
+  @@index([priority])
+  @@map("bulletins")
+}
+
+/// "Who has seen this critical alert." One row per (bulletin, user); the ack
+/// endpoint is idempotent.
+model BulletinAck {
+  id String @id @default(uuid()) @db.Uuid
+
+  bulletinId String @map("bulletin_id") @db.Uuid
+  userId     String @map("user_id") @db.Uuid
+  ackedAt    DateTime @default(now()) @map("acked_at")
+
+  bulletin Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bulletinId, userId])
+  @@index([bulletinId])
+  @@map("bulletin_acks")
+}
+
+// --------------------------------------------------------------------- staff
+
+model StaffMember {
+  id String @id @default(uuid()) @db.Uuid
+
+  systemId      String @unique @map("system_id")
+  fullName      String @map("full_name")
+  preferredName String @map("preferred_name")
+  pronouns      String
+  title         String
+  departments   String[]
+
+  email          String @unique
+  phoneExtension String @map("phone_extension")
+  directPhone    String @map("direct_phone")
+
+  shiftPreference ShiftPreference @map("shift_preference")
+  /// `ShiftRotation[]` — label / days / hours.
+  shiftRotations  Json            @map("shift_rotations")
+
+  avatarUrl String? @map("avatar_url")
+
+  @@index([fullName])
+  @@map("staff_members")
+}
+
+// ------------------------------------------------------------------- logging
+
+model SearchLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  query       String
+  resultCount Int           @map("result_count")
+  surface     SearchSurface
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resultCount])
+  @@map("search_logs")
+}
