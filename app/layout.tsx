@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Operations Hub",
-  description: "Internal bulletin board, knowledge base, and staff directory.",
+  title: "Dove Wiki",
+  description: "Dove Wiki — bulletin board, knowledge base, and staff directory for the emergency animal hospital.",
 };
 
 /**

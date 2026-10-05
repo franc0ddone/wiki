@@ -1,20 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { BookText, Check, ChevronDown, Megaphone, Users } from "lucide-react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { BookOpen, Check, ChevronDown, Megaphone, Users } from "lucide-react";
 import type { PortalView } from "@/types/portal";
 import { cx } from "@/lib/utils";
 
 /**
- * Minimal institutional header: identity on the left, a single view switcher on
- * the right. No tab bar — the active surface is chosen from the dropdown, and
- * the current view is echoed beside the trigger so it is legible at a glance.
+ * Single frosted navigation bar.
+ *
+ * Left: institutional identity with a live presence indicator.
+ * Right: a discreet contextual menu that names the current section and opens a
+ * floating popover to switch between the three surfaces. There is no tab bar.
  */
 
 export interface PortalHeaderProps {
   activeView: PortalView;
   onViewChange: (view: PortalView) => void;
-  /** Institutional name shown as the primary title. */
+  /** Primary institutional mark. Rendered uppercase. */
   title?: string;
   /** Facility subtext under the title. */
   facilityName?: string;
@@ -24,10 +27,10 @@ interface ViewOption {
   id: PortalView;
   label: string;
   description: string;
-  icon: typeof BookText;
+  icon: typeof BookOpen;
 }
 
-const VIEW_OPTIONS: readonly ViewOption[] = [
+export const VIEW_OPTIONS: readonly ViewOption[] = [
   {
     id: "bulletins",
     label: "Bulletin Board",
@@ -38,12 +41,12 @@ const VIEW_OPTIONS: readonly ViewOption[] = [
     id: "knowledge",
     label: "Knowledge Base",
     description: "Standard operating procedures",
-    icon: BookText,
+    icon: BookOpen,
   },
   {
     id: "directory",
     label: "Staff Directory",
-    description: "Personnel and contact details",
+    description: "Personnel, extensions, and rotations",
     icon: Users,
   },
 ];
@@ -58,8 +61,13 @@ export function PortalHeader({
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const activeOption = VIEW_OPTIONS.find((option) => option.id === activeView) ?? VIEW_OPTIONS[0];
+  const activeIndex = Math.max(
+    0,
+    VIEW_OPTIONS.findIndex((option) => option.id === activeView),
+  );
+  const activeOption = VIEW_OPTIONS[activeIndex] ?? VIEW_OPTIONS[0];
   const ActiveIcon = activeOption.icon;
 
   const close = useCallback((restoreFocus: boolean) => {
@@ -67,7 +75,14 @@ export function PortalHeader({
     if (restoreFocus) triggerRef.current?.focus();
   }, []);
 
-  // Dismiss on outside click and on Escape.
+  // On open, move focus to the checked item so arrow keys start from there.
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = requestAnimationFrame(() => itemRefs.current[activeIndex]?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, activeIndex]);
+
+  // Dismiss on outside pointer and on Escape.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -75,7 +90,10 @@ export function PortalHeader({
       if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close(true);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(true);
+      }
     };
 
     document.addEventListener("mousedown", handlePointerDown);
@@ -86,54 +104,78 @@ export function PortalHeader({
     };
   }, [isOpen, close]);
 
+  const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setIsOpen(true);
+    }
+  };
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = itemRefs.current.filter((item): item is HTMLButtonElement => item !== null);
+    if (items.length === 0) return;
+    const current = items.findIndex((item) => item === document.activeElement);
+
+    let next: number | null = null;
+    if (event.key === "ArrowDown") next = (current + 1) % items.length;
+    else if (event.key === "ArrowUp") next = (current - 1 + items.length) % items.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = items.length - 1;
+    else if (event.key === "Tab") {
+      setIsOpen(false);
+      return;
+    }
+
+    if (next !== null) {
+      event.preventDefault();
+      items[next]?.focus();
+    }
+  };
+
   return (
-    <header className="relative z-30 shrink-0 border-b border-zinc-800 bg-zinc-950">
-      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-6 px-5 py-4 sm:px-8">
+    <header className="sticky top-0 z-30 shrink-0 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
+      <div className="flex h-14 w-full items-center justify-between gap-6 px-4 sm:px-6">
         {/* Identity */}
-        <div className="flex min-w-0 items-center gap-3.5">
-          <span
-            aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900"
-          >
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border border-[#5CBEB4]/50">
-              <span className="h-1 w-1 rounded-full bg-[#5CBEB4]" />
-            </span>
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden="true" className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className="animate-presence absolute inset-0 rounded-full bg-[#0F766E]" />
+            <span className="relative h-2.5 w-2.5 rounded-full bg-[#0F766E] ring-2 ring-teal-100" />
           </span>
-          <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-[15px] font-semibold tracking-tight text-zinc-50">
+          <div className="min-w-0">
+            <h1 className="truncate text-[13px] font-bold uppercase leading-4 tracking-[0.06em] text-zinc-900">
               {title}
             </h1>
-            <p className="truncate text-xs text-zinc-500">{facilityName}</p>
+            <p className="truncate text-[11.5px] font-medium leading-4 text-zinc-500">{facilityName}</p>
           </div>
         </div>
 
-        {/* View switcher */}
+        {/* Section menu */}
         <div className="relative shrink-0" ref={containerRef}>
           <button
             ref={triggerRef}
             type="button"
             onClick={() => setIsOpen((open) => !open)}
+            onKeyDown={handleTriggerKeyDown}
             aria-haspopup="menu"
             aria-expanded={isOpen}
             aria-controls={isOpen ? menuId : undefined}
+            aria-label={`Current section: ${activeOption.label}. Switch section`}
             className={cx(
-              "flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5CBEB4]",
+              "flex h-8 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-zinc-800 transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40 focus-visible:ring-offset-1",
               isOpen
-                ? "border-[#5CBEB4]/40 bg-zinc-900"
-                : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900",
+                ? "bg-zinc-900/[0.06]"
+                : "hover:bg-zinc-900/[0.04] active:bg-zinc-900/[0.07]",
             )}
           >
-            <ActiveIcon size={14} strokeWidth={1.75} aria-hidden="true" className="text-[#5CBEB4]" />
-            <span className="hidden text-[13px] font-medium text-zinc-100 sm:inline">
-              {activeOption.label}
-            </span>
+            <ActiveIcon size={14} strokeWidth={1.75} aria-hidden="true" className="text-[#0F766E]" />
+            <span className="hidden sm:inline">{activeOption.label}</span>
             <ChevronDown
               size={14}
               strokeWidth={1.75}
               aria-hidden="true"
               className={cx(
-                "text-zinc-500 transition-transform duration-200",
+                "text-zinc-400 transition-transform duration-200",
                 isOpen && "rotate-180",
               )}
             />
@@ -143,55 +185,69 @@ export function PortalHeader({
             <div
               id={menuId}
               role="menu"
-              aria-label="Switch view"
-              className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.9)]"
+              aria-label="Switch section"
+              onKeyDown={handleMenuKeyDown}
+              className="animate-popover-in absolute right-0 top-[calc(100%+6px)] z-40 w-72 rounded-xl border border-zinc-200/80 bg-white/95 p-1.5 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.22),0_2px_6px_rgba(24,24,27,0.06)] backdrop-blur-xl"
             >
-              {VIEW_OPTIONS.map((option) => {
+              <p className="px-2.5 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                Sections
+              </p>
+              {VIEW_OPTIONS.map((option, index) => {
                 const Icon = option.icon;
                 const isActive = option.id === activeView;
                 return (
                   <button
                     key={option.id}
+                    ref={(node) => {
+                      itemRefs.current[index] = node;
+                    }}
                     type="button"
                     role="menuitemradio"
                     aria-checked={isActive}
+                    tabIndex={-1}
                     onClick={() => {
                       onViewChange(option.id);
                       close(true);
                     }}
                     className={cx(
-                      "flex w-full items-start gap-3 border-b border-zinc-800/70 px-3.5 py-3 text-left transition-colors last:border-b-0",
-                      "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#5CBEB4]",
-                      isActive ? "bg-[#005953]/20" : "hover:bg-zinc-800/60",
+                      "group flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left outline-none transition-colors",
+                      "hover:bg-zinc-100 focus-visible:bg-zinc-100",
+                      isActive && "bg-teal-50/70 hover:bg-teal-50 focus-visible:bg-teal-50",
                     )}
                   >
-                    <Icon
-                      size={14}
-                      strokeWidth={1.75}
+                    <span
                       aria-hidden="true"
-                      className={cx("mt-0.5 shrink-0", isActive ? "text-[#5CBEB4]" : "text-zinc-500")}
-                    />
+                      className={cx(
+                        "mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
+                        isActive
+                          ? "border-teal-200 bg-white text-[#0F766E]"
+                          : "border-zinc-200/80 bg-white text-zinc-500",
+                      )}
+                    >
+                      <Icon size={14} strokeWidth={1.75} />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span
                         className={cx(
-                          "block text-[13px] font-medium",
-                          isActive ? "text-[#5CBEB4]" : "text-zinc-200",
+                          "block text-[13px] font-medium leading-5",
+                          isActive ? "text-teal-900" : "text-zinc-900",
                         )}
                       >
                         {option.label}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-zinc-500">
+                      <span className="block text-[11.5px] leading-4 text-zinc-500">
                         {option.description}
                       </span>
                     </span>
-                    {isActive ? (
-                      <Check
-                        size={14}
-                        strokeWidth={2}
-                        aria-hidden="true"
-                        className="mt-0.5 shrink-0 text-[#5CBEB4]"
-                      />
-                    ) : null}
+                    <Check
+                      size={14}
+                      strokeWidth={2}
+                      aria-hidden="true"
+                      className={cx(
+                        "mt-1 shrink-0 text-[#0F766E]",
+                        isActive ? "opacity-100" : "opacity-0",
+                      )}
+                    />
                   </button>
                 );
               })}

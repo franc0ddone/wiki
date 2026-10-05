@@ -1,13 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpRight, BookText, Info, Pin, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import {
+  ArrowUpRight,
+  BookOpen,
+  CalendarDays,
+  FileText,
+  Info,
+  Megaphone,
+  PenLine,
+  Pin,
+  TriangleAlert,
+} from "lucide-react";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { PortalHeader } from "@/components/PortalHeader";
-import { ViewToolbar } from "@/components/ViewToolbar";
 import {
   BULLETINS,
   KNOWLEDGE_ARTICLES,
@@ -16,7 +25,7 @@ import {
   matchesDepartment,
   matchesQuery,
 } from "@/lib/mock-data";
-import { cx, formatDate, formatDateTime } from "@/lib/utils";
+import { FACILITY_TIME_ZONE, cx, formatDate, formatDateTime } from "@/lib/utils";
 import {
   CLINICAL_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -31,7 +40,7 @@ import {
 
 /* ------------------------------------------------------------------ helpers */
 
-/** Counts per department for the filter bar. `All` is the unfiltered total. */
+/** Counts per department for the chip track. `All` is the unfiltered total. */
 function buildCounts<T extends { departments: ClinicalDepartment[] }>(
   items: readonly T[],
 ): DepartmentCounts {
@@ -42,24 +51,67 @@ function buildCounts<T extends { departments: ClinicalDepartment[] }>(
   return counts;
 }
 
+/** Compact list-row timestamp, pinned to the facility zone for SSR determinism. */
+const ROW_DATE = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: FACILITY_TIME_ZONE,
+});
+const ROW_TIME = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: FACILITY_TIME_ZONE,
+});
+
+function rowTimestamp(iso: string): { date: string; time: string } {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return { date: iso, time: "" };
+  return { date: ROW_DATE.format(parsed), time: ROW_TIME.format(parsed) };
+}
+
+/** First prose paragraph of a markdown body, stripped of inline markers. */
+function excerpt(markdown: string, max = 150): string {
+  const paragraph =
+    markdown
+      .split(/\n\s*\n/)
+      .map((chunk) => chunk.trim())
+      .find(
+        (chunk) =>
+          chunk.length > 0 && !/^(#|>|\||```|[-*]\s|\d+[.)]\s)/.test(chunk) && !/^\*\*\w+:\*\*/.test(chunk),
+      ) ?? "";
+  const plain = paragraph
+    .replace(/\*\*|`|\*/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max).trimEnd()}...` : plain;
+}
+
+/** Display name without the role suffix, e.g. `"Dr. Maya Okonkwo"`. */
+function authorName(author: string): string {
+  return author.split(",")[0]?.trim() ?? author;
+}
+
+/* ------------------------------------------------------------------- badges */
+
 const PRIORITY_META: Record<
   BulletinPriority,
   { label: string; className: string; icon: ReactNode }
 > = {
   urgent: {
     label: "Urgent",
-    className: "border-red-900/80 bg-red-950/40 text-red-400",
+    className: "border-red-200 bg-red-50 text-red-700",
     icon: <TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />,
   },
   pinned: {
     label: "Pinned",
-    className: "border-[#5CBEB4]/40 bg-[#005953]/25 text-[#5CBEB4]",
-    icon: <Pin size={12} strokeWidth={1.75} aria-hidden="true" />,
+    className: "border-teal-200 bg-teal-50 text-teal-800",
+    icon: <Pin size={12} strokeWidth={2} aria-hidden="true" />,
   },
   normal: {
     label: "Notice",
-    className: "border-zinc-800 bg-zinc-900 text-zinc-400",
-    icon: <Info size={12} strokeWidth={1.75} aria-hidden="true" />,
+    className: "border-zinc-200 bg-zinc-50 text-zinc-600",
+    icon: <Info size={12} strokeWidth={2} aria-hidden="true" />,
   },
 };
 
@@ -68,7 +120,7 @@ function PriorityBadge({ priority }: { priority: BulletinPriority }) {
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-px text-[11px] font-semibold",
         meta.className,
       )}
     >
@@ -78,13 +130,44 @@ function PriorityBadge({ priority }: { priority: BulletinPriority }) {
   );
 }
 
-function DepartmentTags({ departments }: { departments: readonly ClinicalDepartment[] }) {
+function StatusBadge({ status }: { status: KnowledgeArticle["status"] }) {
+  const isDraft = status === "draft";
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
+    <span
+      className={cx(
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-px text-[11px] font-semibold",
+        isDraft
+          ? "border-amber-200 bg-amber-50 text-amber-800"
+          : "border-zinc-200 bg-zinc-50 text-zinc-600",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cx("h-1.5 w-1.5 rounded-full", isDraft ? "bg-amber-500" : "bg-[#0F766E]")}
+      />
+      {isDraft ? "Draft" : "Published"}
+    </span>
+  );
+}
+
+function DepartmentTags({
+  departments,
+  subtle = false,
+}: {
+  departments: readonly ClinicalDepartment[];
+  subtle?: boolean;
+}) {
+  return (
+    <span className="flex flex-wrap items-center gap-1">
       {departments.map((department) => (
         <span
           key={department}
-          className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tracking-tight text-zinc-400"
+          className={cx(
+            "whitespace-nowrap rounded-full border px-2 py-px text-[11px] font-medium",
+            subtle
+              ? "border-zinc-200/80 bg-zinc-50 text-zinc-600"
+              : "border-teal-200 bg-teal-50 text-teal-800",
+          )}
         >
           {DEPARTMENT_LABELS[department]}
         </span>
@@ -93,96 +176,99 @@ function DepartmentTags({ departments }: { departments: readonly ClinicalDepartm
   );
 }
 
-function StatusBadge({ status }: { status: KnowledgeArticle["status"] }) {
-  const isDraft = status === "draft";
+function MetaItem({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]",
-        isDraft
-          ? "border-amber-900/80 bg-amber-950/30 text-amber-400"
-          : "border-zinc-800 bg-zinc-900 text-zinc-400",
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className={cx("h-1.5 w-1.5 rounded-full", isDraft ? "bg-amber-400" : "bg-[#5CBEB4]")}
-      />
-      {isDraft ? "Draft" : "Published"}
+    <span className="flex items-center gap-2 text-[13px]">
+      <span className="text-zinc-400">{icon}</span>
+      <span className="sr-only">{label}</span>
+      <span className="text-zinc-600">{children}</span>
     </span>
   );
 }
 
-function MetaItem({ label, children }: { label: string; children: ReactNode }) {
+function EmptyState({ icon, title, message }: { icon: ReactNode; title: string; message: string }) {
   return (
-    <span className="flex items-baseline gap-2">
-      <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
-        {label}
+    <div className="flex max-w-xs flex-col items-center gap-2 text-center">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-400 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        {icon}
       </span>
-      <span className="text-[12px] text-zinc-300">{children}</span>
-    </span>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <p className="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 px-5 py-4 text-center text-[12.5px] text-zinc-500">
-      {message}
-    </p>
+      <p className="mt-1 text-[13.5px] font-semibold text-zinc-800">{title}</p>
+      <p className="text-[12.5px] leading-5 text-zinc-500">{message}</p>
+    </div>
   );
 }
 
 /* ---------------------------------------------------------------- list rows */
 
-function ArticleRow({ article, isSelected }: { article: KnowledgeArticle; isSelected: boolean }) {
+function RowTimestamp({ iso, withTime }: { iso: string; withTime: boolean }) {
+  const stamp = rowTimestamp(iso);
   return (
-    <span className="block">
-      <span className="flex items-start justify-between gap-3">
-        <span
-          className={cx(
-            "text-[13.5px] font-medium leading-snug",
-            isSelected ? "text-[#5CBEB4]" : "text-zinc-100",
-          )}
-        >
-          {article.title}
-        </span>
-        {article.status === "draft" ? (
-          <span className="mt-0.5 shrink-0 rounded border border-amber-900/80 bg-amber-950/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-400">
-            Draft
-          </span>
-        ) : null}
-      </span>
-      <span className="mt-2 flex flex-wrap items-center gap-1.5">
-        <DepartmentTags departments={article.departments} />
-      </span>
-      <span className="mt-2 block truncate text-[11px] text-zinc-600">
-        {formatDate(article.updated_at)}
-        <span className="mx-1.5 text-zinc-700">·</span>
-        {article.author_name}
-      </span>
-    </span>
+    <time dateTime={iso} className="shrink-0 text-[11.5px] tabular-nums text-zinc-500">
+      {stamp.date}
+      {withTime && stamp.time ? <span className="text-zinc-400"> {stamp.time}</span> : null}
+    </time>
   );
 }
 
 function BulletinRow({ bulletin, isSelected }: { bulletin: Bulletin; isSelected: boolean }) {
   return (
     <span className="block">
-      <span className="flex items-center gap-1.5">
-        <PriorityBadge priority={bulletin.priority} />
-        <DepartmentTags departments={bulletin.departments} />
+      <span className="flex items-center justify-between gap-3">
+        <span className="truncate text-[12px] font-medium text-zinc-500">
+          {authorName(bulletin.author_name)}
+        </span>
+        <RowTimestamp iso={bulletin.created_at} withTime />
       </span>
       <span
         className={cx(
-          "mt-2 block text-[13.5px] font-medium leading-snug",
-          isSelected ? "text-[#5CBEB4]" : "text-zinc-100",
+          "mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em]",
+          isSelected ? "text-zinc-900" : "text-zinc-800",
         )}
       >
         {bulletin.title}
       </span>
-      <span className="mt-2 block truncate text-[11px] text-zinc-600">
-        {formatDateTime(bulletin.created_at)}
-        <span className="mx-1.5 text-zinc-700">·</span>
-        {bulletin.author_name}
+      <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
+        {excerpt(bulletin.body_markdown)}
+      </span>
+      <span className="mt-2 flex flex-wrap items-center gap-1">
+        {bulletin.priority !== "normal" ? <PriorityBadge priority={bulletin.priority} /> : null}
+        <DepartmentTags departments={bulletin.departments} subtle={!isSelected} />
+      </span>
+    </span>
+  );
+}
+
+function ArticleRow({ article, isSelected }: { article: KnowledgeArticle; isSelected: boolean }) {
+  return (
+    <span className="block">
+      <span className="flex items-center justify-between gap-3">
+        <span className="truncate text-[12px] font-medium text-zinc-500">
+          {authorName(article.author_name)}
+        </span>
+        <RowTimestamp iso={article.updated_at} withTime={false} />
+      </span>
+      <span
+        className={cx(
+          "mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em]",
+          isSelected ? "text-zinc-900" : "text-zinc-800",
+        )}
+      >
+        {article.title}
+      </span>
+      <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
+        {excerpt(article.body_markdown)}
+      </span>
+      <span className="mt-2 flex flex-wrap items-center gap-1">
+        {article.status === "draft" ? <StatusBadge status="draft" /> : null}
+        <DepartmentTags departments={article.departments} subtle={!isSelected} />
       </span>
     </span>
   );
@@ -190,93 +276,134 @@ function BulletinRow({ bulletin, isSelected }: { bulletin: Bulletin; isSelected:
 
 /* ------------------------------------------------------------- detail panes */
 
+function DetailFrame({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-[72rem] px-4 py-6 sm:px-6 md:px-8 md:py-10">{children}</div>;
+}
+
 function ArticleDetail({ article }: { article: KnowledgeArticle }) {
   return (
-    <article className="mx-auto w-full max-w-[68rem] px-6 py-8 sm:px-10 sm:py-10">
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={article.status} />
-        <DepartmentTags departments={article.departments} />
-      </div>
-
-      <h1 className="mt-5 max-w-3xl text-2xl font-semibold leading-tight tracking-tight text-zinc-50 sm:text-[2rem]">
-        {article.title}
-      </h1>
-
-      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-zinc-800 pb-5">
-        <MetaItem label="Author">{article.author_name}</MetaItem>
-        <MetaItem label="Updated">{formatDate(article.updated_at)}</MetaItem>
-        <MetaItem label="Slug">
-          <span className="font-mono text-[11px] text-zinc-400">{article.slug}</span>
-        </MetaItem>
-      </div>
-
-      <div className="mt-8">
-        <MarkdownReader source={article.body_markdown} showTableOfContents />
-      </div>
-
-      {article.status === "draft" ? (
-        <p className="mt-10 rounded-lg border border-amber-900/60 bg-amber-950/20 px-4 py-3.5 text-[12.5px] leading-6 text-amber-300">
-          This procedure is still a draft and is not in force. Do not follow it for patient care
-          until the clinical leads publish it.
-        </p>
-      ) : null}
-    </article>
+    <DetailFrame>
+      <MarkdownReader
+        source={article.body_markdown}
+        header={
+          <>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={article.status} />
+              <DepartmentTags departments={article.departments} />
+            </div>
+            <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.15] tracking-[-0.025em] text-zinc-900 md:text-[2.2rem]">
+              {article.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+              <MetaItem icon={<PenLine size={14} strokeWidth={1.75} aria-hidden="true" />} label="Author">
+                {article.author_name}
+              </MetaItem>
+              <MetaItem
+                icon={<CalendarDays size={14} strokeWidth={1.75} aria-hidden="true" />}
+                label="Updated"
+              >
+                Updated {formatDate(article.updated_at)}
+              </MetaItem>
+            </div>
+          </>
+        }
+        footer={
+          article.status === "draft" ? (
+            <aside
+              role="note"
+              className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3.5 text-[13.5px] leading-relaxed text-amber-900"
+            >
+              <TriangleAlert
+                size={14}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="mt-[3px] shrink-0 text-amber-700"
+              />
+              This procedure is a draft and is not in force. Do not follow it for patient care until
+              the clinical leads publish it.
+            </aside>
+          ) : (
+            <p className="border-t border-zinc-100 pt-6 font-mono text-[11.5px] text-zinc-400">
+              {article.slug}
+            </p>
+          )
+        }
+      />
+    </DetailFrame>
   );
 }
 
-function BulletinDetail({ bulletin }: { bulletin: Bulletin }) {
+function BulletinDetail({
+  bulletin,
+  onOpenArticle,
+}: {
+  bulletin: Bulletin;
+  onOpenArticle: (articleId: string) => void;
+}) {
   const linkedArticle = findLinkedArticle(bulletin);
 
   return (
-    <article className="mx-auto w-full max-w-3xl px-6 py-8 sm:px-10 sm:py-10">
-      <div className="flex flex-wrap items-center gap-2">
-        <PriorityBadge priority={bulletin.priority} />
-        <DepartmentTags departments={bulletin.departments} />
-      </div>
-
-      <h1 className="mt-5 text-2xl font-semibold leading-tight tracking-tight text-zinc-50 sm:text-[2rem]">
-        {bulletin.title}
-      </h1>
-
-      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-zinc-800 pb-5">
-        <MetaItem label="Posted">{formatDateTime(bulletin.created_at)}</MetaItem>
-        <MetaItem label="By">{bulletin.author_name}</MetaItem>
-      </div>
-
-      <div className="mt-8">
-        <MarkdownReader source={bulletin.body_markdown} />
-      </div>
-
-      <div className="mt-10 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-          Referenced procedure
-        </p>
-        {linkedArticle ? (
-          <p className="mt-2.5 flex items-start gap-2.5 text-[13px] text-zinc-200">
-            <BookText
-              size={14}
-              strokeWidth={1.75}
-              aria-hidden="true"
-              className="mt-0.5 shrink-0 text-[#5CBEB4]"
-            />
-            <span className="min-w-0">
-              {linkedArticle.title}
-              <span className="mt-1 block font-mono text-[11px] text-zinc-500">
-                {linkedArticle.slug}
-              </span>
-            </span>
-            <ArrowUpRight
-              size={14}
-              strokeWidth={1.75}
-              aria-hidden="true"
-              className="mt-0.5 shrink-0 text-zinc-600"
-            />
-          </p>
-        ) : (
-          <p className="mt-2.5 text-[13px] text-zinc-500">No linked procedure for this notice.</p>
-        )}
-      </div>
-    </article>
+    <DetailFrame>
+      <MarkdownReader
+        source={bulletin.body_markdown}
+        header={
+          <>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <PriorityBadge priority={bulletin.priority} />
+              <DepartmentTags departments={bulletin.departments} />
+            </div>
+            <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.15] tracking-[-0.025em] text-zinc-900 md:text-[2.2rem]">
+              {bulletin.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+              <MetaItem icon={<PenLine size={14} strokeWidth={1.75} aria-hidden="true" />} label="Posted by">
+                {bulletin.author_name}
+              </MetaItem>
+              <MetaItem
+                icon={<CalendarDays size={14} strokeWidth={1.75} aria-hidden="true" />}
+                label="Posted"
+              >
+                {formatDateTime(bulletin.created_at)}
+              </MetaItem>
+            </div>
+          </>
+        }
+        footer={
+          <div className="border-t border-zinc-100 pt-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+              Referenced procedure
+            </p>
+            {linkedArticle ? (
+              <button
+                type="button"
+                onClick={() => onOpenArticle(linkedArticle.id)}
+                className="group mt-2.5 flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-teal-200 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-[#0F766E]">
+                  <FileText size={14} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13.5px] font-semibold text-zinc-900">
+                    {linkedArticle.title}
+                  </span>
+                  <span className="block text-[12px] text-zinc-500">
+                    Open in Knowledge Base
+                  </span>
+                </span>
+                <ArrowUpRight
+                  size={14}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                  className="shrink-0 text-zinc-400 transition-colors group-hover:text-[#0F766E]"
+                />
+              </button>
+            ) : (
+              <p className="mt-2 text-[13px] text-zinc-500">No linked procedure for this notice.</p>
+            )}
+          </div>
+        }
+      />
+    </DetailFrame>
   );
 }
 
@@ -295,6 +422,11 @@ export default function OperationsHubPage() {
     setActiveView(view);
     setSearchQuery("");
     setActiveDepartment("All");
+  };
+
+  const openArticle = (articleId: string) => {
+    handleViewChange("knowledge");
+    setSelectedArticleId(articleId);
   };
 
   /* Bulletin board */
@@ -337,7 +469,8 @@ export default function OperationsHubPage() {
     [searchQuery],
   );
   const filteredArticles = useMemo(
-    () => searchedArticles.filter((article) => matchesDepartment(article.departments, activeDepartment)),
+    () =>
+      searchedArticles.filter((article) => matchesDepartment(article.departments, activeDepartment)),
     [searchedArticles, activeDepartment],
   );
   const articleCounts = useMemo(() => buildCounts(searchedArticles), [searchedArticles]);
@@ -369,12 +502,13 @@ export default function OperationsHubPage() {
   const staffCounts = useMemo(() => buildCounts(searchedStaff), [searchedStaff]);
 
   const isFiltered = searchQuery.trim().length > 0 || activeDepartment !== "All";
-  const noMatchHint = isFiltered
+  const noMatchTitle = isFiltered ? "No matches" : "Nothing here yet";
+  const noMatchMessage = isFiltered
     ? "Nothing matches the current search and department filter."
-    : "Nothing has been published here yet.";
+    : "Items appear here once they are published.";
 
   return (
-    <div className="flex h-dvh flex-col bg-zinc-950">
+    <div className="flex h-dvh flex-col bg-[#F4F4F5] text-zinc-900">
       <PortalHeader activeView={activeView} onViewChange={handleViewChange} />
 
       <main className="flex min-h-0 flex-1 flex-col">
@@ -384,27 +518,38 @@ export default function OperationsHubPage() {
             getId={(bulletin) => bulletin.id}
             selectedId={selectedBulletin?.id ?? null}
             onSelect={setSelectedBulletinId}
-            listTitle="Notices"
+            listTitle="Bulletin Board"
             listSubtitle={`${filteredBulletins.length} of ${BULLETINS.length}`}
             renderListItem={(bulletin, isSelected) => (
               <BulletinRow bulletin={bulletin} isSelected={isSelected} />
             )}
-            toolbar={
-              <ViewToolbar
-                layout="list"
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                searchPlaceholder="Search notices…"
-                searchLabel="Search bulletins"
-                activeDepartment={activeDepartment}
-                onDepartmentChange={setActiveDepartment}
-                counts={bulletinCounts}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search notices"
+            searchLabel="Search bulletins"
+            activeDepartment={activeDepartment}
+            onDepartmentChange={setActiveDepartment}
+            counts={bulletinCounts}
+            detail={
+              selectedBulletin ? (
+                <BulletinDetail bulletin={selectedBulletin} onOpenArticle={openArticle} />
+              ) : null
+            }
+            detailLabel="Bulletin reader"
+            emptyListState={
+              <EmptyState
+                icon={<Megaphone size={14} strokeWidth={1.75} aria-hidden="true" />}
+                title={noMatchTitle}
+                message={noMatchMessage}
               />
             }
-            detail={selectedBulletin ? <BulletinDetail bulletin={selectedBulletin} /> : null}
-            detailLabel="Bulletin reader"
-            emptyListState={<EmptyState message={noMatchHint} />}
-            emptyDetailState={<EmptyState message="Select a notice to read it here." />}
+            emptyDetailState={
+              <EmptyState
+                icon={<Megaphone size={14} strokeWidth={1.75} aria-hidden="true" />}
+                title="No notice selected"
+                message="Choose a notice from the list to read it here."
+              />
+            }
           />
         ) : null}
 
@@ -414,33 +559,41 @@ export default function OperationsHubPage() {
             getId={(article) => article.id}
             selectedId={selectedArticle?.id ?? null}
             onSelect={setSelectedArticleId}
-            listTitle="Procedures"
+            listTitle="Knowledge Base"
             listSubtitle={`${filteredArticles.length} of ${KNOWLEDGE_ARTICLES.length}`}
             renderListItem={(article, isSelected) => (
               <ArticleRow article={article} isSelected={isSelected} />
             )}
-            toolbar={
-              <ViewToolbar
-                layout="list"
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                searchPlaceholder="Search procedures…"
-                searchLabel="Search standard operating procedures"
-                activeDepartment={activeDepartment}
-                onDepartmentChange={setActiveDepartment}
-                counts={articleCounts}
-              />
-            }
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search procedures"
+            searchLabel="Search standard operating procedures"
+            activeDepartment={activeDepartment}
+            onDepartmentChange={setActiveDepartment}
+            counts={articleCounts}
             detail={selectedArticle ? <ArticleDetail article={selectedArticle} /> : null}
             detailLabel="Procedure reader"
-            emptyListState={<EmptyState message={noMatchHint} />}
-            emptyDetailState={<EmptyState message="Select a procedure to read it here." />}
+            emptyListState={
+              <EmptyState
+                icon={<BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />}
+                title={noMatchTitle}
+                message={noMatchMessage}
+              />
+            }
+            emptyDetailState={
+              <EmptyState
+                icon={<BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />}
+                title="No procedure selected"
+                message="Choose a procedure from the list to read it here."
+              />
+            }
           />
         ) : null}
 
         {activeView === "directory" ? (
           <DirectoryGrid
             staff={filteredStaff}
+            totalCount={STAFF_DIRECTORY.length}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             activeDepartment={activeDepartment}

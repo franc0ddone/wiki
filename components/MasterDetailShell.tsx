@@ -1,21 +1,217 @@
 "use client";
 
+import { useEffect, useId, useRef, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search, X } from "lucide-react";
+import {
+  DEPARTMENT_FILTERS,
+  DEPARTMENT_LABELS,
+  type Department,
+  type DepartmentCounts,
+} from "@/types/portal";
 import { cx } from "@/lib/utils";
 
 /**
- * Responsive master/detail split.
+ * Responsive master/detail split with independently scrolling panes.
  *
- * Desktop (lg+): a fixed-width, internally scrolling list pane beside a
- * scrollable detail reader. Mobile: one column that shows the list until an item
- * is selected, then swaps to the detail with a back control.
+ * Desktop (lg+): a fixed-width rail (search, department chip track, list) beside
+ * a scrollable reading canvas. Mobile: the list shows until an item is
+ * selected, then the detail takes over with a back control.
  *
- * The shell is a flex child (`flex-1 min-h-0`) — give its parent a bounded
- * height (e.g. `h-dvh flex flex-col`) so both panes scroll internally. The
- * detail scroller carries `data-scroll-root`, which `MarkdownReader` uses to
- * anchor its table-of-contents scroll spy.
+ * The shell is a flex child (`flex-1 min-h-0`); its parent needs a bounded
+ * height (`h-dvh flex flex-col`) so both panes scroll internally. The detail
+ * scroller carries `data-scroll-root`, which `MarkdownReader` uses to anchor its
+ * table-of-contents scroll spy.
+ *
+ * `SearchField` and `DepartmentChipTrack` are exported so `DirectoryGrid`
+ * renders the exact same controls.
  */
+
+/* ------------------------------------------------------------ search field */
+
+const subscribeNoop = () => () => {};
+const readIsApple = () => /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+/** Server render and hydration both assume Apple; non-Apple clients re-render once. */
+const readIsAppleOnServer = () => true;
+
+function useIsApplePlatform(): boolean {
+  return useSyncExternalStore(subscribeNoop, readIsApple, readIsAppleOnServer);
+}
+
+export interface SearchFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  /** Accessible name for the input. */
+  label: string;
+  /** Bind Cmd+K / Ctrl+K to focus this field. Enable on one field per screen. */
+  enableShortcut?: boolean;
+  className?: string;
+}
+
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+  enableShortcut = true,
+  className,
+}: SearchFieldProps) {
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isApple = useIsApplePlatform();
+
+  useEffect(() => {
+    if (!enableShortcut) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
+      // Never steal focus from behind an open modal sheet.
+      if (document.querySelector("[aria-modal='true']")) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [enableShortcut]);
+
+  const hasValue = value.length > 0;
+
+  return (
+    <div className={cx("relative", className)}>
+      <label htmlFor={inputId} className="sr-only">
+        {label}
+      </label>
+      <Search
+        size={14}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"
+      />
+      <input
+        ref={inputRef}
+        id={inputId}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            if (hasValue) onChange("");
+            else event.currentTarget.blur();
+          }
+        }}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        className={cx(
+          "h-8 w-full rounded-lg border border-zinc-200/80 bg-white pl-8 text-[13px] text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
+          "placeholder:text-zinc-400 transition-[border-color,box-shadow]",
+          "focus:border-teal-600/40 focus:outline-none focus:ring-[3px] focus:ring-teal-600/15",
+          hasValue ? "pr-8" : enableShortcut ? "pr-12" : "pr-3",
+        )}
+      />
+      {hasValue ? (
+        <button
+          type="button"
+          onClick={() => {
+            onChange("");
+            inputRef.current?.focus();
+          }}
+          aria-label="Clear search"
+          className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-600 transition-colors hover:bg-zinc-300/80 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40"
+        >
+          <X size={11} strokeWidth={2.25} aria-hidden="true" />
+        </button>
+      ) : enableShortcut ? (
+        <kbd
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2 top-1/2 flex h-[18px] -translate-y-1/2 items-center rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-[10.5px] font-medium tracking-wide text-zinc-500"
+        >
+          {isApple ? "\u2318K" : "Ctrl K"}
+        </kbd>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------ department chips */
+
+export interface DepartmentChipTrackProps {
+  active: Department;
+  onChange: (department: Department) => void;
+  counts: DepartmentCounts;
+  /** Accessible name for the chip group. */
+  label?: string;
+  className?: string;
+}
+
+export function DepartmentChipTrack({
+  active,
+  onChange,
+  counts,
+  label = "Filter by department",
+  className,
+}: DepartmentChipTrackProps) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep the active chip in view when it changes (e.g. after a view reset).
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const chip = track.querySelector<HTMLElement>("[aria-pressed='true']");
+    if (!chip) return;
+    const chipLeft = chip.offsetLeft;
+    const chipRight = chipLeft + chip.offsetWidth;
+    if (chipLeft < track.scrollLeft || chipRight > track.scrollLeft + track.clientWidth) {
+      track.scrollTo({ left: Math.max(0, chipLeft - 12), behavior: "smooth" });
+    }
+  }, [active]);
+
+  return (
+    <div
+      ref={trackRef}
+      role="group"
+      aria-label={label}
+      className={cx("fade-x scrollbar-none -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5", className)}
+    >
+      {DEPARTMENT_FILTERS.map((department) => {
+        const isActive = department === active;
+        const count = counts[department] ?? 0;
+        const isEmpty = !isActive && count === 0;
+
+        return (
+          <button
+            key={department}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onChange(department)}
+            title={DEPARTMENT_LABELS[department]}
+            className={cx(
+              "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+              isActive
+                ? "border-teal-200 bg-teal-50 text-teal-800 shadow-[0_1px_2px_rgba(15,118,110,0.08)]"
+                : "border-zinc-200/80 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900",
+              isEmpty && "text-zinc-400",
+            )}
+          >
+            {department === "All" ? "All" : DEPARTMENT_LABELS[department]}
+            <span
+              className={cx(
+                "tabular-nums text-[11px]",
+                isActive ? "text-teal-700/70" : "text-zinc-400",
+              )}
+            >
+              {count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ shell */
 
 export interface MasterDetailShellProps<T> {
   items: readonly T[];
@@ -24,15 +220,22 @@ export interface MasterDetailShellProps<T> {
   selectedId: string | null;
   /** Called with `null` when the mobile back control clears the selection. */
   onSelect: (id: string | null) => void;
-  /** Inner content of the list row button. */
+  /** Inner content of a list row. The shell owns the row chrome and selection. */
   renderListItem: (item: T, isSelected: boolean) => ReactNode;
   /** Resolved detail content, or `null` when nothing is selected. */
   detail: ReactNode | null;
   listTitle: string;
-  /** Right-aligned count or summary in the list header, e.g. `"3 of 5"`. */
+  /** Right-aligned count in the rail header, e.g. `"3 of 5"`. */
   listSubtitle?: string;
-  /** Search / filter controls rendered directly under the list header. */
-  toolbar?: ReactNode;
+
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  searchLabel: string;
+  activeDepartment: Department;
+  onDepartmentChange: (department: Department) => void;
+  counts: DepartmentCounts;
+
   emptyListState: ReactNode;
   emptyDetailState: ReactNode;
   /** Accessible label for the detail region. */
@@ -49,46 +252,70 @@ export function MasterDetailShell<T>({
   detail,
   listTitle,
   listSubtitle,
-  toolbar,
+  searchQuery,
+  onSearchChange,
+  searchPlaceholder,
+  searchLabel,
+  activeDepartment,
+  onDepartmentChange,
+  counts,
   emptyListState,
   emptyDetailState,
   detailLabel,
   className,
 }: MasterDetailShellProps<T>) {
   const hasSelection = selectedId !== null;
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // A new selection starts reading from the top.
+  useEffect(() => {
+    detailScrollRef.current?.scrollTo({ top: 0 });
+  }, [selectedId]);
 
   return (
     <div
       className={cx(
-        "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(320px,364px)_minmax(0,1fr)]",
+        "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(320px,372px)_minmax(0,1fr)]",
         className,
       )}
     >
-      {/* Master pane */}
+      {/* Rail */}
       <aside
         aria-label={listTitle}
         className={cx(
-          "flex min-h-0 flex-col border-zinc-800 bg-zinc-950 lg:border-r",
+          "min-h-0 flex-1 flex-col border-zinc-200/80 bg-[#ECECEE]/70 lg:flex-none lg:border-r",
           hasSelection ? "hidden lg:flex" : "flex",
         )}
       >
-        <div className="shrink-0 border-b border-zinc-800 px-5 pb-4 pt-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              {listTitle}
-            </h2>
+        <div className="shrink-0 space-y-3 px-4 pb-3 pt-4">
+          <div className="flex items-baseline justify-between gap-3 px-0.5">
+            <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">{listTitle}</h2>
             {listSubtitle ? (
-              <span className="text-[11px] tabular-nums text-zinc-600">{listSubtitle}</span>
+              <span className="text-[11.5px] font-medium tabular-nums text-zinc-500">
+                {listSubtitle}
+              </span>
             ) : null}
           </div>
-          {toolbar ? <div className="mt-4">{toolbar}</div> : null}
+          <SearchField
+            value={searchQuery}
+            onChange={onSearchChange}
+            placeholder={searchPlaceholder}
+            label={searchLabel}
+          />
+          <DepartmentChipTrack
+            active={activeDepartment}
+            onChange={onDepartmentChange}
+            counts={counts}
+          />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="h-px shrink-0 bg-zinc-200/80" />
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
           {items.length === 0 ? (
-            <div className="p-5">{emptyListState}</div>
+            <div className="p-3">{emptyListState}</div>
           ) : (
-            <ul role="list" className="divide-y divide-zinc-800/60">
+            <ul role="list" className="space-y-0.5">
               {items.map((item) => {
                 const id = getId(item);
                 const isSelected = id === selectedId;
@@ -99,13 +326,20 @@ export function MasterDetailShell<T>({
                       onClick={() => onSelect(id)}
                       aria-current={isSelected ? "true" : undefined}
                       className={cx(
-                        "w-full px-5 py-4 text-left transition-colors",
-                        "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#5CBEB4]",
+                        "relative w-full overflow-hidden rounded-lg py-3 pl-4 pr-3 text-left transition-[background-color,box-shadow] duration-150",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
                         isSelected
-                          ? "bg-[#005953]/15 shadow-[inset_2px_0_0_0_#5CBEB4]"
-                          : "hover:bg-zinc-900/70",
+                          ? "bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(228,228,231,0.8)]"
+                          : "hover:bg-zinc-100/60",
                       )}
                     >
+                      <span
+                        aria-hidden="true"
+                        className={cx(
+                          "absolute inset-y-0 left-0 w-[3px] bg-[#0F766E] transition-opacity",
+                          isSelected ? "opacity-100" : "opacity-0",
+                        )}
+                      />
                       {renderListItem(item, isSelected)}
                     </button>
                   </li>
@@ -116,27 +350,28 @@ export function MasterDetailShell<T>({
         </div>
       </aside>
 
-      {/* Detail pane */}
+      {/* Reading canvas */}
       <section
         aria-label={detailLabel}
-        className={cx(
-          "min-h-0 flex-1 flex-col bg-zinc-950",
-          hasSelection ? "flex" : "hidden lg:flex",
-        )}
+        className={cx("min-h-0 flex-1 flex-col bg-[#F4F4F5]", hasSelection ? "flex" : "hidden lg:flex")}
       >
-        <div className="flex shrink-0 items-center border-b border-zinc-800 px-5 py-2.5 lg:hidden">
+        <div className="flex shrink-0 items-center border-b border-zinc-200/80 bg-white/80 px-3 py-2 backdrop-blur-md lg:hidden">
           <button
             type="button"
             onClick={() => onSelect(null)}
-            className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-[#5CBEB4]/40 hover:text-[#5CBEB4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5CBEB4]"
+            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
           >
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-            Back to {listTitle.toLowerCase()}
+            {listTitle}
           </button>
         </div>
 
-        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto">
-          {detail ?? <div className="p-8">{emptyDetailState}</div>}
+        <div ref={detailScrollRef} data-scroll-root className="min-h-0 flex-1 overflow-y-auto">
+          {detail ?? (
+            <div className="flex h-full min-h-[320px] items-center justify-center p-8">
+              {emptyDetailState}
+            </div>
+          )}
         </div>
       </section>
     </div>

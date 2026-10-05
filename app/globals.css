@@ -1,22 +1,48 @@
 @import "tailwindcss";
 
 /*
- * Dark studio theme for the Emergency Operations Hub.
+ * Operations Hub — "macOS Native Light" design system.
  *
- * Tailwind v4 — the `@theme` block registers brand tokens as utilities. The
- * components also use arbitrary hex values (`bg-[#005953]`), so they render
- * identically if you are still on Tailwind v3.
+ * Built for reading dense SOPs under fluorescent clinical lighting: a warm
+ * oyster canvas, crisp white panes, graphite ink, and a single petroleum-teal
+ * accent. Low glare, high legibility.
+ *
+ * Tailwind v4: `@theme` registers the tokens below as utilities
+ * (`bg-canvas`, `text-ink`, `border-hairline`, `bg-accent` ...). Components use
+ * stock `zinc-*` / `teal-*` utilities plus arbitrary hex values, so they render
+ * the same if the tokens are never referenced.
  */
 @theme {
-  --color-studio-bg: #09090b; /* zinc-950 */
-  --color-studio-surface: #18181b; /* zinc-900 */
-  --color-studio-border: #27272a; /* zinc-800 */
-  --color-brand: #005953;
-  --color-mint: #5cbeb4;
+  /* System type stack: SF Pro on Apple hardware, Segoe/Inter elsewhere. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI",
+    system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* Surfaces */
+  --color-canvas: #f4f4f5; /* zinc-100 — base canvas */
+  --color-pane: #ffffff; /* elevated panes and cards */
+  --color-rail: #ececee; /* rails and inactive panels */
+  --color-hairline: rgb(228 228 231 / 0.8); /* zinc-200/80 */
+
+  /* Ink */
+  --color-ink: #18181b; /* zinc-900 — primary */
+  --color-ink-secondary: #52525b; /* zinc-600 */
+  --color-ink-muted: #71717a; /* zinc-500 */
+
+  /* Accent */
+  --color-accent: #0f766e; /* petroleum teal */
+  --color-accent-deep: #005953;
+
+  /* Elevation */
+  --shadow-pane: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-popover: 0 12px 40px -12px rgba(24, 24, 27, 0.22), 0 2px 6px rgba(24, 24, 27, 0.06);
+  --shadow-sheet: -24px 0 60px -24px rgba(24, 24, 27, 0.28);
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -25,17 +51,19 @@ body {
 }
 
 body {
-  background-color: #09090b;
-  color: #e4e4e7;
-  font-feature-settings: "cv11", "ss01";
+  background-color: #f4f4f5;
+  color: #18181b;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01", "kern";
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background-color: rgba(0, 89, 83, 0.55);
-  color: #f4f4f5;
+  background-color: rgba(15, 118, 110, 0.16);
+  color: #18181b;
 }
 
 h1,
@@ -44,19 +72,22 @@ h3 {
   text-wrap: balance;
 }
 
-p {
+p,
+li {
   text-wrap: pretty;
 }
 
-/* Thin studio scrollbars inside the master/detail panes and the drawer. */
+/* ------------------------------------------------------------------ scroll */
+
+/* Hairline overlay-style scrollbars, the way macOS draws them in light mode. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: #d4d4d8 transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
 }
 
 *::-webkit-scrollbar-track {
@@ -64,20 +95,85 @@ p {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #3f3f46;
+  background-color: #d4d4d8;
   border: 3px solid transparent;
   border-radius: 9999px;
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #52525b;
+  background-color: #a1a1aa;
 }
 
-/* Strip the native search clear affordance; the toolbars render their own. */
-input[type="search"]::-webkit-search-cancel-button {
+/* Horizontal chip tracks scroll by touch / trackpad without a visible bar. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Soft edge fade on horizontally scrolling chip tracks. */
+.fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 20px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 20px),
+    transparent 100%
+  );
+}
+
+/* --------------------------------------------------------------- controls */
+
+/* Strip the native search clear affordance; the fields render their own. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* ------------------------------------------------------------------ motion */
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-popover-in {
+  transform-origin: top right;
+  animation: popover-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes presence-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.animate-presence {
+  animation: presence-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -86,5 +182,7 @@ input[type="search"]::-webkit-search-cancel-button {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }

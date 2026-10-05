@@ -1,0 +1,64 @@
+diff --git a/app/globals.css b/app/globals.css
+index 38ca728..02fc00a 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -1,7 +1,7 @@
+ @import "tailwindcss";
+ 
+ /*
+- * Dark studio theme for the Emergency Operations Hub.
++ * Dark studio theme for Dove Wiki.
+  *
+  * Tailwind v4 — the `@theme` block registers brand tokens as utilities. The
+  * components also use arbitrary hex values (`bg-[#005953]`), so they render
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 6b19cf6..4fab365 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
+ import "./globals.css";
+ 
+ export const metadata: Metadata = {
+-  title: "Operations Hub",
+-  description: "Internal bulletin board, knowledge base, and staff directory.",
++  title: "Dove Wiki",
++  description: "Dove Wiki — bulletin board, knowledge base, and staff directory for the emergency animal hospital.",
+ };
+ 
+ /**
+diff --git a/components/PortalHeader.tsx b/components/PortalHeader.tsx
+index f97aecd..936145c 100644
+--- a/components/PortalHeader.tsx
++++ b/components/PortalHeader.tsx
+@@ -14,9 +14,9 @@ import { cx } from "@/lib/utils";
+ export interface PortalHeaderProps {
+   activeView: PortalView;
+   onViewChange: (view: PortalView) => void;
+-  /** Institutional name shown as the primary title. */
++  /** Product name shown as the primary title. */
+   title?: string;
+-  /** Facility subtext under the title. */
++  /** Subtle facility / product subtext under the title. */
+   facilityName?: string;
+ }
+ 
+@@ -51,8 +51,8 @@ const VIEW_OPTIONS: readonly ViewOption[] = [
+ export function PortalHeader({
+   activeView,
+   onViewChange,
+-  title = "Operations Hub",
+-  facilityName = "Eastside Emergency Animal Hospital",
++  title = "Dove Wiki",
++  facilityName = "Clinical operations · Eastside Emergency Animal Hospital",
+ }: PortalHeaderProps) {
+   const [isOpen, setIsOpen] = useState(false);
+   const menuId = useId();
+@@ -103,7 +103,7 @@ export function PortalHeader({
+             <h1 className="truncate text-[15px] font-semibold tracking-tight text-zinc-50">
+               {title}
+             </h1>
+-            <p className="truncate text-xs text-zinc-500">{facilityName}</p>
++            <p className="truncate text-[11px] tracking-wide text-zinc-500">{facilityName}</p>
+           </div>
+         </div>
+ 

@@ -1,24 +1,43 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Info, Lightbulb, OctagonAlert, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import {
+  ClipboardList,
+  Info,
+  Lightbulb,
+  ListTree,
+  OctagonAlert,
+  Syringe,
+  TriangleAlert,
+} from "lucide-react";
 import { cx } from "@/lib/utils";
 
 /**
- * Dependency-free renderer for the clinical Markdown subset used by the portal.
+ * Reading surface for SOPs and bulletins: a floating white paper canvas with an
+ * auto-generated table of contents.
  *
- * Supported: `#`/`##`/`###` headings, paragraphs, ordered and unordered lists,
- * pipe tables, fenced code, horizontal rules, blockquotes, clinical callouts
- * (`> [!note|tip|warning|critical] body`), and inline bold / italic / code /
- * links.
+ * Dependency-free renderer for the clinical Markdown subset used by the portal:
+ * `#`/`##`/`###` headings, paragraphs, ordered and unordered lists, pipe tables,
+ * fenced code, horizontal rules, blockquotes, inline bold / italic / code /
+ * links, and clinical callouts:
+ *
+ *   > [!note]     general information           (teal)
+ *   > [!tip]      practical advice              (teal)
+ *   > [!dosing]   dosing / drug reference        (teal)
+ *   > [!protocol] mandatory protocol step        (teal)
+ *   > [!warning]  caution                       (amber)
+ *   > [!critical] patient-safety critical        (red)
  *
  * Everything is emitted as React children rather than raw HTML, so stored
- * markdown can never become injected markup. Tiptap takes over *authoring* in a
- * later phase; this stays the read-only path for stored bodies.
+ * markdown can never become injected markup.
+ *
+ * Table of contents: H2/H3 headings get stable ids. At `xl` and up the outline
+ * is a sticky right rail with scroll spy; below `xl` it collapses into jump
+ * links at the top of the paper.
  */
 
-type CalloutVariant = "note" | "tip" | "warning" | "critical";
+type CalloutVariant = "note" | "tip" | "dosing" | "protocol" | "warning" | "critical";
 
 type Block =
   | { kind: "heading"; level: 1 | 2 | 3; id: string; text: string }
@@ -55,6 +74,11 @@ function slugify(text: string): string {
     .slice(0, 64);
 }
 
+/** Heading text without inline markdown markers, for the outline. */
+function plainText(text: string): string {
+  return text.replace(/\*\*|`|\*/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+}
+
 function splitTableRow(line: string): string[] {
   return line
     .trim()
@@ -67,7 +91,9 @@ function splitTableRow(line: string): string[] {
 function normalizeVariant(raw: string): CalloutVariant {
   const value = raw.toLowerCase();
   if (value === "tip") return "tip";
-  if (value === "warning" || value === "warn") return "warning";
+  if (value === "dosing" || value === "dose" || value === "dosage") return "dosing";
+  if (value === "protocol" || value === "procedure") return "protocol";
+  if (value === "warning" || value === "warn" || value === "caution") return "warning";
   if (value === "critical" || value === "danger") return "critical";
   return "note";
 }
@@ -125,7 +151,11 @@ export function parseMarkdown(source: string): Block[] {
     }
 
     // Tables: a pipe row immediately followed by a `| --- |` divider.
-    if (TABLE_ROW_RE.test(line) && index + 1 < lines.length && TABLE_DIVIDER_RE.test(lines[index + 1])) {
+    if (
+      TABLE_ROW_RE.test(line) &&
+      index + 1 < lines.length &&
+      TABLE_DIVIDER_RE.test(lines[index + 1])
+    ) {
       const head = splitTableRow(line);
       index += 2;
       const rows: string[][] = [];
@@ -158,7 +188,7 @@ export function parseMarkdown(source: string): Block[] {
       const collected: string[] = [];
       while (index < lines.length) {
         const next = QUOTE_RE.exec(lines[index]);
-        if (!next) break;
+        if (!next || CALLOUT_RE.test(lines[index])) break;
         collected.push(next[1].trim());
         index += 1;
       }
@@ -200,20 +230,27 @@ export function parseMarkdown(source: string): Block[] {
       paragraph.push(current.trim());
       index += 1;
     }
-    blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+    if (paragraph.length > 0) {
+      blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+    } else {
+      // Defensive: never stall on a line no branch consumed.
+      index += 1;
+    }
   }
 
   return blocks;
 }
 
-/** Extract the heading outline used by the article table of contents. */
+/** Extract the H2/H3 outline used by the table of contents. */
 export function extractToc(blocks: readonly Block[]): TocEntry[] {
   return blocks.flatMap((block) =>
     block.kind === "heading" && (block.level === 2 || block.level === 3)
-      ? [{ id: block.id, text: block.text, level: block.level }]
+      ? [{ id: block.id, text: plainText(block.text), level: block.level }]
       : [],
   );
 }
+
+/* ------------------------------------------------------------------ inline */
 
 const INLINE_RE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*[^*\n]+\*)/g;
 
@@ -221,24 +258,24 @@ const INLINE_RE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*[^*\n]+\*)/g;
 function safeHref(href: string): string | undefined {
   const value = href.trim();
   if (/^(https?:|mailto:|tel:)/i.test(value)) return value;
-  if (value.startsWith("/")) return value;
+  if (value.startsWith("/") || value.startsWith("#")) return value;
   return undefined;
 }
 
 function renderInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
+  const pattern = new RegExp(INLINE_RE.source, "g");
   let cursor = 0;
   let key = 0;
   let match: RegExpExecArray | null;
 
-  INLINE_RE.lastIndex = 0;
-  while ((match = INLINE_RE.exec(text)) !== null) {
+  while ((match = pattern.exec(text)) !== null) {
     if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
 
     const token = match[0];
     if (token.startsWith("**")) {
       nodes.push(
-        <strong key={`i${key++}`} className="font-semibold text-zinc-100">
+        <strong key={`i${key++}`} className="font-semibold text-zinc-900">
           {token.slice(2, -2)}
         </strong>,
       );
@@ -246,7 +283,7 @@ function renderInline(text: string): ReactNode[] {
       nodes.push(
         <code
           key={`i${key++}`}
-          className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[0.85em] text-[#5CBEB4]"
+          className="rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 py-px font-mono text-[0.84em] font-medium text-teal-800"
         >
           {token.slice(1, -1)}
         </code>,
@@ -260,7 +297,7 @@ function renderInline(text: string): ReactNode[] {
           <a
             key={`i${key++}`}
             href={href}
-            className="text-[#5CBEB4] underline decoration-[#5CBEB4]/30 underline-offset-2 transition-colors hover:decoration-[#5CBEB4]"
+            className="font-medium text-[#0F766E] underline decoration-teal-600/30 underline-offset-[3px] transition-colors hover:decoration-teal-600"
           >
             {label}
           </a>
@@ -270,7 +307,7 @@ function renderInline(text: string): ReactNode[] {
       );
     } else {
       nodes.push(
-        <em key={`i${key++}`} className="italic text-zinc-200">
+        <em key={`i${key++}`} className="italic text-zinc-800">
           {token.slice(1, -1)}
         </em>,
       );
@@ -283,38 +320,59 @@ function renderInline(text: string): ReactNode[] {
   return nodes;
 }
 
+/* ---------------------------------------------------------------- callouts */
+
 const CALLOUT_STYLES: Record<
   CalloutVariant,
-  { wrap: string; label: string; icon: ReactNode }
+  { title: string; wrap: string; label: string; body: string; icon: ReactNode }
 > = {
   note: {
-    wrap: "border-[#5CBEB4]/30 bg-[#005953]/12",
-    label: "text-[#5CBEB4]",
+    title: "Note",
+    wrap: "border-teal-200 bg-teal-50/70",
+    label: "text-teal-800",
+    body: "text-teal-950/85",
     icon: <Info size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   tip: {
-    wrap: "border-[#5CBEB4]/30 bg-[#005953]/12",
-    label: "text-[#5CBEB4]",
+    title: "Tip",
+    wrap: "border-teal-200 bg-teal-50/70",
+    label: "text-teal-800",
+    body: "text-teal-950/85",
     icon: <Lightbulb size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
+  dosing: {
+    title: "Dosing",
+    wrap: "border-teal-200 bg-teal-50/70",
+    label: "text-teal-800",
+    body: "text-teal-950/85",
+    icon: <Syringe size={14} strokeWidth={1.75} aria-hidden="true" />,
+  },
+  protocol: {
+    title: "Protocol",
+    wrap: "border-teal-200 bg-teal-50/70",
+    label: "text-teal-800",
+    body: "text-teal-950/85",
+    icon: <ClipboardList size={14} strokeWidth={1.75} aria-hidden="true" />,
+  },
   warning: {
-    wrap: "border-amber-900/70 bg-amber-950/25",
-    label: "text-amber-400",
+    title: "Warning",
+    wrap: "border-amber-200 bg-amber-50/80",
+    label: "text-amber-800",
+    body: "text-amber-950/85",
     icon: <TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   critical: {
-    wrap: "border-red-900/70 bg-red-950/25",
-    label: "text-red-400",
+    title: "Critical",
+    wrap: "border-red-200 bg-red-50/80",
+    label: "text-red-700",
+    body: "text-red-950/85",
     icon: <OctagonAlert size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
 };
 
-const CALLOUT_TITLES: Record<CalloutVariant, string> = {
-  note: "Note",
-  tip: "Tip",
-  warning: "Warning",
-  critical: "Critical",
-};
+/* ------------------------------------------------------------------ blocks */
+
+const BODY_TEXT = "text-[15.5px] leading-relaxed text-zinc-800";
 
 function renderBlock(block: Block, key: number): ReactNode {
   switch (block.kind) {
@@ -325,7 +383,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           <h1
             key={key}
             {...anchor}
-            className="scroll-mt-8 text-2xl font-semibold tracking-tight text-zinc-50 sm:text-[1.75rem]"
+            className="scroll-mt-6 text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-zinc-900"
           >
             {renderInline(block.text)}
           </h1>
@@ -336,7 +394,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           <h2
             key={key}
             {...anchor}
-            className="scroll-mt-8 border-t border-zinc-800 pt-7 text-lg font-semibold tracking-tight text-zinc-50 first:border-t-0 first:pt-0 sm:text-xl"
+            className="scroll-mt-6 border-t border-zinc-100 pt-8 text-[1.3rem] font-semibold leading-snug tracking-[-0.015em] text-zinc-900 first:border-t-0 first:pt-0"
           >
             {renderInline(block.text)}
           </h2>
@@ -346,7 +404,7 @@ function renderBlock(block: Block, key: number): ReactNode {
         <h3
           key={key}
           {...anchor}
-          className="scroll-mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5CBEB4]/80"
+          className="scroll-mt-6 pt-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em] text-zinc-900"
         >
           {renderInline(block.text)}
         </h3>
@@ -355,7 +413,7 @@ function renderBlock(block: Block, key: number): ReactNode {
 
     case "paragraph":
       return (
-        <p key={key} className="text-[15px] leading-7 text-zinc-300">
+        <p key={key} className={BODY_TEXT}>
           {renderInline(block.text)}
         </p>
       );
@@ -363,11 +421,14 @@ function renderBlock(block: Block, key: number): ReactNode {
     case "list": {
       if (block.ordered) {
         return (
-          <ol key={key} className="space-y-2.5 pl-6">
+          <ol key={key} className="space-y-2 pl-6">
             {block.items.map((item, itemIndex) => (
               <li
                 key={itemIndex}
-                className="list-decimal pl-1 text-[15px] leading-7 text-zinc-300 marker:font-medium marker:text-[#5CBEB4]/70"
+                className={cx(
+                  "list-decimal pl-1.5 marker:text-[13px] marker:font-semibold marker:text-teal-700",
+                  BODY_TEXT,
+                )}
               >
                 {renderInline(item)}
               </li>
@@ -376,12 +437,9 @@ function renderBlock(block: Block, key: number): ReactNode {
         );
       }
       return (
-        <ul key={key} className="space-y-2.5 pl-6">
+        <ul key={key} className="space-y-2 pl-6">
           {block.items.map((item, itemIndex) => (
-            <li
-              key={itemIndex}
-              className="list-disc pl-1 text-[15px] leading-7 text-zinc-300 marker:text-[#5CBEB4]/60"
-            >
+            <li key={itemIndex} className={cx("list-disc pl-1.5 marker:text-teal-600/70", BODY_TEXT)}>
               {renderInline(item)}
             </li>
           ))}
@@ -391,33 +449,33 @@ function renderBlock(block: Block, key: number): ReactNode {
 
     case "table":
       return (
-        <div key={key} className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full border-collapse text-left text-sm">
+        <div
+          key={key}
+          className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+        >
+          <table className="w-full border-collapse text-left text-[13.5px]">
             <thead>
-              <tr className="bg-zinc-900/80">
+              <tr className="bg-zinc-50">
                 {block.head.map((cell, cellIndex) => (
                   <th
                     key={cellIndex}
                     scope="col"
-                    className="border-b border-zinc-800 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-400"
+                    className="whitespace-nowrap border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500"
                   >
                     {renderInline(cell)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-zinc-100">
               {block.rows.map((row, rowIndex) => (
-                <tr
-                  key={rowIndex}
-                  className="border-b border-zinc-800/70 last:border-b-0 odd:bg-zinc-950 even:bg-zinc-900/30"
-                >
+                <tr key={rowIndex} className="transition-colors hover:bg-zinc-50/70">
                   {row.map((cell, cellIndex) => (
                     <td
                       key={cellIndex}
                       className={cx(
                         "px-4 py-2.5 align-top leading-6",
-                        cellIndex === 0 ? "font-medium text-zinc-100" : "text-zinc-300",
+                        cellIndex === 0 ? "font-medium text-zinc-900" : "text-zinc-700",
                       )}
                     >
                       {renderInline(cell)}
@@ -433,18 +491,25 @@ function renderBlock(block: Block, key: number): ReactNode {
     case "callout": {
       const style = CALLOUT_STYLES[block.variant];
       return (
-        <div key={key} className={cx("rounded-lg border px-4 py-3.5", style.wrap)}>
+        <aside
+          key={key}
+          role="note"
+          aria-label={style.title}
+          className={cx("rounded-xl border px-4 py-3.5", style.wrap)}
+        >
           <p
             className={cx(
-              "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]",
+              "flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.07em]",
               style.label,
             )}
           >
             {style.icon}
-            {CALLOUT_TITLES[block.variant]}
+            {style.title}
           </p>
-          <p className="mt-2 text-[15px] leading-7 text-zinc-200">{renderInline(block.text)}</p>
-        </div>
+          <p className={cx("mt-1.5 text-[15px] leading-relaxed", style.body)}>
+            {renderInline(block.text)}
+          </p>
+        </aside>
       );
     }
 
@@ -452,7 +517,7 @@ function renderBlock(block: Block, key: number): ReactNode {
       return (
         <blockquote
           key={key}
-          className="border-l border-zinc-700 pl-4 text-[15px] italic leading-7 text-zinc-400"
+          className="border-l-2 border-zinc-200 pl-4 text-[15.5px] italic leading-relaxed text-zinc-600"
         >
           {renderInline(block.text)}
         </blockquote>
@@ -462,40 +527,50 @@ function renderBlock(block: Block, key: number): ReactNode {
       return (
         <pre
           key={key}
-          className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 font-mono text-xs leading-6 text-zinc-300"
+          className="overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 font-mono text-[12.5px] leading-6 text-zinc-800"
         >
           <code>{block.text}</code>
         </pre>
       );
 
     case "rule":
-      return <hr key={key} className="border-zinc-800" />;
+      return <hr key={key} className="border-zinc-100" />;
 
     default:
       return null;
   }
 }
 
+/* ------------------------------------------------------------------ reader */
+
 export interface MarkdownReaderProps {
   source: string;
-  className?: string;
-  /** Render the sticky "On this page" rail beside the article (lg and up). */
+  /** Title / metadata rendered inside the paper, above the body. */
+  header?: ReactNode;
+  /** Content rendered inside the paper, below the body. */
+  footer?: ReactNode;
+  /** Build the outline from H2/H3 headings. Shown only when there are 2+ entries. */
   showTableOfContents?: boolean;
+  className?: string;
 }
 
 export function MarkdownReader({
   source,
+  header,
+  footer,
+  showTableOfContents = true,
   className,
-  showTableOfContents = false,
 }: MarkdownReaderProps) {
   const blocks = useMemo(() => parseMarkdown(source), [source]);
   const toc = useMemo(() => extractToc(blocks), [blocks]);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [spyId, setSpyId] = useState<string | null>(null);
 
-  const hasToc = showTableOfContents && toc.length > 0;
+  const hasToc = showTableOfContents && toc.length >= 2;
+  const activeId = spyId && toc.some((entry) => entry.id === spyId) ? spyId : (toc[0]?.id ?? null);
 
-  // Scroll-spy: highlight the heading currently nearest the top of the reader.
+  // Scroll spy, driven by the nearest `[data-scroll-root]` scroller rather than
+  // the viewport (an IntersectionObserver would observe the wrong root).
   useEffect(() => {
     if (!hasToc) return;
     const root = rootRef.current;
@@ -504,52 +579,99 @@ export function MarkdownReader({
     const scrollRoot = root.closest("[data-scroll-root]");
     const target: HTMLElement | Window = scrollRoot instanceof HTMLElement ? scrollRoot : window;
 
+    let frame = 0;
     const update = () => {
-      const headings = root.querySelectorAll<HTMLElement>("[data-heading-id]");
-      if (headings.length === 0) return;
-      const top = scrollRoot instanceof HTMLElement ? scrollRoot.getBoundingClientRect().top : 0;
-      let current = headings[0].dataset.headingId ?? null;
-      headings.forEach((heading) => {
-        if (heading.getBoundingClientRect().top - top <= 96) {
-          current = heading.dataset.headingId ?? current;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const headings = root.querySelectorAll<HTMLElement>("article [data-heading-id]");
+        if (headings.length === 0) return;
+        const top = scrollRoot instanceof HTMLElement ? scrollRoot.getBoundingClientRect().top : 0;
+        let current = headings[0]?.dataset.headingId ?? null;
+        headings.forEach((heading) => {
+          if (heading.getBoundingClientRect().top - top <= 120) {
+            current = heading.dataset.headingId ?? current;
+          }
+        });
+        // At the very bottom, the last heading wins even if it never reaches the line.
+        if (scrollRoot instanceof HTMLElement) {
+          const atBottom =
+            scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 4;
+          if (atBottom) current = headings[headings.length - 1]?.dataset.headingId ?? current;
         }
+        setSpyId(current);
       });
-      setActiveId(current);
     };
 
     update();
     target.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
     return () => {
+      cancelAnimationFrame(frame);
       target.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
   }, [hasToc, source]);
 
   const jumpTo = useCallback((id: string) => {
-    const node = document.getElementById(id);
+    const node = rootRef.current?.querySelector<HTMLElement>(`[data-heading-id='${id}']`);
     if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
-    setActiveId(id);
+    setSpyId(id);
   }, []);
 
   return (
     <div
       ref={rootRef}
       className={cx(
-        hasToc && "lg:grid lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start lg:gap-12",
+        "w-full",
+        hasToc && "xl:grid xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:items-start xl:gap-10",
+        className,
       )}
     >
-      <div className={cx("space-y-5", className)}>
-        {blocks.map((block, index) => renderBlock(block, index))}
-      </div>
+      <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm md:p-12">
+        {header ? <header className="mb-8 border-b border-zinc-100 pb-7">{header}</header> : null}
+
+        {hasToc ? (
+          <nav
+            aria-label="Jump to section"
+            className="mb-8 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3 xl:hidden"
+          >
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+              <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
+              On this page
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-x-1 gap-y-1">
+              {toc
+                .filter((entry) => entry.level === 2)
+                .map((entry) => (
+                  <li key={entry.id}>
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(entry.id)}
+                      className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                    >
+                      {entry.text}
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </nav>
+        ) : null}
+
+        <div className="max-w-[46rem] space-y-5">
+          {blocks.map((block, index) => renderBlock(block, index))}
+        </div>
+
+        {footer ? <footer className="mt-10">{footer}</footer> : null}
+      </article>
 
       {hasToc ? (
-        <aside className="hidden lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-10rem)] lg:overflow-y-auto">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        <aside className="hidden xl:sticky xl:top-8 xl:block xl:max-h-[calc(100dvh-8rem)] xl:overflow-y-auto">
+          <p className="flex items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+            <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
             On this page
           </p>
-          <nav className="mt-3 border-l border-zinc-800" aria-label="Article sections">
-            <ul className="space-y-1">
+          <nav className="mt-3" aria-label="Article sections">
+            <ul className="space-y-px border-l border-zinc-200">
               {toc.map((entry) => {
                 const isActive = entry.id === activeId;
                 return (
@@ -557,14 +679,14 @@ export function MarkdownReader({
                     <button
                       type="button"
                       onClick={() => jumpTo(entry.id)}
-                      aria-current={isActive ? "true" : undefined}
+                      aria-current={isActive ? "location" : undefined}
                       className={cx(
-                        "-ml-px block w-full border-l py-1 pr-2 text-left text-xs leading-5 transition-colors",
+                        "-ml-px block w-full border-l-2 py-1.5 pr-2 text-left text-[12.5px] leading-5 transition-colors",
                         entry.level === 3 ? "pl-6" : "pl-3",
-                        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5CBEB4]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
                         isActive
-                          ? "border-[#5CBEB4] font-medium text-[#5CBEB4]"
-                          : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300",
+                          ? "border-[#0F766E] font-medium text-teal-800"
+                          : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900",
                       )}
                     >
                       {entry.text}
