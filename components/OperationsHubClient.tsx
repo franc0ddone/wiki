@@ -1,23 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   ArrowUpRight,
   BookOpen,
   CalendarDays,
   FileText,
+  History,
   Info,
   Megaphone,
   PenLine,
+  Pencil,
   Pin,
+  Plus,
   TriangleAlert,
 } from "lucide-react";
+import { CommandPalette } from "@/components/CommandPalette";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { PortalHeader } from "@/components/PortalHeader";
-import { matchesDepartment, matchesQuery } from "@/lib/data/filters";
+import { ReferencedBy } from "@/components/ReferencedBy";
+import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
+import { matchesDepartment } from "@/lib/data/filters";
+import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
+import { roleAtLeast, type Role } from "@/lib/roles";
+import { buildSearchIndex, searchSurface } from "@/lib/search";
+import type { SearchHit, SearchSurface } from "@/lib/search";
 import { FACILITY_TIME_ZONE, cx, formatDate, formatDateTime } from "@/lib/utils";
 import {
   CLINICAL_DEPARTMENTS,
@@ -39,15 +50,23 @@ import {
  * `lib/data/*`) and handed in as props; everything interactive — view
  * switching, search, department filtering, list/detail selection, the
  * personnel drawer — lives here so the page itself can stay a server
- * component. Client-side filtering keeps the phase-1 matching behaviour
- * exactly (`matchesQuery` / `matchesDepartment`); the search upgrade is a
- * later pass.
+ * component.
+ *
+ * Search is client-side over those same props (`lib/search`): one Fuse index
+ * per surface, built once per dataset. The per-view fields and the global
+ * command palette (`Ctrl/Cmd+K`) share it, so they agree on typo tolerance
+ * and clinical synonyms. Department filtering (`matchesDepartment`) is
+ * unchanged.
  */
 
 export interface OperationsHubClientProps {
   articles: readonly KnowledgeArticle[];
   bulletins: readonly Bulletin[];
   staff: readonly StaffMember[];
+  /** The signed-in user's role; `null` when there is no session. Gates edit affordances only (the API enforces it regardless). */
+  viewerRole?: Role | null;
+  /** Open this procedure on load (`/procedures/<slug>` redirects here). */
+  initialArticleSlug?: string | null;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -94,6 +113,7 @@ function excerpt(markdown: string, max = 150): string {
   const plain = paragraph
     .replace(/\*\*|`|\*/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
   return plain.length > max ? `${plain.slice(0, max).trimEnd()}...` : plain;
@@ -152,21 +172,24 @@ function PriorityBadge({ priority }: { priority: BulletinPriority }) {
 }
 
 function StatusBadge({ status }: { status: KnowledgeArticle["status"] }) {
+  if (status === "published") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-px text-xs font-semibold text-zinc-600">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#0F766E]" />
+        Published
+      </span>
+    );
+  }
   const isDraft = status === "draft";
   return (
     <span
       className={cx(
         "inline-flex items-center gap-1.5 rounded-full border px-2 py-px text-xs font-semibold",
-        isDraft
-          ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-zinc-200 bg-zinc-50 text-zinc-600",
+        isDraft ? "border-amber-200 bg-amber-50 text-amber-800" : "border-sky-200 bg-sky-50 text-sky-800",
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cx("h-1.5 w-1.5 rounded-full", isDraft ? "bg-amber-500" : "bg-[#0F766E]")}
-      />
-      {isDraft ? "Draft" : "Published"}
+      <span aria-hidden="true" className={cx("h-1.5 w-1.5 rounded-full", isDraft ? "bg-amber-500" : "bg-sky-500")} />
+      {isDraft ? "Draft" : "In review"}
     </span>
   );
 }
@@ -282,7 +305,7 @@ function ArticleRow({ article, isSelected }: { article: KnowledgeArticle; isSele
         {excerpt(article.body_markdown)}
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-1">
-        {article.status === "draft" ? <StatusBadge status="draft" /> : null}
+        {article.status !== "published" ? <StatusBadge status={article.status} /> : null}
         <DepartmentTags departments={article.departments} />
       </span>
     </span>
@@ -295,16 +318,50 @@ function DetailFrame({ children }: { children: ReactNode }) {
   return <div className="mx-auto w-full max-w-[72rem] px-4 py-6 sm:px-6 md:px-8 md:py-10">{children}</div>;
 }
 
-function ArticleDetail({ article }: { article: KnowledgeArticle }) {
+function ArticleDetail({
+  article,
+  canEdit,
+  onOpenHistory,
+  onOpenArticleBySlug,
+  onOpenBulletin,
+}: {
+  article: KnowledgeArticle;
+  canEdit: boolean;
+  onOpenHistory: () => void;
+  onOpenArticleBySlug: (slug: string, anchor?: string) => void;
+  onOpenBulletin: (id: string) => void;
+}) {
   return (
     <DetailFrame>
       <MarkdownReader
         source={article.body_markdown}
+        onOpenArticle={onOpenArticleBySlug}
         header={
           <>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <StatusBadge status={article.status} />
-              <DepartmentTags departments={article.departments} />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge status={article.status} />
+                <DepartmentTags departments={article.departments} />
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 print:hidden">
+                <button
+                  type="button"
+                  onClick={onOpenHistory}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                >
+                  <History size={14} strokeWidth={1.75} aria-hidden="true" />
+                  History
+                </button>
+                {canEdit ? (
+                  <Link
+                    href={`/articles/${encodeURIComponent(article.slug)}/edit`}
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1"
+                  >
+                    <Pencil size={13} strokeWidth={2} aria-hidden="true" />
+                    Edit
+                  </Link>
+                ) : null}
+              </div>
             </div>
             <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.15] tracking-tight text-zinc-900 md:text-[2.2rem]">
               {article.title}
@@ -323,25 +380,33 @@ function ArticleDetail({ article }: { article: KnowledgeArticle }) {
           </>
         }
         footer={
-          article.status === "draft" ? (
-            <aside
-              role="note"
-              className="flex gap-3 rounded-[10px] border border-amber-200 bg-amber-50/80 px-4 py-3.5 text-[13.5px] leading-relaxed text-amber-900"
-            >
-              <TriangleAlert
-                size={14}
-                strokeWidth={1.75}
-                aria-hidden="true"
-                className="mt-[3px] shrink-0 text-amber-700"
+          <div className="space-y-6">
+            {article.status !== "published" ? (
+              <aside
+                role="note"
+                className="flex gap-3 rounded-[10px] border border-amber-200 bg-amber-50/80 px-4 py-3.5 text-[13.5px] leading-relaxed text-amber-900"
+              >
+                <TriangleAlert
+                  size={14}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                  className="mt-[3px] shrink-0 text-amber-700"
+                />
+                {article.status === "draft"
+                  ? "This procedure is a draft and is not in force. Do not follow it for patient care until the clinical leads publish it."
+                  : "This procedure is awaiting clinical review and is not in force. Do not follow it for patient care until a clinical lead publishes it."}
+              </aside>
+            ) : null}
+            <div className="border-t border-zinc-200 pt-6">
+              <ReferencedBy
+                key={article.slug}
+                slug={article.slug}
+                onOpenArticleBySlug={onOpenArticleBySlug}
+                onOpenBulletin={onOpenBulletin}
               />
-              This procedure is a draft and is not in force. Do not follow it for patient care until
-              the clinical leads publish it.
-            </aside>
-          ) : (
-            <p className="border-t border-zinc-200 pt-6 font-mono text-xs text-zinc-400">
-              {article.slug}
-            </p>
-          )
+            </div>
+            <p className="font-mono text-xs text-zinc-400">{article.slug}</p>
+          </div>
         }
       />
     </DetailFrame>
@@ -352,10 +417,12 @@ function BulletinDetail({
   bulletin,
   articles,
   onOpenArticle,
+  onOpenArticleBySlug,
 }: {
   bulletin: Bulletin;
   articles: readonly KnowledgeArticle[];
   onOpenArticle: (articleId: string) => void;
+  onOpenArticleBySlug: (slug: string, anchor?: string) => void;
 }) {
   const linkedArticle = findLinkedArticle(bulletin, articles);
 
@@ -363,6 +430,7 @@ function BulletinDetail({
     <DetailFrame>
       <MarkdownReader
         source={bulletin.body_markdown}
+        onOpenArticle={onOpenArticleBySlug}
         header={
           <>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -424,14 +492,47 @@ function BulletinDetail({
 
 /* --------------------------------------------------------------------- page */
 
-export function OperationsHubClient({ articles, bulletins, staff }: OperationsHubClientProps) {
-  const [activeView, setActiveView] = useState<PortalView>("bulletins");
+/** Items in relevance order when a search is active; the dataset's own order otherwise. */
+function rankBy<T extends { id: string }>(items: readonly T[], order: readonly string[] | null): readonly T[] {
+  if (order === null) return items;
+  const byId = new Map(items.map((item) => [item.id, item]));
+  return order.flatMap((id) => {
+    const item = byId.get(id);
+    return item ? [item] : [];
+  });
+}
+
+const SEARCH_DEBOUNCE_MS = 150;
+
+export function OperationsHubClient({
+  articles,
+  bulletins,
+  staff,
+  viewerRole = null,
+  initialArticleSlug = null,
+}: OperationsHubClientProps) {
+  const [activeView, setActiveView] = useState<PortalView>(() =>
+    initialArticleSlug && articles.some((article) => article.slug === initialArticleSlug)
+      ? "knowledge"
+      : "bulletins",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [activeDepartment, setActiveDepartment] = useState<Department>("All");
-  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
+    () => articles.find((article) => article.slug === initialArticleSlug)?.id ?? null,
+  );
   const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(
     bulletins[0]?.id ?? null,
   );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [personRequest, setPersonRequest] = useState<{ memberId: string; nonce: number } | null>(null);
+  const pendingAnchor = useRef<string | null>(null);
+
+  const isAuthor = viewerRole !== null && roleAtLeast(viewerRole, "author");
+  /** A published procedure is changed by republishing it, which only a clinical lead may do. */
+  const canEditArticle = (article: KnowledgeArticle) =>
+    isAuthor && (article.status !== "published" || (viewerRole !== null && roleAtLeast(viewerRole, "clinical_lead")));
 
   const handleViewChange = (view: PortalView) => {
     setActiveView(view);
@@ -444,18 +545,66 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
     setSelectedArticleId(articleId);
   };
 
+  const openBulletin = (bulletinId: string) => {
+    handleViewChange("bulletins");
+    setSelectedBulletinId(bulletinId);
+  };
+
+  const openPerson = (memberId: string) => {
+    handleViewChange("directory");
+    setPersonRequest({ memberId, nonce: Date.now() });
+  };
+
+  /** Follow an in-article `/procedures/<slug>#anchor` link without leaving the portal. */
+  const openArticleBySlug = useCallback(
+    (slug: string, anchor?: string): boolean => {
+      const target = articles.find((article) => article.slug === slug);
+      if (!target) return false; // unknown slug: let the browser handle the link
+      pendingAnchor.current = anchor ?? null;
+      setActiveView("knowledge");
+      setSearchQuery("");
+      setActiveDepartment("All");
+      setSelectedArticleId(target.id);
+      return true;
+    },
+    [articles],
+  );
+
+  // After an in-app link switches articles, bring the linked section into view.
+  // Runs after the shell's own "new selection starts at the top" effect.
+  useEffect(() => {
+    const anchor = pendingAnchor.current;
+    if (!anchor) return;
+    pendingAnchor.current = null;
+    let node: HTMLElement | null = document.getElementById(anchor);
+    node?.scrollIntoView({ block: "start" });
+    while (node) {
+      const details: HTMLElement | null = node.closest("details");
+      if (!details) break;
+      (details as HTMLDetailsElement).open = true;
+      node = details.parentElement;
+    }
+  }, [selectedArticleId, activeView]);
+
+  const handleOpenResult = (hit: SearchHit) => {
+    if (hit.surface === "articles") openArticle(hit.id);
+    else if (hit.surface === "bulletins") openBulletin(hit.id);
+    else openPerson(hit.id);
+  };
+
+  /* Search: one index per dataset, shared by the palette and the per-view fields. */
+  const searchIndex = useMemo(
+    () => buildSearchIndex(articles, bulletins, staff),
+    [articles, bulletins, staff],
+  );
+  const debouncedQuery = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS);
+  // Clearing the field must restore the full list immediately, not 150 ms later.
+  const effectiveQuery = searchQuery.trim().length === 0 ? "" : debouncedQuery;
+
   /* Bulletin board */
   const searchedBulletins = useMemo(
-    () =>
-      bulletins.filter((bulletin) =>
-        matchesQuery(searchQuery, [
-          bulletin.title,
-          bulletin.body_markdown,
-          bulletin.author_name,
-          bulletin.priority,
-        ]),
-      ),
-    [bulletins, searchQuery],
+    () => rankBy(bulletins, searchSurface(searchIndex, "bulletins", effectiveQuery)),
+    [bulletins, searchIndex, effectiveQuery],
   );
   const filteredBulletins = useMemo(
     () =>
@@ -472,16 +621,8 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
 
   /* Knowledge base */
   const searchedArticles = useMemo(
-    () =>
-      articles.filter((article) =>
-        matchesQuery(searchQuery, [
-          article.title,
-          article.slug,
-          article.body_markdown,
-          article.author_name,
-        ]),
-      ),
-    [articles, searchQuery],
+    () => rankBy(articles, searchSurface(searchIndex, "articles", effectiveQuery)),
+    [articles, searchIndex, effectiveQuery],
   );
   const filteredArticles = useMemo(
     () => searchedArticles.filter((article) => matchesDepartment(article.departments, activeDepartment)),
@@ -495,19 +636,8 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
 
   /* Staff directory */
   const searchedStaff = useMemo(
-    () =>
-      staff.filter((member) =>
-        matchesQuery(searchQuery, [
-          member.full_name,
-          member.preferred_name,
-          member.pronouns,
-          member.title,
-          member.email,
-          member.phone_extension,
-          member.system_id,
-        ]),
-      ),
-    [staff, searchQuery],
+    () => rankBy(staff, searchSurface(searchIndex, "staff", effectiveQuery)),
+    [staff, searchIndex, effectiveQuery],
   );
   const filteredStaff = useMemo(
     () => searchedStaff.filter((member) => matchesDepartment(member.departments, activeDepartment)),
@@ -515,17 +645,32 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
   );
   const staffCounts = useMemo(() => buildCounts(searchedStaff), [searchedStaff]);
 
+  // Dead-search telemetry: one fire-and-forget log per settled query (>= 3 chars).
+  const activeSurface: SearchSurface =
+    activeView === "bulletins" ? "bulletins" : activeView === "knowledge" ? "articles" : "staff";
+  const activeResultCount =
+    activeView === "bulletins"
+      ? searchedBulletins.length
+      : activeView === "knowledge"
+        ? searchedArticles.length
+        : searchedStaff.length;
+  useSettledSearchLog(effectiveQuery, activeResultCount, activeSurface);
+
   const isFiltered = searchQuery.trim().length > 0 || activeDepartment !== "All";
   const noMatchTitle = isFiltered ? "No matches" : "Nothing here yet";
   const noMatchMessage = isFiltered
-    ? "Nothing matches the current search and department filter."
+    ? "Nothing matches the current search and department filter. Try fewer words, or an abbreviation."
     : "Items appear here once they are published.";
 
   return (
-    <div className="flex h-dvh flex-col bg-[#F4F4F5] text-zinc-900">
-      <PortalHeader activeView={activeView} onViewChange={handleViewChange} />
+    <div className="flex h-dvh flex-col bg-[#F4F4F5] text-zinc-900 print:block print:h-auto">
+      <PortalHeader
+        activeView={activeView}
+        onViewChange={handleViewChange}
+        onOpenSearch={() => setPaletteOpen(true)}
+      />
 
-      <main className="flex min-h-0 flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col print:block">
         {activeView === "bulletins" ? (
           <MasterDetailShell
             items={filteredBulletins}
@@ -550,6 +695,7 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
                   bulletin={selectedBulletin}
                   articles={articles}
                   onOpenArticle={openArticle}
+                  onOpenArticleBySlug={openArticleBySlug}
                 />
               ) : null
             }
@@ -579,6 +725,17 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
             onSelect={setSelectedArticleId}
             listTitle="Knowledge Base"
             listSubtitle={`${filteredArticles.length} of ${articles.length}`}
+            listActions={
+              isAuthor ? (
+                <Link
+                  href="/articles/new"
+                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                >
+                  <Plus size={13} strokeWidth={2} aria-hidden="true" />
+                  New procedure
+                </Link>
+              ) : null
+            }
             renderListItem={(article, isSelected) => (
               <ArticleRow article={article} isSelected={isSelected} />
             )}
@@ -589,7 +746,17 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
             activeDepartment={activeDepartment}
             onDepartmentChange={setActiveDepartment}
             counts={articleCounts}
-            detail={selectedArticle ? <ArticleDetail article={selectedArticle} /> : null}
+            detail={
+              selectedArticle ? (
+                <ArticleDetail
+                  article={selectedArticle}
+                  canEdit={canEditArticle(selectedArticle)}
+                  onOpenHistory={() => setHistoryOpen(true)}
+                  onOpenArticleBySlug={openArticleBySlug}
+                  onOpenBulletin={openBulletin}
+                />
+              ) : null
+            }
             detailLabel="Procedure reader"
             emptyListState={
               <EmptyState
@@ -617,9 +784,25 @@ export function OperationsHubClient({ articles, bulletins, staff }: OperationsHu
             activeDepartment={activeDepartment}
             onDepartmentChange={setActiveDepartment}
             counts={staffCounts}
+            openRequest={personRequest}
           />
         ) : null}
       </main>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        index={searchIndex}
+        onOpenResult={handleOpenResult}
+      />
+
+      {historyOpen && selectedArticle ? (
+        <VersionHistoryDialog
+          slug={selectedArticle.slug}
+          articleTitle={selectedArticle.title}
+          onClose={() => setHistoryOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

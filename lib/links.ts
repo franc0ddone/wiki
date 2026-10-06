@@ -1,4 +1,4 @@
-import { slugify } from "@/components/MarkdownReader";
+import { collectHeadings, parseMarkdown } from "@/lib/markdown/parser";
 
 /**
  * Internal link validation.
@@ -9,12 +9,13 @@ import { slugify } from "@/components/MarkdownReader";
  * lands on nothing. The editor will call `validateLinks` at save time and
  * surface the result inline.
  *
- * **Client module.** `slugify` is imported from `components/MarkdownReader.tsx`
- * so that link validation uses the *same* algorithm that renders heading ids —
- * they can never disagree. That file is a `"use client"` module, so this one is
- * too: import it from client components (the editor), never from a route
- * handler. Server-side callers want `lib/slug.ts`, whose implementation
- * `scripts/verify-backend.ts` asserts is identical to this one.
+ * Heading ids come from `lib/markdown/parser.ts` — the same pure parser the
+ * reader renders from — so link validation can never disagree with the ids the
+ * reader emits (explicit `{#custom-id}` suffixes and `-2` repeat suffixes
+ * included). That module is framework-free, so this one is safe to import from
+ * client components (the editor) and server code alike. `lib/slug.ts` remains
+ * the server-side slug generator; `scripts/verify-backend.ts` asserts it
+ * matches the parser's `slugify`.
  */
 
 export interface InternalLinks {
@@ -36,7 +37,6 @@ interface ParsedLink {
 }
 
 const LINK_RE = /\[([^\]]*)\]\(([^)\s]+)\)/g;
-const HEADING_RE = /^(#{1,3})\s+(.+)$/;
 
 /**
  * Every markdown link that points inside the wiki.
@@ -80,26 +80,13 @@ export function extractInternalLinks(markdown: string): InternalLinks {
 /**
  * Heading ids this markdown will produce, in document order.
  *
- * Mirrors `parseMarkdown`'s id assignment exactly, including the
- * `-2` / `-3` suffix repeated headings get, so an anchor written by hand
- * resolves against the ids the reader will actually emit.
+ * Reads the ids straight off the reader's parser (fenced code, `:::details`
+ * nesting, `{#custom-id}` suffixes and the `-2` / `-3` suffix repeated headings
+ * get are all handled there), so an anchor written by hand resolves against
+ * the ids the reader will actually emit.
  */
 export function extractHeadingIds(markdown: string): string[] {
-  const used = new Map<string, number>();
-  const ids: string[] = [];
-
-  for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
-    const heading = HEADING_RE.exec(line);
-    if (!heading) continue;
-
-    const text = heading[2].trim();
-    const base = slugify(text) || "section";
-    const seen = used.get(base) ?? 0;
-    used.set(base, seen + 1);
-    ids.push(seen === 0 ? base : `${base}-${seen + 1}`);
-  }
-
-  return ids;
+  return collectHeadings(parseMarkdown(markdown)).map((heading) => heading.id);
 }
 
 /**

@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import {
+  Check,
+  ChevronRight,
   ClipboardList,
   Info,
   Lightbulb,
@@ -11,16 +14,32 @@ import {
   Syringe,
   TriangleAlert,
 } from "lucide-react";
+import { ClinicalTable } from "@/components/reader/ClinicalTable";
+import { InlineText, ReaderNavContext, safeImageSrc } from "@/components/reader/Inline";
+import type { ReaderNav } from "@/components/reader/Inline";
+import { Lightbox } from "@/components/reader/Lightbox";
+import {
+  collectImages,
+  extractToc,
+  parseMarkdown,
+  slugify,
+  type Block,
+  type CalloutVariant,
+  type ListBlock,
+  type TocEntry,
+} from "@/lib/markdown/parser";
 import { cx } from "@/lib/utils";
 
 /**
  * Reading surface for SOPs and bulletins: a floating white paper canvas with an
  * auto-generated table of contents.
  *
- * Dependency-free renderer for the clinical Markdown subset used by the portal:
- * `#`/`##`/`###` headings, paragraphs, ordered and unordered lists, pipe tables,
- * fenced code, horizontal rules, blockquotes, inline bold / italic / code /
- * links, and clinical callouts:
+ * Renders the clinical Markdown subset parsed by `lib/markdown/parser.ts`:
+ * `#`/`##`/`###` headings (with optional `{#custom-id}`), paragraphs, nested
+ * ordered / unordered / task lists, pipe tables (sortable, filterable), fenced
+ * code (```mermaid renders a flowchart), `:::details` collapsibles, figures,
+ * horizontal rules, blockquotes, nested inline emphasis / code / links, and
+ * clinical callouts:
  *
  *   > [!note]     general information           (teal)
  *   > [!tip]      practical advice              (teal)
@@ -29,300 +48,33 @@ import { cx } from "@/lib/utils";
  *   > [!warning]  caution                       (amber)
  *   > [!critical] patient-safety critical        (red)
  *
- * Everything is emitted as React children rather than raw HTML, so stored
- * markdown can never become injected markup.
+ * XSS posture: everything is emitted as React children. There is no
+ * `dangerouslySetInnerHTML` and no raw-HTML passthrough; `href` / `src` values
+ * pass an allowlist (`safeHref` / `safeImageSrc`). Mermaid is loaded lazily and
+ * its SVG is walked against an element allowlist before it touches the page.
  *
  * Table of contents: H2/H3 headings get stable ids. At `xl` and up the outline
  * is a sticky right rail with scroll spy; below `xl` it collapses into jump
  * links at the top of the paper.
+ *
+ * Print: chrome is hidden and every collapsed table / `<details>` is forced
+ * open, so a printed SOP never hides content.
  */
 
-type CalloutVariant = "note" | "tip" | "dosing" | "protocol" | "warning" | "critical";
+// Heavy and rare: fetched only when a ```mermaid fence is actually rendered.
+const MermaidDiagram = dynamic(() => import("@/components/reader/MermaidDiagram"), {
+  ssr: false,
+  loading: () => (
+    <p className="text-[12.5px] text-zinc-500" role="status">
+      Rendering diagram…
+    </p>
+  ),
+});
 
-type Block =
-  | { kind: "heading"; level: 1 | 2 | 3; id: string; text: string }
-  | { kind: "paragraph"; text: string }
-  | { kind: "list"; ordered: boolean; items: string[] }
-  | { kind: "table"; head: string[]; rows: string[][] }
-  | { kind: "callout"; variant: CalloutVariant; text: string }
-  | { kind: "quote"; text: string }
-  | { kind: "code"; text: string }
-  | { kind: "rule" };
-
-export interface TocEntry {
-  id: string;
-  text: string;
-  level: 2 | 3;
-}
-
-const HEADING_RE = /^(#{1,3})\s+(.+)$/;
-const UNORDERED_RE = /^\s*[-*]\s+(.+)$/;
-const ORDERED_RE = /^\s*\d+[.)]\s+(.+)$/;
-const QUOTE_RE = /^\s*>\s?(.*)$/;
-const CALLOUT_RE = /^\s*>\s*\[!(\w+)\]\s*(.*)$/;
-const RULE_RE = /^\s*(?:-{3,}|\*{3,})\s*$/;
-const FENCE_RE = /^\s*```/;
-const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
-const TABLE_DIVIDER_RE = /^\s*\|?[\s:|-]+\|?\s*$/;
-
-/**
- * Heading/anchor slug. Exported so `lib/links.ts` can validate internal links
- * against the exact ids this reader emits — the two must never disagree.
- */
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[`*_]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-}
-
-/** Heading text without inline markdown markers, for the outline. */
-function plainText(text: string): string {
-  return text.replace(/\*\*|`|\*/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-}
-
-function splitTableRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
-}
-
-function normalizeVariant(raw: string): CalloutVariant {
-  const value = raw.toLowerCase();
-  if (value === "tip") return "tip";
-  if (value === "dosing" || value === "dose" || value === "dosage") return "dosing";
-  if (value === "protocol" || value === "procedure") return "protocol";
-  if (value === "warning" || value === "warn" || value === "caution") return "warning";
-  if (value === "critical" || value === "danger") return "critical";
-  return "note";
-}
-
-export function parseMarkdown(source: string): Block[] {
-  const lines = source.replace(/\r\n/g, "\n").split("\n");
-  const blocks: Block[] = [];
-  const usedIds = new Map<string, number>();
-  let index = 0;
-
-  const nextHeadingId = (text: string): string => {
-    const base = slugify(text) || "section";
-    const seen = usedIds.get(base) ?? 0;
-    usedIds.set(base, seen + 1);
-    return seen === 0 ? base : `${base}-${seen + 1}`;
-  };
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (line.trim().length === 0) {
-      index += 1;
-      continue;
-    }
-
-    if (FENCE_RE.test(line)) {
-      index += 1;
-      const code: string[] = [];
-      while (index < lines.length && !FENCE_RE.test(lines[index])) {
-        code.push(lines[index]);
-        index += 1;
-      }
-      index += 1; // consume the closing fence (or run off the end safely)
-      blocks.push({ kind: "code", text: code.join("\n") });
-      continue;
-    }
-
-    if (RULE_RE.test(line)) {
-      blocks.push({ kind: "rule" });
-      index += 1;
-      continue;
-    }
-
-    const heading = HEADING_RE.exec(line);
-    if (heading) {
-      const text = heading[2].trim();
-      blocks.push({
-        kind: "heading",
-        level: heading[1].length as 1 | 2 | 3,
-        id: nextHeadingId(text),
-        text,
-      });
-      index += 1;
-      continue;
-    }
-
-    // Tables: a pipe row immediately followed by a `| --- |` divider.
-    if (
-      TABLE_ROW_RE.test(line) &&
-      index + 1 < lines.length &&
-      TABLE_DIVIDER_RE.test(lines[index + 1])
-    ) {
-      const head = splitTableRow(line);
-      index += 2;
-      const rows: string[][] = [];
-      while (index < lines.length && TABLE_ROW_RE.test(lines[index])) {
-        rows.push(splitTableRow(lines[index]));
-        index += 1;
-      }
-      blocks.push({ kind: "table", head, rows });
-      continue;
-    }
-
-    const callout = CALLOUT_RE.exec(line);
-    if (callout) {
-      const variant = normalizeVariant(callout[1]);
-      const body: string[] = [];
-      if (callout[2].trim().length > 0) body.push(callout[2].trim());
-      index += 1;
-      while (index < lines.length) {
-        const next = QUOTE_RE.exec(lines[index]);
-        if (!next || CALLOUT_RE.test(lines[index])) break;
-        body.push(next[1].trim());
-        index += 1;
-      }
-      blocks.push({ kind: "callout", variant, text: body.join(" ") });
-      continue;
-    }
-
-    const quote = QUOTE_RE.exec(line);
-    if (quote) {
-      const collected: string[] = [];
-      while (index < lines.length) {
-        const next = QUOTE_RE.exec(lines[index]);
-        if (!next || CALLOUT_RE.test(lines[index])) break;
-        collected.push(next[1].trim());
-        index += 1;
-      }
-      blocks.push({ kind: "quote", text: collected.join(" ") });
-      continue;
-    }
-
-    const unordered = UNORDERED_RE.exec(line);
-    const ordered = ORDERED_RE.exec(line);
-    if (unordered || ordered) {
-      const isOrdered = Boolean(ordered) && !unordered;
-      const items: string[] = [];
-      while (index < lines.length) {
-        const current = lines[index];
-        const match = isOrdered ? ORDERED_RE.exec(current) : UNORDERED_RE.exec(current);
-        if (!match) break;
-        items.push(match[1].trim());
-        index += 1;
-      }
-      blocks.push({ kind: "list", ordered: isOrdered, items });
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (index < lines.length) {
-      const current = lines[index];
-      if (
-        current.trim().length === 0 ||
-        HEADING_RE.test(current) ||
-        UNORDERED_RE.test(current) ||
-        ORDERED_RE.test(current) ||
-        QUOTE_RE.test(current) ||
-        FENCE_RE.test(current) ||
-        RULE_RE.test(current) ||
-        TABLE_ROW_RE.test(current)
-      ) {
-        break;
-      }
-      paragraph.push(current.trim());
-      index += 1;
-    }
-    if (paragraph.length > 0) {
-      blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
-    } else {
-      // Defensive: never stall on a line no branch consumed.
-      index += 1;
-    }
-  }
-
-  return blocks;
-}
-
-/** Extract the H2/H3 outline used by the table of contents. */
-export function extractToc(blocks: readonly Block[]): TocEntry[] {
-  return blocks.flatMap((block) =>
-    block.kind === "heading" && (block.level === 2 || block.level === 3)
-      ? [{ id: block.id, text: plainText(block.text), level: block.level }]
-      : [],
-  );
-}
-
-/* ------------------------------------------------------------------ inline */
-
-const INLINE_RE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*[^*\n]+\*)/g;
-
-/** Only allow schemes that are safe to render as a link target. */
-function safeHref(href: string): string | undefined {
-  const value = href.trim();
-  if (/^(https?:|mailto:|tel:)/i.test(value)) return value;
-  if (value.startsWith("/") || value.startsWith("#")) return value;
-  return undefined;
-}
-
-function renderInline(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const pattern = new RegExp(INLINE_RE.source, "g");
-  let cursor = 0;
-  let key = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
-
-    const token = match[0];
-    if (token.startsWith("**")) {
-      nodes.push(
-        <strong key={`i${key++}`} className="font-semibold text-zinc-900">
-          {token.slice(2, -2)}
-        </strong>,
-      );
-    } else if (token.startsWith("`")) {
-      nodes.push(
-        <code
-          key={`i${key++}`}
-          className="rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 py-px font-mono text-[0.84em] font-medium text-teal-800"
-        >
-          {token.slice(1, -1)}
-        </code>,
-      );
-    } else if (token.startsWith("[")) {
-      const linkMatch = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(token);
-      const label = linkMatch?.[1] ?? token;
-      const href = linkMatch ? safeHref(linkMatch[2]) : undefined;
-      nodes.push(
-        href ? (
-          <a
-            key={`i${key++}`}
-            href={href}
-            className="font-medium text-[#0F766E] underline decoration-teal-600/30 underline-offset-[3px] transition-colors hover:decoration-teal-600"
-          >
-            {label}
-          </a>
-        ) : (
-          label
-        ),
-      );
-    } else {
-      nodes.push(
-        <em key={`i${key++}`} className="italic text-zinc-800">
-          {token.slice(1, -1)}
-        </em>,
-      );
-    }
-
-    cursor = match.index + token.length;
-  }
-
-  if (cursor < text.length) nodes.push(text.slice(cursor));
-  return nodes;
-}
+// The parser lives in `lib/markdown/parser.ts` (pure, server-safe). These
+// re-exports keep this module's historical public surface intact.
+export { extractToc, parseMarkdown, slugify };
+export type { TocEntry };
 
 /* ---------------------------------------------------------------- callouts */
 
@@ -378,6 +130,96 @@ const CALLOUT_STYLES: Record<
 
 const BODY_TEXT = "text-[15.5px] leading-relaxed text-zinc-800";
 
+function TaskBox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      role="checkbox"
+      aria-checked={checked}
+      aria-readonly="true"
+      aria-label={checked ? "Done" : "Not done"}
+      className={cx(
+        "mt-[5px] flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border",
+        checked ? "border-[#0F766E] bg-[#0F766E] text-white" : "border-zinc-400 bg-white",
+      )}
+    >
+      {checked ? <Check size={11} strokeWidth={3} aria-hidden="true" /> : null}
+    </span>
+  );
+}
+
+function renderList(list: ListBlock, key: string | number, depth = 0): ReactNode {
+  const Tag = list.ordered ? "ol" : "ul";
+  return (
+    <Tag key={key} className={cx("space-y-2.5", depth === 0 ? "pl-6" : "mt-2.5 pl-5")}>
+      {list.items.map((item, itemIndex) => {
+        const nested = item.children ? renderList(item.children, "nested", depth + 1) : null;
+
+        if (item.checked !== null) {
+          return (
+            <li key={itemIndex} className={cx("list-none", BODY_TEXT)}>
+              <div className="-ml-6 flex items-start gap-2.5">
+                <TaskBox checked={item.checked} />
+                <span className={cx(item.checked && "text-zinc-500 line-through decoration-zinc-300")}>
+                  <InlineText text={item.text} />
+                </span>
+              </div>
+              {nested}
+            </li>
+          );
+        }
+
+        return (
+          <li
+            key={itemIndex}
+            className={cx(
+              "pl-1.5",
+              list.ordered
+                ? "list-decimal marker:text-[13px] marker:font-semibold marker:text-teal-700"
+                : "list-disc marker:text-teal-600/70",
+              BODY_TEXT,
+            )}
+          >
+            <InlineText text={item.text} />
+            {nested}
+          </li>
+        );
+      })}
+    </Tag>
+  );
+}
+
+function ArticleFigure({ src, alt }: { src: string; alt: string }) {
+  const safe = safeImageSrc(src);
+  const nav = useContext(ReaderNavContext);
+  if (!safe) {
+    return (
+      <p className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13px] text-amber-900">
+        Image not shown (unsupported address): {alt}
+      </p>
+    );
+  }
+  return (
+    <figure className="space-y-2 print:break-inside-avoid">
+      <button
+        type="button"
+        onClick={() => nav.openImage?.(safe)}
+        aria-label={`Enlarge image: ${alt}`}
+        className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:cursor-auto"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- origin is the hospital's object store */}
+        <img
+          src={safe}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          className="mx-auto max-h-[28rem] w-auto max-w-full object-contain"
+        />
+      </button>
+      <figcaption className="text-center text-[13px] leading-5 text-zinc-500">{alt}</figcaption>
+    </figure>
+  );
+}
+
 function renderBlock(block: Block, key: number): ReactNode {
   switch (block.kind) {
     case "heading": {
@@ -389,7 +231,7 @@ function renderBlock(block: Block, key: number): ReactNode {
             {...anchor}
             className="scroll-mt-6 text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-zinc-900"
           >
-            {renderInline(block.text)}
+            <InlineText text={block.text} />
           </h1>
         );
       }
@@ -400,7 +242,7 @@ function renderBlock(block: Block, key: number): ReactNode {
             {...anchor}
             className="scroll-mt-6 mt-10 mb-4 text-[1.3rem] font-semibold leading-snug tracking-[-0.015em] text-zinc-900"
           >
-            {renderInline(block.text)}
+            <InlineText text={block.text} />
           </h2>
         );
       }
@@ -410,7 +252,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           {...anchor}
           className="scroll-mt-6 mt-6 mb-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em] text-zinc-900"
         >
-          {renderInline(block.text)}
+          <InlineText text={block.text} />
         </h3>
       );
     }
@@ -418,81 +260,18 @@ function renderBlock(block: Block, key: number): ReactNode {
     case "paragraph":
       return (
         <p key={key} className={BODY_TEXT}>
-          {renderInline(block.text)}
+          <InlineText text={block.text} />
         </p>
       );
 
-    case "list": {
-      if (block.ordered) {
-        return (
-          <ol key={key} className="space-y-2.5 pl-6">
-            {block.items.map((item, itemIndex) => (
-              <li
-                key={itemIndex}
-                className={cx(
-                  "list-decimal pl-1.5 marker:text-[13px] marker:font-semibold marker:text-teal-700",
-                  BODY_TEXT,
-                )}
-              >
-                {renderInline(item)}
-              </li>
-            ))}
-          </ol>
-        );
-      }
-      return (
-        <ul key={key} className="space-y-2.5 pl-6">
-          {block.items.map((item, itemIndex) => (
-            <li key={itemIndex} className={cx("list-disc pl-1.5 marker:text-teal-600/70", BODY_TEXT)}>
-              {renderInline(item)}
-            </li>
-          ))}
-        </ul>
-      );
-    }
+    case "image":
+      return <ArticleFigure key={key} src={block.src} alt={block.alt} />;
+
+    case "list":
+      return renderList(block, key);
 
     case "table":
-      return (
-        <div
-          key={key}
-          className="overflow-hidden rounded-[10px] border border-zinc-300/60 bg-white"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-[13.5px]">
-              <thead>
-                <tr className="bg-zinc-50">
-                  {block.head.map((cell, cellIndex) => (
-                    <th
-                      key={cellIndex}
-                      scope="col"
-                      className="whitespace-nowrap border-b border-zinc-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500"
-                    >
-                      {renderInline(cell)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200">
-                {block.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="transition-colors duration-150 hover:bg-zinc-50/70">
-                    {row.map((cell, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className={cx(
-                          "px-4 py-3 align-top leading-6",
-                          cellIndex === 0 ? "font-medium text-zinc-900" : "text-zinc-700",
-                        )}
-                      >
-                        {renderInline(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
+      return <ClinicalTable key={key} head={block.head} rows={block.rows} />;
 
     case "callout": {
       const style = CALLOUT_STYLES[block.variant];
@@ -501,7 +280,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           key={key}
           role="note"
           aria-label={style.title}
-          className={cx("my-6 rounded-[10px] border px-4 py-3.5", style.wrap)}
+          className={cx("my-6 rounded-[10px] border px-4 py-3.5 print:break-inside-avoid", style.wrap)}
         >
           <p
             className={cx(
@@ -512,9 +291,13 @@ function renderBlock(block: Block, key: number): ReactNode {
             {style.icon}
             {style.title}
           </p>
-          <p className={cx("mt-1.5 text-[15px] leading-relaxed", style.body)}>
-            {renderInline(block.text)}
-          </p>
+          <div className={cx("mt-1.5 space-y-2 text-[15px] leading-relaxed", style.body)}>
+            {block.paragraphs.map((paragraph, index) => (
+              <p key={index}>
+                <InlineText text={paragraph} />
+              </p>
+            ))}
+          </div>
         </aside>
       );
     }
@@ -523,20 +306,47 @@ function renderBlock(block: Block, key: number): ReactNode {
       return (
         <blockquote
           key={key}
-          className="border-l-2 border-zinc-200 pl-4 text-[15.5px] italic leading-relaxed text-zinc-600"
+          className="space-y-2 border-l-2 border-zinc-200 pl-4 text-[15.5px] italic leading-relaxed text-zinc-600"
         >
-          {renderInline(block.text)}
+          {block.paragraphs.map((paragraph, index) => (
+            <p key={index}>
+              <InlineText text={paragraph} />
+            </p>
+          ))}
         </blockquote>
       );
 
     case "code":
+      if (block.lang === "mermaid") return <MermaidDiagram key={key} source={block.text} />;
       return (
         <pre
           key={key}
-          className="overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 font-mono text-[12.5px] leading-6 text-zinc-800"
+          data-lang={block.lang || undefined}
+          className="overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 font-mono text-[12.5px] leading-6 text-zinc-800 print:whitespace-pre-wrap"
         >
           <code>{block.text}</code>
         </pre>
+      );
+
+    case "details":
+      return (
+        <details
+          key={key}
+          className="group rounded-[10px] border border-zinc-300/60 bg-white print:border-zinc-400"
+        >
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[10px] px-4 py-3 text-[14.5px] font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              size={15}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="shrink-0 text-zinc-400 transition-transform duration-150 group-open:rotate-90"
+            />
+            <InlineText text={block.summary} />
+          </summary>
+          <div className="space-y-4 border-t border-zinc-200 px-4 py-4">
+            {block.blocks.map((inner, index) => renderBlock(inner, index))}
+          </div>
+        </details>
       );
 
     case "rule":
@@ -557,7 +367,23 @@ export interface MarkdownReaderProps {
   footer?: ReactNode;
   /** Build the outline from H2/H3 headings. Shown only when there are 2+ entries. */
   showTableOfContents?: boolean;
+  /**
+   * Open an internal `/procedures/<slug>[#anchor]` link inside the app. When
+   * omitted, those links are ordinary site-relative anchors.
+   */
+  onOpenArticle?: (slug: string, anchor?: string) => boolean | void;
   className?: string;
+}
+
+/** Open every ancestor `<details>` of a node so it can be scrolled to. */
+function revealInside(node: HTMLElement | null) {
+  let el: HTMLElement | null = node;
+  while (el) {
+    const details: HTMLElement | null = el.closest("details");
+    if (!details) break;
+    (details as HTMLDetailsElement).open = true;
+    el = details.parentElement;
+  }
 }
 
 export function MarkdownReader({
@@ -565,15 +391,39 @@ export function MarkdownReader({
   header,
   footer,
   showTableOfContents = true,
+  onOpenArticle,
   className,
 }: MarkdownReaderProps) {
   const blocks = useMemo(() => parseMarkdown(source), [source]);
   const toc = useMemo(() => extractToc(blocks), [blocks]);
+  const images = useMemo(() => collectImages(blocks), [blocks]);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const lightboxOpenerRef = useRef<HTMLElement | null>(null);
   const [spyId, setSpyId] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const hasToc = showTableOfContents && toc.length >= 2;
   const activeId = spyId && toc.some((entry) => entry.id === spyId) ? spyId : (toc[0]?.id ?? null);
+
+  const nav = useMemo<ReaderNav>(
+    () => ({
+      onOpenArticle,
+      openImage: (src) => {
+        const index = images.findIndex((image) => image.src === src);
+        if (index >= 0) {
+          lightboxOpenerRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          setLightboxIndex(index);
+        }
+      },
+    }),
+    [onOpenArticle, images],
+  );
+
+  const closeLightbox = useCallback(() => {
+    setLightboxIndex(null);
+    lightboxOpenerRef.current?.focus();
+  }, []);
 
   // Scroll spy, driven by the nearest `[data-scroll-root]` scroller rather than
   // the viewport (an IntersectionObserver would observe the wrong root).
@@ -594,6 +444,8 @@ export function MarkdownReader({
         const top = scrollRoot instanceof HTMLElement ? scrollRoot.getBoundingClientRect().top : 0;
         let current = headings[0]?.dataset.headingId ?? null;
         headings.forEach((heading) => {
+          // Headings inside a closed <details> have no box; skip them.
+          if (heading.getClientRects().length === 0) return;
           if (heading.getBoundingClientRect().top - top <= 120) {
             current = heading.dataset.headingId ?? current;
           }
@@ -618,93 +470,140 @@ export function MarkdownReader({
     };
   }, [hasToc, source]);
 
+  // Print must never hide content: open every <details> for the duration of a
+  // print job and restore the reader's own state afterwards.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let reopened: HTMLDetailsElement[] = [];
+
+    const beforePrint = () => {
+      reopened = [];
+      root.querySelectorAll<HTMLDetailsElement>("details").forEach((element) => {
+        if (!element.open) {
+          element.open = true;
+          reopened.push(element);
+        }
+      });
+    };
+    const afterPrint = () => {
+      reopened.forEach((element) => {
+        element.open = false;
+      });
+      reopened = [];
+    };
+
+    window.addEventListener("beforeprint", beforePrint);
+    window.addEventListener("afterprint", afterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", beforePrint);
+      window.removeEventListener("afterprint", afterPrint);
+    };
+  }, []);
+
   const jumpTo = useCallback((id: string) => {
-    const node = rootRef.current?.querySelector<HTMLElement>(`[data-heading-id='${id}']`);
-    if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+    const node = rootRef.current?.querySelector<HTMLElement>(
+      `[data-heading-id='${CSS.escape(id)}']`,
+    );
+    if (node) {
+      revealInside(node);
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     setSpyId(id);
   }, []);
 
   return (
-    <div
-      ref={rootRef}
-      className={cx(
-        "w-full",
-        hasToc && "xl:grid xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:items-start xl:gap-10",
-        className,
-      )}
-    >
-      <article className="min-w-0 rounded-xl border border-zinc-300/70 bg-white p-8 shadow-[0_1px_2px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)] ring-1 ring-black/[0.04] md:p-12">
-        {header ? <header className="mb-6 border-b border-zinc-200 pb-6">{header}</header> : null}
+    <ReaderNavContext.Provider value={nav}>
+      <div
+        ref={rootRef}
+        className={cx(
+          "w-full",
+          hasToc && "xl:grid xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:items-start xl:gap-10 print:block",
+          className,
+        )}
+      >
+        <article className="min-w-0 rounded-xl border border-zinc-300/70 bg-white p-8 shadow-[0_1px_2px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)] ring-1 ring-black/[0.04] md:p-12 print:rounded-none print:border-0 print:p-0 print:shadow-none print:ring-0">
+          {header ? <header className="mb-6 border-b border-zinc-200 pb-6">{header}</header> : null}
+
+          {hasToc ? (
+            <nav
+              aria-label="Jump to section"
+              className="mb-8 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3 xl:hidden print:hidden"
+            >
+              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
+                On this page
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-x-1 gap-y-1">
+                {toc
+                  .filter((entry) => entry.level === 2)
+                  .map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(entry.id)}
+                        className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                      >
+                        {entry.text}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </nav>
+          ) : null}
+
+          <div className="max-w-3xl space-y-4 print:max-w-none">
+            {blocks.map((block, index) => renderBlock(block, index))}
+          </div>
+
+          {footer ? <footer className="mt-10">{footer}</footer> : null}
+        </article>
 
         {hasToc ? (
-          <nav
-            aria-label="Jump to section"
-            className="mb-8 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3 xl:hidden"
-          >
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+          <aside className="hidden xl:sticky xl:top-8 xl:block xl:max-h-[calc(100dvh-8rem)] xl:overflow-y-auto print:hidden">
+            <p className="flex items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
               <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
               On this page
             </p>
-            <ul className="mt-2 flex flex-wrap gap-x-1 gap-y-1">
-              {toc
-                .filter((entry) => entry.level === 2)
-                .map((entry) => (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() => jumpTo(entry.id)}
-                      className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-                    >
-                      {entry.text}
-                    </button>
-                  </li>
-                ))}
-            </ul>
-          </nav>
+            <nav className="mt-3" aria-label="Article sections">
+              <ul className="space-y-1 border-l border-zinc-200">
+                {toc.map((entry) => {
+                  const isActive = entry.id === activeId;
+                  return (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(entry.id)}
+                        aria-current={isActive ? "location" : undefined}
+                        className={cx(
+                          "-ml-px block w-full border-l-2 py-1 pr-2 text-left text-[12.5px] leading-5 transition-colors duration-150",
+                          entry.level === 3 ? "pl-6" : "pl-3",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
+                          isActive
+                            ? "border-[#0F766E] font-medium text-teal-800"
+                            : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900",
+                        )}
+                      >
+                        {entry.text}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </aside>
         ) : null}
 
-        <div className="max-w-3xl space-y-4">
-          {blocks.map((block, index) => renderBlock(block, index))}
-        </div>
-
-        {footer ? <footer className="mt-10">{footer}</footer> : null}
-      </article>
-
-      {hasToc ? (
-        <aside className="hidden xl:sticky xl:top-8 xl:block xl:max-h-[calc(100dvh-8rem)] xl:overflow-y-auto">
-          <p className="flex items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-            <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
-            On this page
-          </p>
-          <nav className="mt-3" aria-label="Article sections">
-            <ul className="space-y-1 border-l border-zinc-200">
-              {toc.map((entry) => {
-                const isActive = entry.id === activeId;
-                return (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() => jumpTo(entry.id)}
-                      aria-current={isActive ? "location" : undefined}
-                      className={cx(
-                        "-ml-px block w-full border-l-2 py-1 pr-2 text-left text-[12.5px] leading-5 transition-colors duration-150",
-                        entry.level === 3 ? "pl-6" : "pl-3",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
-                        isActive
-                          ? "border-[#0F766E] font-medium text-teal-800"
-                          : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900",
-                      )}
-                    >
-                      {entry.text}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </aside>
-      ) : null}
-    </div>
+        {lightboxIndex !== null ? (
+          <Lightbox
+            images={images}
+            index={lightboxIndex}
+            onIndexChange={setLightboxIndex}
+            onClose={closeLightbox}
+          />
+        ) : null}
+      </div>
+    </ReaderNavContext.Provider>
   );
 }
 

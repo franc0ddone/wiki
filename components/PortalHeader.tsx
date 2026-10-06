@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { BookOpen, Check, ChevronDown, Megaphone, Users } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Megaphone, Search, Users } from "lucide-react";
 import type { PortalView } from "@/types/portal";
+import { useSearchShortcutLabel } from "@/lib/platform";
 import { cx } from "@/lib/utils";
 
 /**
@@ -17,6 +18,8 @@ import { cx } from "@/lib/utils";
 export interface PortalHeaderProps {
   activeView: PortalView;
   onViewChange: (view: PortalView) => void;
+  /** Opens the command palette (which also owns the global Ctrl/Cmd+K shortcut). */
+  onOpenSearch?: () => void;
   /** Product wordmark shown as the primary title. Rendered uppercase. */
   title?: string;
   /** Subtle facility / product subtext under the wordmark. */
@@ -54,6 +57,7 @@ export const VIEW_OPTIONS: readonly ViewOption[] = [
 export function PortalHeader({
   activeView,
   onViewChange,
+  onOpenSearch,
   title = "Dove Wiki",
   facilityName = "Clinical operations · Dove Lewis Emergency Animal Hospital",
 }: PortalHeaderProps) {
@@ -62,6 +66,7 @@ export function PortalHeader({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const shortcutLabel = useSearchShortcutLabel();
 
   const activeIndex = Math.max(
     0,
@@ -133,7 +138,7 @@ export function PortalHeader({
   };
 
   return (
-    <header className="sticky top-0 z-30 shrink-0 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
+    <header className="sticky top-0 z-30 shrink-0 print:hidden border-b border-zinc-200/80 bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
       <div className="flex h-14 w-full items-center justify-between gap-6 px-4 sm:px-6">
         {/* Identity */}
         <div className="flex min-w-0 items-center gap-3">
@@ -148,6 +153,30 @@ export function PortalHeader({
             <p className="truncate text-xs text-zinc-400">{facilityName}</p>
           </div>
         </div>
+
+        {/* Global search */}
+        {onOpenSearch ? (
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            aria-label={`Search everything (${shortcutLabel})`}
+            aria-keyshortcuts="Control+K Meta+K"
+            className={cx(
+              "ml-auto flex h-8 min-w-0 items-center gap-2 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-500 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors",
+              "hover:border-zinc-400 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40 focus-visible:ring-offset-1",
+              "sm:w-64 md:w-72",
+            )}
+          >
+            <Search size={14} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-zinc-400" />
+            <span className="hidden min-w-0 flex-1 truncate text-left sm:inline">Search everything</span>
+            <kbd
+              aria-hidden="true"
+              className="hidden h-[18px] shrink-0 items-center rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-[11px] font-medium tracking-wide text-zinc-500 sm:flex"
+            >
+              {shortcutLabel}
+            </kbd>
+          </button>
+        ) : null}
 
         {/* Section menu */}
         <div className="relative shrink-0" ref={containerRef}>

@@ -41,6 +41,11 @@ export interface DirectoryGridProps {
   activeDepartment: Department;
   onDepartmentChange: (department: Department) => void;
   counts: DepartmentCounts;
+  /**
+   * Ask the grid to open a person's drawer (the command palette does this).
+   * `nonce` makes repeat requests for the same person re-fire.
+   */
+  openRequest?: { memberId: string; nonce: number } | null;
 }
 
 const DRAWER_EXIT_MS = 240;
@@ -209,10 +214,23 @@ export function DirectoryGrid({
   activeDepartment,
   onDepartmentChange,
   counts,
+  openRequest = null,
 }: DirectoryGridProps) {
   const [selected, setSelected] = useState<StaffMember | null>(null);
+  const [handledNonce, setHandledNonce] = useState<number | null>(null);
   const [isEntered, setIsEntered] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<string, CopyStatus>>({});
+
+  // Opening in response to a request is derived during render (adjusting state
+  // when a prop changes), not in an effect, so the drawer mounts in one pass.
+  if (openRequest && openRequest.nonce !== handledNonce) {
+    const requested = staff.find((member) => member.id === openRequest.memberId);
+    if (requested) {
+      setHandledNonce(openRequest.nonce);
+      setCopyStatus({});
+      setSelected(requested);
+    }
+  }
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);

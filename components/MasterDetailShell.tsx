@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { ArrowLeft, Search, X } from "lucide-react";
 import {
@@ -9,6 +9,7 @@ import {
   type Department,
   type DepartmentCounts,
 } from "@/types/portal";
+import { useIsApplePlatform } from "@/lib/platform";
 import { cx } from "@/lib/utils";
 
 /**
@@ -29,27 +30,18 @@ import { cx } from "@/lib/utils";
 
 /* ------------------------------------------------------------ search field */
 
-const subscribeNoop = () => () => {};
-const readIsApple = () => /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
-/**
- * Server render and hydration assume a non-Apple (Windows 11) client, which is
- * the hospital's target platform. Windows clients therefore see the correct
- * `Ctrl K` hint in the server HTML with no flicker; an Apple client re-renders
- * once with `⌘K`.
- */
-const readIsAppleOnServer = () => false;
-
-function useIsApplePlatform(): boolean {
-  return useSyncExternalStore(subscribeNoop, readIsApple, readIsAppleOnServer);
-}
-
 export interface SearchFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   /** Accessible name for the input. */
   label: string;
-  /** Bind the platform search shortcut to focus this field. Enable on one field per screen. */
+  /**
+   * Bind Ctrl/Cmd+K to focus this field (and show the key hint). **Off by
+   * default: the command palette (`components/CommandPalette.tsx`) owns that
+   * shortcut globally.** Enabling this alongside the palette would make two
+   * handlers fight over the same keystroke.
+   */
   enableShortcut?: boolean;
   className?: string;
 }
@@ -59,7 +51,7 @@ export function SearchField({
   onChange,
   placeholder,
   label,
-  enableShortcut = true,
+  enableShortcut = false,
   className,
 }: SearchFieldProps) {
   const inputId = useId();
@@ -70,7 +62,7 @@ export function SearchField({
     if (!enableShortcut) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
-      // Never steal focus from behind an open modal sheet.
+      // Never steal focus from behind an open modal sheet or the palette.
       if (document.querySelector("[aria-modal='true']")) return;
       event.preventDefault();
       inputRef.current?.focus();
@@ -232,6 +224,8 @@ export interface MasterDetailShellProps<T> {
   listTitle: string;
   /** Right-aligned count in the rail header, e.g. `"3 of 5"`. */
   listSubtitle?: string;
+  /** Optional controls beside the rail title (e.g. a "New" button). */
+  listActions?: ReactNode;
 
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -257,6 +251,7 @@ export function MasterDetailShell<T>({
   detail,
   listTitle,
   listSubtitle,
+  listActions,
   searchQuery,
   onSearchChange,
   searchPlaceholder,
@@ -280,7 +275,7 @@ export function MasterDetailShell<T>({
   return (
     <div
       className={cx(
-        "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(320px,372px)_minmax(0,1fr)]",
+        "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(320px,372px)_minmax(0,1fr)] print:block print:overflow-visible",
         className,
       )}
     >
@@ -288,18 +283,21 @@ export function MasterDetailShell<T>({
       <aside
         aria-label={listTitle}
         className={cx(
-          "min-h-0 flex-1 flex-col border-zinc-200/80 bg-[#ECECEE]/70 lg:flex-none lg:border-r",
+          "min-h-0 flex-1 flex-col border-zinc-200/80 bg-[#ECECEE]/70 lg:flex-none lg:border-r print:hidden",
           hasSelection ? "hidden lg:flex" : "flex",
         )}
       >
         <div className="shrink-0 space-y-3 px-4 pb-3 pt-4">
           <div className="flex items-baseline justify-between gap-3 px-0.5">
             <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">{listTitle}</h2>
-            {listSubtitle ? (
-              <span className="text-xs font-medium tabular-nums text-zinc-500">
-                {listSubtitle}
-              </span>
-            ) : null}
+            <div className="flex items-center gap-2.5">
+              {listActions}
+              {listSubtitle ? (
+                <span className="text-xs font-medium tabular-nums text-zinc-500">
+                  {listSubtitle}
+                </span>
+              ) : null}
+            </div>
           </div>
           <SearchField
             value={searchQuery}
@@ -358,9 +356,9 @@ export function MasterDetailShell<T>({
       {/* Reading canvas */}
       <section
         aria-label={detailLabel}
-        className={cx("min-h-0 flex-1 flex-col bg-[#F4F4F5]", hasSelection ? "flex" : "hidden lg:flex")}
+        className={cx("min-h-0 flex-1 flex-col bg-[#F4F4F5] print:block", hasSelection ? "flex" : "hidden lg:flex")}
       >
-        <div className="flex shrink-0 items-center border-b border-zinc-200/80 bg-white/80 px-3 py-2 backdrop-blur-md lg:hidden">
+        <div className="flex shrink-0 items-center border-b border-zinc-200/80 bg-white/80 px-3 py-2 backdrop-blur-md lg:hidden print:hidden">
           <button
             type="button"
             onClick={() => onSelect(null)}
@@ -371,7 +369,7 @@ export function MasterDetailShell<T>({
           </button>
         </div>
 
-        <div ref={detailScrollRef} data-scroll-root className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={detailScrollRef} data-scroll-root className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
           {detail ?? (
             <div className="flex h-full min-h-[320px] items-center justify-center p-8">
               {emptyDetailState}

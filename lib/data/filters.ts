@@ -1,3 +1,4 @@
+import { matchesFields } from "@/lib/search";
 import type { ClinicalDepartment, Department } from "@/types/portal";
 
 /**
@@ -10,16 +11,24 @@ import type { ClinicalDepartment, Department } from "@/types/portal";
  * import everything it needs from `@/lib/data` and the mock file becomes dead
  * weight rather than a hidden dependency.
  *
- * The database versions of the same rules live in the `q` / `department`
- * filters of each `get*` function; these stay for client-side re-filtering of
- * an already-fetched list (which is what the current components do).
+ * The database versions of the same rules (`q`) are plain substring matches in
+ * each `get*` function; client-side search goes through `lib/search`.
  */
 
-/** Case-insensitive substring match across the searchable fields of an item. */
+/**
+ * Does `query` match any of these fields?
+ *
+ * Runs on the shared search engine (`lib/search`): fuzzy, typo-tolerant, every
+ * word must match somewhere in the record, and clinical synonyms expand
+ * (`epi` also finds "epinephrine"). An empty query matches everything.
+ *
+ * This is the single-record predicate. The portal's per-view search fields
+ * use the indexed path (`searchSurface`) instead, which ranks the results and
+ * avoids re-tokenising every record per keystroke; both share one engine, so
+ * they agree on what a query means.
+ */
 export function matchesQuery(query: string, fields: readonly (string | undefined)[]): boolean {
-  const needle = query.trim().toLowerCase();
-  if (needle.length === 0) return true;
-  return fields.some((field) => (field ?? "").toLowerCase().includes(needle));
+  return matchesFields(query, fields);
 }
 
 /**
