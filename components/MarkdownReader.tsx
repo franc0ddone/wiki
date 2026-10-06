@@ -398,7 +398,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           <h2
             key={key}
             {...anchor}
-            className="scroll-mt-6 border-t border-zinc-100 pt-8 text-[1.3rem] font-semibold leading-snug tracking-[-0.015em] text-zinc-900 first:border-t-0 first:pt-0"
+            className="scroll-mt-6 mt-10 mb-4 text-[1.3rem] font-semibold leading-snug tracking-[-0.015em] text-zinc-900"
           >
             {renderInline(block.text)}
           </h2>
@@ -408,7 +408,7 @@ function renderBlock(block: Block, key: number): ReactNode {
         <h3
           key={key}
           {...anchor}
-          className="scroll-mt-6 pt-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em] text-zinc-900"
+          className="scroll-mt-6 mt-6 mb-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em] text-zinc-900"
         >
           {renderInline(block.text)}
         </h3>
@@ -425,7 +425,7 @@ function renderBlock(block: Block, key: number): ReactNode {
     case "list": {
       if (block.ordered) {
         return (
-          <ol key={key} className="space-y-2 pl-6">
+          <ol key={key} className="space-y-2.5 pl-6">
             {block.items.map((item, itemIndex) => (
               <li
                 key={itemIndex}
@@ -441,7 +441,7 @@ function renderBlock(block: Block, key: number): ReactNode {
         );
       }
       return (
-        <ul key={key} className="space-y-2 pl-6">
+        <ul key={key} className="space-y-2.5 pl-6">
           {block.items.map((item, itemIndex) => (
             <li key={itemIndex} className={cx("list-disc pl-1.5 marker:text-teal-600/70", BODY_TEXT)}>
               {renderInline(item)}
@@ -455,40 +455,42 @@ function renderBlock(block: Block, key: number): ReactNode {
       return (
         <div
           key={key}
-          className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+          className="overflow-hidden rounded-[10px] border border-zinc-300/60 bg-white"
         >
-          <table className="w-full border-collapse text-left text-[13.5px]">
-            <thead>
-              <tr className="bg-zinc-50">
-                {block.head.map((cell, cellIndex) => (
-                  <th
-                    key={cellIndex}
-                    scope="col"
-                    className="whitespace-nowrap border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500"
-                  >
-                    {renderInline(cell)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {block.rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="transition-colors hover:bg-zinc-50/70">
-                  {row.map((cell, cellIndex) => (
-                    <td
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-[13.5px]">
+              <thead>
+                <tr className="bg-zinc-50">
+                  {block.head.map((cell, cellIndex) => (
+                    <th
                       key={cellIndex}
-                      className={cx(
-                        "px-4 py-2.5 align-top leading-6",
-                        cellIndex === 0 ? "font-medium text-zinc-900" : "text-zinc-700",
-                      )}
+                      scope="col"
+                      className="whitespace-nowrap border-b border-zinc-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500"
                     >
                       {renderInline(cell)}
-                    </td>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-200">
+                {block.rows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="transition-colors duration-150 hover:bg-zinc-50/70">
+                    {row.map((cell, cellIndex) => (
+                      <td
+                        key={cellIndex}
+                        className={cx(
+                          "px-4 py-3 align-top leading-6",
+                          cellIndex === 0 ? "font-medium text-zinc-900" : "text-zinc-700",
+                        )}
+                      >
+                        {renderInline(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
 
@@ -499,7 +501,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           key={key}
           role="note"
           aria-label={style.title}
-          className={cx("rounded-xl border px-4 py-3.5", style.wrap)}
+          className={cx("my-6 rounded-[10px] border px-4 py-3.5", style.wrap)}
         >
           <p
             className={cx(
@@ -631,15 +633,15 @@ export function MarkdownReader({
         className,
       )}
     >
-      <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm md:p-12">
-        {header ? <header className="mb-8 border-b border-zinc-100 pb-7">{header}</header> : null}
+      <article className="min-w-0 rounded-xl border border-zinc-300/70 bg-white p-8 shadow-[0_1px_2px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)] ring-1 ring-black/[0.04] md:p-12">
+        {header ? <header className="mb-6 border-b border-zinc-200 pb-6">{header}</header> : null}
 
         {hasToc ? (
           <nav
             aria-label="Jump to section"
             className="mb-8 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3 xl:hidden"
           >
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
               <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
               On this page
             </p>
@@ -661,7 +663,7 @@ export function MarkdownReader({
           </nav>
         ) : null}
 
-        <div className="max-w-[46rem] space-y-5">
+        <div className="max-w-3xl space-y-4">
           {blocks.map((block, index) => renderBlock(block, index))}
         </div>
 
@@ -670,12 +672,12 @@ export function MarkdownReader({
 
       {hasToc ? (
         <aside className="hidden xl:sticky xl:top-8 xl:block xl:max-h-[calc(100dvh-8rem)] xl:overflow-y-auto">
-          <p className="flex items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+          <p className="flex items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
             <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
             On this page
           </p>
           <nav className="mt-3" aria-label="Article sections">
-            <ul className="space-y-px border-l border-zinc-200">
+            <ul className="space-y-1 border-l border-zinc-200">
               {toc.map((entry) => {
                 const isActive = entry.id === activeId;
                 return (
@@ -685,7 +687,7 @@ export function MarkdownReader({
                       onClick={() => jumpTo(entry.id)}
                       aria-current={isActive ? "location" : undefined}
                       className={cx(
-                        "-ml-px block w-full border-l-2 py-1.5 pr-2 text-left text-[12.5px] leading-5 transition-colors",
+                        "-ml-px block w-full border-l-2 py-1 pr-2 text-left text-[12.5px] leading-5 transition-colors duration-150",
                         entry.level === 3 ? "pl-6" : "pl-3",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
                         isActive

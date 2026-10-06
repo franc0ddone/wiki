@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Dove Wiki",
-  description: "Dove Wiki — bulletin board, knowledge base, and staff directory for the emergency animal hospital.",
+  description: "Dove Wiki — bulletin board, knowledge base, and staff directory for Dove Lewis Emergency Animal Hospital.",
 };
 
 /**

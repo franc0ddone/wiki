@@ -26,10 +26,10 @@ import { cx, initials, writeToClipboard } from "@/lib/utils";
 import { DepartmentChipTrack, SearchField } from "@/components/MasterDetailShell";
 
 /**
- * Personnel directory in the Apple Contacts / Mail list idiom: alphabetical
- * sections of white rows on the canvas. Selecting a row opens a slide-over
- * sheet from the right edge with the full record. Search and department
- * filtering are owned by the page, so all three surfaces filter alike.
+ * Personnel directory in the contact-book list idiom: alphabetical sections of
+ * white rows on the canvas. Selecting a row opens a slide-over sheet from the
+ * right edge with the full record. Search and department filtering are owned by
+ * the page, so all three surfaces filter alike.
  */
 
 export interface DirectoryGridProps {
@@ -71,7 +71,7 @@ function Avatar({ member, size = "sm" }: { member: StaffMember; size?: keyof typ
         width={size === "lg" ? 176 : 80}
         height={size === "lg" ? 176 : 80}
         className={cx(
-          "shrink-0 object-cover ring-1 ring-zinc-200/80",
+          "shrink-0 object-cover ring-1 ring-teal-600/20",
           AVATAR_SIZES[size],
           size === "lg" && "shadow-[0_4px_14px_-4px_rgba(0,0,0,0.18)]",
         )}
@@ -84,7 +84,7 @@ function Avatar({ member, size = "sm" }: { member: StaffMember; size?: keyof typ
       aria-hidden="true"
       className={cx(
         "flex shrink-0 select-none items-center justify-center font-semibold tracking-[0.02em] text-teal-800",
-        "bg-[linear-gradient(145deg,#F0FDFA_0%,#CCFBF1_55%,#99F6E4_140%)] ring-1 ring-inset ring-teal-200/80",
+        "bg-[linear-gradient(145deg,#F0FDFA_0%,#CCFBF1_55%,#99F6E4_140%)] ring-1 ring-inset ring-teal-600/20",
         AVATAR_SIZES[size],
         size === "lg" && "shadow-[0_4px_14px_-4px_rgba(15,118,110,0.35)]",
       )}
@@ -111,13 +111,13 @@ function DepartmentTags({
       {shown.map((department) => (
         <span
           key={department}
-          className="whitespace-nowrap rounded-full border border-teal-200 bg-teal-50 px-2 py-px text-[11px] font-medium text-teal-800"
+          className="whitespace-nowrap rounded-full border border-teal-600/30 bg-teal-50/50 px-2 py-px text-xs font-medium text-teal-700"
         >
           {DEPARTMENT_LABELS[department]}
         </span>
       ))}
       {overflow > 0 ? (
-        <span className="text-[11px] font-medium text-zinc-400">+{overflow}</span>
+        <span className="text-xs font-medium text-zinc-400">+{overflow}</span>
       ) : null}
     </span>
   );
@@ -133,7 +133,7 @@ const SHIFT_ICONS: Record<ShiftPreference, typeof Sun> = {
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+    <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
       {children}
     </p>
   );
@@ -141,8 +141,8 @@ function GroupLabel({ children }: { children: ReactNode }) {
 
 function Group({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      <div className="divide-y divide-zinc-100">{children}</div>
+    <div className="overflow-hidden rounded-[10px] border border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+      <div className="divide-y divide-zinc-200">{children}</div>
     </div>
   );
 }
@@ -151,7 +151,7 @@ function GroupRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-h-11 items-center justify-between gap-4 px-4 py-2.5">
       <span className="shrink-0 text-[13px] text-zinc-500">{label}</span>
-      <span className="min-w-0 text-right text-[13px] text-zinc-900">{children}</span>
+      <span className="min-w-0 text-right text-[13px] font-medium text-zinc-900">{children}</span>
     </div>
   );
 }
@@ -173,7 +173,7 @@ function CopyButton({
       onClick={onCopy}
       aria-label={label}
       className={cx(
-        "flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-colors",
+        "flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
         status === "copied"
           ? "border-teal-200 bg-teal-50 text-teal-800"
@@ -220,7 +220,7 @@ export function DirectoryGrid({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Contacts-style alphabetical sections by family name. */
+  /* Alphabetical sections by family name. */
   const sections = useMemo(() => {
     const sorted = [...staff].sort((a, b) =>
       familyName(a.full_name).localeCompare(familyName(b.full_name), "en-US"),
@@ -358,7 +358,7 @@ export function DirectoryGrid({
                   <h3 className="px-1 pb-1.5 text-[12px] font-semibold text-zinc-500">{letter}</h3>
                   <ul
                     role="list"
-                    className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                    className="divide-y divide-zinc-200 overflow-hidden rounded-[10px] border border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
                   >
                     {members.map((member) => {
                       const isOpen = selected?.id === member.id;
@@ -370,7 +370,7 @@ export function DirectoryGrid({
                             aria-haspopup="dialog"
                             aria-expanded={isOpen}
                             className={cx(
-                              "group flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors sm:px-5",
+                              "group flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors duration-150 sm:px-5",
                               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
                               isOpen ? "bg-teal-50/60" : "hover:bg-zinc-100/60",
                             )}
@@ -400,7 +400,7 @@ export function DirectoryGrid({
 
                             <span className="hidden shrink-0 flex-col items-end gap-1.5 md:flex">
                               <DepartmentTags departments={member.departments} max={2} />
-                              <span className="font-mono text-[11.5px] tabular-nums text-zinc-500">
+                              <span className="font-mono text-xs tabular-nums text-zinc-500">
                                 ext {member.phone_extension}
                               </span>
                             </span>
@@ -444,13 +444,13 @@ export function DirectoryGrid({
             aria-labelledby="directory-sheet-title"
             onKeyDown={handlePanelKeyDown}
             className={cx(
-              "relative flex h-full w-full max-w-[420px] flex-col border-l border-zinc-200/80 bg-[#F7F7F8] shadow-[-24px_0_60px_-24px_rgba(24,24,27,0.28)]",
+              "relative flex h-full w-full max-w-[420px] flex-col border-l border-zinc-300/70 bg-[#F7F7F8] shadow-[-24px_0_64px_-24px_rgba(24,24,27,0.28)]",
               "transition-transform duration-[240ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
               isEntered ? "translate-x-0" : "translate-x-full",
             )}
           >
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-zinc-200/80 bg-white/80 px-4 backdrop-blur-md">
-              <span className="text-[12px] font-semibold uppercase tracking-[0.07em] text-zinc-500">
+              <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                 Personnel
               </span>
               <button
@@ -458,7 +458,7 @@ export function DirectoryGrid({
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Close"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-colors duration-150 hover:bg-zinc-200 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40"
               >
                 <X size={14} strokeWidth={2} aria-hidden="true" />
               </button>
@@ -488,37 +488,21 @@ export function DirectoryGrid({
                   type="button"
                   onClick={() => void handleCopy(extKey, selected.phone_extension)}
                   aria-label={`Copy extension ${selected.phone_extension}`}
-                  className={cx(
-                    "flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-[12px] font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
-                    copyStatus[extKey] === "copied"
-                      ? "border-teal-200 bg-teal-50 text-teal-800"
-                      : copyStatus[extKey] === "failed"
-                        ? "border-red-200 bg-red-50 text-red-700"
-                        : "border-zinc-200/80 bg-white text-[#0F766E] hover:bg-zinc-50",
-                  )}
+                  className="flex flex-col items-center gap-1 rounded-[10px] border border-zinc-300/60 bg-white px-2 py-2.5 text-[12px] font-medium text-[#0F766E] transition-colors duration-150 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
                 >
-                  {copyStatus[extKey] === "copied" ? (
-                    <Check size={16} strokeWidth={2.25} aria-hidden="true" />
-                  ) : (
-                    <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
-                  )}
-                  {copyStatus[extKey] === "copied"
-                    ? "Copied"
-                    : copyStatus[extKey] === "failed"
-                      ? "Failed"
-                      : `Ext ${selected.phone_extension}`}
+                  <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
+                  Copy extension
                 </button>
                 <a
                   href={`mailto:${selected.email}`}
-                  className="flex flex-col items-center gap-1 rounded-xl border border-zinc-200/80 bg-white px-2 py-2.5 text-[12px] font-medium text-[#0F766E] transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="flex flex-col items-center gap-1 rounded-[10px] border border-zinc-300/60 bg-white px-2 py-2.5 text-[12px] font-medium text-[#0F766E] transition-colors duration-150 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
                 >
                   <Mail size={16} strokeWidth={1.75} aria-hidden="true" />
                   Email
                 </a>
                 <a
                   href={`tel:${selected.direct_phone.replace(/[^\d+]/g, "")}`}
-                  className="flex flex-col items-center gap-1 rounded-xl border border-zinc-200/80 bg-white px-2 py-2.5 text-[12px] font-medium text-[#0F766E] transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="flex flex-col items-center gap-1 rounded-[10px] border border-zinc-300/60 bg-white px-2 py-2.5 text-[12px] font-medium text-[#0F766E] transition-colors duration-150 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
                 >
                   <Phone size={16} strokeWidth={1.75} aria-hidden="true" />
                   Call
@@ -571,7 +555,7 @@ export function DirectoryGrid({
               {/* Departments */}
               <div className="mt-6">
                 <GroupLabel>Assigned departments</GroupLabel>
-                <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
                   <DepartmentTags departments={selected.departments} />
                 </div>
               </div>
@@ -619,7 +603,7 @@ export function DirectoryGrid({
                 </Group>
               </div>
 
-              <p className="mt-6 px-1 text-[11.5px] leading-5 text-zinc-500">
+              <p className="mt-6 text-xs leading-5 text-zinc-500">
                 Profile edits and photo uploads arrive with the Supabase auth phase. Contact the
                 Practice Administrator to correct a record.
               </p>

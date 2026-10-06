@@ -17,9 +17,9 @@ import { cx } from "@/lib/utils";
 export interface PortalHeaderProps {
   activeView: PortalView;
   onViewChange: (view: PortalView) => void;
-  /** Primary institutional mark. Rendered uppercase. */
+  /** Product wordmark shown as the primary title. Rendered uppercase. */
   title?: string;
-  /** Facility subtext under the title. */
+  /** Subtle facility / product subtext under the wordmark. */
   facilityName?: string;
 }
 
@@ -54,8 +54,8 @@ export const VIEW_OPTIONS: readonly ViewOption[] = [
 export function PortalHeader({
   activeView,
   onViewChange,
-  title = "Operations Hub",
-  facilityName = "Eastside Emergency Animal Hospital",
+  title = "Dove Wiki",
+  facilityName = "Clinical operations · Dove Lewis Emergency Animal Hospital",
 }: PortalHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuId = useId();
@@ -145,7 +145,7 @@ export function PortalHeader({
             <h1 className="truncate text-[13px] font-bold uppercase leading-4 tracking-[0.06em] text-zinc-900">
               {title}
             </h1>
-            <p className="truncate text-[11.5px] font-medium leading-4 text-zinc-500">{facilityName}</p>
+            <p className="truncate text-xs text-zinc-400">{facilityName}</p>
           </div>
         </div>
 
@@ -189,7 +189,7 @@ export function PortalHeader({
               onKeyDown={handleMenuKeyDown}
               className="animate-popover-in absolute right-0 top-[calc(100%+6px)] z-40 w-72 rounded-xl border border-zinc-200/80 bg-white/95 p-1.5 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.22),0_2px_6px_rgba(24,24,27,0.06)] backdrop-blur-xl"
             >
-              <p className="px-2.5 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              <p className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
                 Sections
               </p>
               {VIEW_OPTIONS.map((option, index) => {
@@ -235,7 +235,7 @@ export function PortalHeader({
                       >
                         {option.label}
                       </span>
-                      <span className="block text-[11.5px] leading-4 text-zinc-500">
+                      <span className="block text-xs leading-4 text-zinc-500">
                         {option.description}
                       </span>
                     </span>

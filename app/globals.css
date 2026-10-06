@@ -1,11 +1,15 @@
 @import "tailwindcss";
 
 /*
- * Operations Hub — "macOS Native Light" design system.
+ * Dove Wiki — "Clinical Light" design system.
  *
  * Built for reading dense SOPs under fluorescent clinical lighting: a warm
  * oyster canvas, crisp white panes, graphite ink, and a single petroleum-teal
  * accent. Low glare, high legibility.
+ *
+ * Target platform is Windows 11 on Chromium (Edge / Chrome), typically a
+ * 1080p non-retina display. Hairline borders and sub-12px text degrade there,
+ * so visible card edges and the contrast minimums are mandatory, not optional.
  *
  * Tailwind v4: `@theme` registers the tokens below as utilities
  * (`bg-canvas`, `text-ink`, `border-hairline`, `bg-accent` ...). Components use
@@ -13,7 +17,7 @@
  * the same if the tokens are never referenced.
  */
 @theme {
-  /* System type stack: SF Pro on Apple hardware, Segoe/Inter elsewhere. */
+  /* System type stack: Segoe UI on Windows, SF Pro on Apple, Inter elsewhere. */
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI",
     system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -79,7 +83,7 @@ li {
 
 /* ------------------------------------------------------------------ scroll */
 
-/* Hairline overlay-style scrollbars, the way macOS draws them in light mode. */
+/* Hairline overlay-style scrollbars, drawn as the browser does in light mode. */
 * {
   scrollbar-width: thin;
   scrollbar-color: #d4d4d8 transparent;

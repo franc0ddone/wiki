@@ -1,5 +1,6 @@
 /**
- * Domain types for the Emergency Animal Hospital internal operations portal.
+ * Domain types for the Dove Lewis Emergency Animal Hospital internal operations
+ * portal.
  *
  * Field names mirror the shape the Supabase/PostgreSQL tables will expose in a
  * later phase (snake_case preserved) so mock objects can be swapped for real

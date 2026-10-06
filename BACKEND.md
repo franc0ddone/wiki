@@ -1,7 +1,7 @@
 # Dove Wiki — backend
 
 Persistence, API, versioning, auth scaffolding, uploads, and import tooling for
-the Operations Hub. **This pass is backend-only:** `lib/mock-data.ts` still
+Dove Wiki. **This pass is backend-only:** `lib/mock-data.ts` still
 works exactly as it did, and no component was changed other than the one
 permitted export in `components/MarkdownReader.tsx`.
 

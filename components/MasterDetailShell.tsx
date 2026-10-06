@@ -31,8 +31,13 @@ import { cx } from "@/lib/utils";
 
 const subscribeNoop = () => () => {};
 const readIsApple = () => /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
-/** Server render and hydration both assume Apple; non-Apple clients re-render once. */
-const readIsAppleOnServer = () => true;
+/**
+ * Server render and hydration assume a non-Apple (Windows 11) client, which is
+ * the hospital's target platform. Windows clients therefore see the correct
+ * `Ctrl K` hint in the server HTML with no flicker; an Apple client re-renders
+ * once with `⌘K`.
+ */
+const readIsAppleOnServer = () => false;
 
 function useIsApplePlatform(): boolean {
   return useSyncExternalStore(subscribeNoop, readIsApple, readIsAppleOnServer);
@@ -44,7 +49,7 @@ export interface SearchFieldProps {
   placeholder: string;
   /** Accessible name for the input. */
   label: string;
-  /** Bind Cmd+K / Ctrl+K to focus this field. Enable on one field per screen. */
+  /** Bind the platform search shortcut to focus this field. Enable on one field per screen. */
   enableShortcut?: boolean;
   className?: string;
 }
@@ -104,9 +109,9 @@ export function SearchField({
         autoComplete="off"
         spellCheck={false}
         className={cx(
-          "h-8 w-full rounded-lg border border-zinc-200/80 bg-white pl-8 text-[13px] text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
-          "placeholder:text-zinc-400 transition-[border-color,box-shadow]",
-          "focus:border-teal-600/40 focus:outline-none focus:ring-[3px] focus:ring-teal-600/15",
+          "h-8 w-full rounded-lg border border-zinc-300/60 bg-white pl-8 text-[13px] text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)]",
+          "placeholder:text-zinc-400 transition-colors duration-150",
+          "focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15",
           hasValue ? "pr-8" : enableShortcut ? "pr-12" : "pr-3",
         )}
       />
@@ -187,11 +192,11 @@ export function DepartmentChipTrack({
             onClick={() => onChange(department)}
             title={DEPARTMENT_LABELS[department]}
             className={cx(
-              "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-colors",
+              "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
               isActive
-                ? "border-teal-200 bg-teal-50 text-teal-800 shadow-[0_1px_2px_rgba(15,118,110,0.08)]"
-                : "border-zinc-200/80 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900",
+                ? "border-teal-600/40 bg-teal-50 text-teal-800"
+                : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
               isEmpty && "text-zinc-400",
             )}
           >
@@ -291,7 +296,7 @@ export function MasterDetailShell<T>({
           <div className="flex items-baseline justify-between gap-3 px-0.5">
             <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">{listTitle}</h2>
             {listSubtitle ? (
-              <span className="text-[11.5px] font-medium tabular-nums text-zinc-500">
+              <span className="text-xs font-medium tabular-nums text-zinc-500">
                 {listSubtitle}
               </span>
             ) : null}
@@ -315,7 +320,7 @@ export function MasterDetailShell<T>({
           {items.length === 0 ? (
             <div className="p-3">{emptyListState}</div>
           ) : (
-            <ul role="list" className="space-y-0.5">
+            <ul role="list" className="space-y-1.5">
               {items.map((item) => {
                 const id = getId(item);
                 const isSelected = id === selectedId;
@@ -326,11 +331,11 @@ export function MasterDetailShell<T>({
                       onClick={() => onSelect(id)}
                       aria-current={isSelected ? "true" : undefined}
                       className={cx(
-                        "relative w-full overflow-hidden rounded-lg py-3 pl-4 pr-3 text-left transition-[background-color,box-shadow] duration-150",
+                        "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
                         isSelected
-                          ? "bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(228,228,231,0.8)]"
-                          : "hover:bg-zinc-100/60",
+                          ? "border-zinc-300/60 bg-teal-50/60 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
+                          : "border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:shadow-[0_2px_6px_rgba(16,24,40,0.08)]",
                       )}
                     >
                       <span
