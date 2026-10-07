@@ -4,10 +4,23 @@
  * Link labels are kept (URLs dropped), fenced-code content is kept (fence
  * markers and the language tag dropped), callout markers `[!tip]` and
  * `:::details` directives are dropped (the summary text is kept), list / quote
- * / heading / emphasis markers are removed, table pipes become spaces. The
- * result is one whitespace-collapsed string, which is what Fuse indexes and
+ * / heading / emphasis markers are removed, table pipes become spaces, and the
+ * stored block / inline formatting this wiki adds (`{align=…}` suffixes,
+ * `~sub~`, `^sup^`, `==mark==`) is stripped so only the words are indexed.
+ * The result is one whitespace-collapsed string, which is what Fuse indexes and
  * what result snippets are cut from — so highlight indices line up exactly.
  */
+
+import { splitInlineConventions } from "@/lib/markdown/inline-conventions";
+import { stripBlockAttributeSuffix } from "@/lib/markdown/block-attributes";
+
+/** `~sub~` / `^sup^` / `==mark==` → `sub` / `sup` / `mark`; lone markers are prose. */
+function stripInlineConventions(line: string): string {
+  return splitInlineConventions(line)
+    .map((part) => part.value)
+    .join("");
+}
+
 export function stripMarkdown(markdown: string): string {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
@@ -31,7 +44,6 @@ export function stripMarkdown(markdown: string): string {
 
     line = line
       .replace(/^\s{0,3}#{1,6}\s+/, "") // heading marker
-      .replace(/\s*\{#[A-Za-z0-9_-]+\}\s*$/, "") // explicit heading id
       .replace(/^\s*(?:>\s?)+/, "") // quote
       .replace(/^\s*\[![A-Za-z]+\]\s*/, "") // callout marker
       .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "") // list marker
@@ -41,6 +53,9 @@ export function stripMarkdown(markdown: string): string {
       .replace(/(\*\*|__|\*|`)/g, "") // emphasis / code ticks
       .replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, "$1") // escapes
       .replace(/\|/g, " "); // table pipes
+
+    line = stripInlineConventions(line);
+    line = stripBlockAttributeSuffix(line).trim();
 
     out.push(line.trim());
   }

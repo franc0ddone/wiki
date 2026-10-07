@@ -30,6 +30,7 @@ import {
   type TocEntry,
 } from "@/lib/markdown/parser";
 import type { ImageAlign } from "@/lib/markdown/image-attributes";
+import { blockTextStyle } from "@/lib/markdown/block-attributes";
 import { footnoteDefinitionId, footnoteReferenceId } from "@/lib/markdown/footnotes";
 import { cx } from "@/lib/utils";
 
@@ -249,11 +250,13 @@ function renderBlock(block: Block, key: number): ReactNode {
   switch (block.kind) {
     case "heading": {
       const anchor = { id: block.id, "data-heading-id": block.id };
+      const style = blockTextStyle(block.align, block.lineHeight);
       if (block.level === 1) {
         return (
           <h1
             key={key}
             {...anchor}
+            style={style}
             className="scroll-mt-6 text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-zinc-900"
           >
             <InlineText text={block.text} />
@@ -265,6 +268,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           <h2
             key={key}
             {...anchor}
+            style={style}
             className="scroll-mt-6 mt-10 mb-4 text-[1.3rem] font-semibold leading-snug tracking-[-0.015em] text-zinc-900"
           >
             <InlineText text={block.text} />
@@ -275,6 +279,7 @@ function renderBlock(block: Block, key: number): ReactNode {
         <h3
           key={key}
           {...anchor}
+          style={style}
           className="scroll-mt-6 mt-6 mb-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em] text-zinc-900"
         >
           <InlineText text={block.text} />
@@ -284,7 +289,7 @@ function renderBlock(block: Block, key: number): ReactNode {
 
     case "paragraph":
       return (
-        <p key={key} className={BODY_TEXT}>
+        <p key={key} style={blockTextStyle(block.align, block.lineHeight)} className={BODY_TEXT}>
           <InlineText text={block.text} />
         </p>
       );

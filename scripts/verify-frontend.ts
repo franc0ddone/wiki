@@ -6,8 +6,28 @@
  * separately; this script covers everything that can be decided without one.
  */
 import assert from "node:assert/strict";
+import { EditorState } from "@tiptap/pm/state";
+import type { Transaction } from "@tiptap/pm/state";
+import { Schema } from "@tiptap/pm/model";
+import {
+  closeDoubleQuote,
+  closeSingleQuote,
+  ellipsis,
+  emDash,
+  openDoubleQuote,
+  openSingleQuote,
+} from "@tiptap/extension-typography";
+import type { InputRule } from "@tiptap/core";
 import { parseInline, inlinePlain } from "@/lib/markdown/inline";
 import { collectFootnotes, collectHeadings, extractToc, parseMarkdown, splitTableRow } from "@/lib/markdown/parser";
+import {
+  LINE_HEIGHTS,
+  blockTextStyle,
+  serializeBlockAttributes,
+  splitBlockAttributes,
+} from "@/lib/markdown/block-attributes";
+import { MARK_DELIMITERS, splitInlineConventions } from "@/lib/markdown/inline-conventions";
+import { buildEditorExtensions } from "@/components/editor/extensions";
 import {
   IMAGE_MAX_WIDTH,
   IMAGE_MIN_WIDTH,
@@ -414,6 +434,226 @@ check("the link picker's search finds a procedure fuzzily", () => {
   const outcome = search(index, "parvo isolaton", { surfaces: ["articles"] });
   assert.ok(outcome.bySurface.articles.length > 0, "no procedure matched a typo'd query");
   assert.match(outcome.bySurface.articles[0]?.title ?? "", /parvo/i);
+});
+
+console.log("paragraph formatting");
+check("block attributes recognise only the keys they own", () => {
+  assert.deepEqual(splitBlockAttributes("Confirm the dose."), {
+    text: "Confirm the dose.",
+    align: null,
+    lineHeight: null,
+    id: null,
+  });
+  assert.deepEqual(splitBlockAttributes("Give IM.{align=center}"), {
+    text: "Give IM.",
+    align: "center",
+    lineHeight: null,
+    id: null,
+  });
+  assert.deepEqual(splitBlockAttributes("Titrate slowly.{line-height=1.5}"), {
+    text: "Titrate slowly.",
+    align: null,
+    lineHeight: "1.5",
+    id: null,
+  });
+  assert.deepEqual(splitBlockAttributes("Purpose {#purpose align=justify line-height=2}"), {
+    text: "Purpose",
+    align: "justify",
+    lineHeight: "2",
+    id: "purpose",
+  });
+  // Prose braces, unknown keys and values outside the offered set are not formatting.
+  assert.equal(splitBlockAttributes("Give {2 mg}").text, "Give {2 mg}");
+  assert.equal(splitBlockAttributes("Ratio {width=3 align=sideways}").text, "Ratio {width=3 align=sideways}");
+  assert.equal(splitBlockAttributes("Half {line-height=1.25}").text, "Half {line-height=1.25}");
+  // A group that would leave the block empty is its own paragraph, not a directive.
+  assert.equal(splitBlockAttributes("{align=center}").text, "{align=center}");
+});
+check("alignment + line-height survive save → reload → render", () => {
+  // What the editor writes …
+  const suffix = serializeBlockAttributes({ align: "center", lineHeight: "1.5" });
+  assert.equal(suffix, "{align=center line-height=1.5}");
+  assert.equal(serializeBlockAttributes({ align: null, lineHeight: null }), "");
+
+  // … what the reader loads …
+  const [block] = parseMarkdown(`Confirm the dose before induction.${suffix}`);
+  assert.equal(block.kind, "paragraph");
+  if (block.kind !== "paragraph") throw new Error("expected a paragraph");
+  assert.equal(block.text, "Confirm the dose before induction.");
+  assert.equal(block.align, "center");
+  assert.equal(block.lineHeight, "1.5");
+
+  // … and what it renders.
+  assert.deepEqual(blockTextStyle(block.align, block.lineHeight), { textAlign: "center", lineHeight: "1.5" });
+  assert.equal(blockTextStyle(null, null), undefined, "an unformatted block keeps the reader's own styling");
+  assert.deepEqual(blockTextStyle("right", null), { textAlign: "right" });
+  assert.deepEqual(LINE_HEIGHTS, ["1", "1.5", "2"]);
+});
+check("heading formatting keeps its explicit id, and plain `{#id}` is unchanged", () => {
+  const [heading] = parseMarkdown("## Purpose {#purpose align=center}");
+  assert.equal(heading.kind, "heading");
+  if (heading.kind !== "heading") throw new Error("expected a heading");
+  assert.equal(heading.id, "purpose");
+  assert.equal(heading.text, "Purpose");
+  assert.equal(heading.align, "center");
+  assert.equal(heading.lineHeight, null);
+  assert.deepEqual(blockTextStyle(heading.align, heading.lineHeight), { textAlign: "center" });
+  assert.deepEqual(collectHeadings(parseMarkdown("## Purpose {#why}")).map((h) => [h.id, h.text]), [["why", "Purpose"]]);
+});
+check("a block image's suffix is still the image's, not the paragraph's", () => {
+  const [image] = parseMarkdown('![Crash cart](https://cdn.example/x.png){width=480 align=right}');
+  assert.equal(image.kind, "image");
+  if (image.kind === "image") {
+    assert.equal(image.align, "right");
+    assert.equal(image.width, 480);
+  }
+});
+
+console.log("inline formatting");
+check("subscript, superscript and highlight round-trip through the reader", () => {
+  const nodes = parseInline("H~2~O at 10^9^ CFU ==check the label==");
+  assert.deepEqual(
+    nodes.map((node) => node.t),
+    ["text", "subscript", "text", "superscript", "text", "highlight"],
+  );
+  assert.equal(inlinePlain(nodes), "H2O at 109 CFU check the label");
+  // The delimiters the editor serializes are exactly the ones the reader reads.
+  assert.deepEqual(MARK_DELIMITERS, {
+    subscript: { open: "~", close: "~" },
+    superscript: { open: "^", close: "^" },
+    highlight: { open: "==", close: "==" },
+  });
+});
+check("nested emphasis inside a highlight is kept", () => {
+  const [highlight] = parseInline("==**urgent**==");
+  assert.equal(highlight.t, "highlight");
+  if (highlight.t !== "highlight") throw new Error("expected a highlight");
+  assert.equal(highlight.c[0]?.t, "strong");
+  assert.equal(inlinePlain(highlight.c), "urgent");
+});
+check("lone markers stay prose (approximate doses, powers, strike)", () => {
+  assert.equal(inlinePlain(parseInline("Give ~5 mg IM")), "Give ~5 mg IM");
+  assert.equal(inlinePlain(parseInline("10^6 CFU/mL")), "10^6 CFU/mL");
+  assert.equal(inlinePlain(parseInline("~~withdrawn~~")), "~~withdrawn~~");
+  assert.equal(inlinePlain(parseInline("pH == 7")), "pH == 7");
+  // `[^1]` is still a footnote reference, not a superscript.
+  assert.equal(parseInline("See this[^1] and that[^2].").filter((node) => node.t === "footnoteRef").length, 2);
+});
+check("the editor's delimiter scanner and the reader segment identically", () => {
+  const fixtures = [
+    "H~2~O",
+    "10^9^ CFU",
+    "==mark me==",
+    "Give ~5 mg",
+    "pH == 7",
+    "~~withdrawn~~",
+    "H~2~O then ==checked==",
+    "plain text",
+  ];
+  for (const fixture of fixtures) {
+    const fromEditor = splitInlineConventions(fixture).map((part) => ({ kind: part.kind, value: part.value }));
+    const fromReader = parseInline(fixture).map((node) =>
+      node.t === "text" ? { kind: "text" as const, value: node.v } : { kind: node.t, value: inlinePlain([node]) },
+    );
+    assert.deepEqual(fromEditor, fromReader, `disagreement on ${JSON.stringify(fixture)}`);
+  }
+});
+check("stripMarkdown drops the stored delimiters and suffixes, keeps the words", () => {
+  assert.equal(
+    stripMarkdown("H~2~O at 10^9^ CFU ==checked==\n\nCentred text.{align=center}\n\n## Purpose {#purpose}"),
+    "H2O at 109 CFU checked Centred text. Purpose",
+  );
+});
+
+console.log("typography");
+/** One paragraph of text is all a text input rule needs. */
+const TYPOGRAPHY_SCHEMA = new Schema({
+  nodes: {
+    doc: { content: "block+" },
+    paragraph: { content: "inline*", group: "block" },
+    text: { group: "inline" },
+  },
+});
+
+/**
+ * Apply a Tiptap text input rule the way the editor does: the typed characters
+ * are already in the document and the rule rewrites the span its `find`
+ * matched. The real rule objects from `@tiptap/extension-typography` run
+ * against a real ProseMirror transaction — no DOM, nothing reimplemented.
+ */
+function typeInto(rule: InputRule, typed: string): string {
+  const doc = TYPOGRAPHY_SCHEMA.node("doc", null, [
+    TYPOGRAPHY_SCHEMA.node("paragraph", null, [TYPOGRAPHY_SCHEMA.text(typed)]),
+  ]);
+  const state = EditorState.create({ doc, schema: TYPOGRAPHY_SCHEMA });
+
+  const find = rule.find;
+  assert.ok(find instanceof RegExp, "expected a pattern-driven input rule");
+  const match = find.exec(typed);
+  assert.ok(match, `${String(find)} does not match ${JSON.stringify(typed)}`);
+
+  // The handler reads `state.tr`, `range` and `match` only, and `tr` is pinned
+  // to one transaction (`EditorState#tr` would hand back a fresh one).
+  const tr = state.tr;
+  const handler = rule.handler as (props: {
+    state: { tr: Transaction };
+    range: { from: number; to: number };
+    match: RegExpExecArray;
+  }) => void;
+  // Paragraph text starts at position 1, so text index i is document position 1 + i.
+  handler({
+    state: { tr },
+    range: { from: 1 + match.index, to: 1 + match.index + match[0].length },
+    match,
+  });
+  return tr.doc.textContent;
+}
+
+check("smart quotes, em dashes and ellipses are applied as they are typed", () => {
+  assert.equal(typeInto(emDash(), "Hold --"), "Hold —");
+  assert.equal(typeInto(ellipsis(), "Wait..."), "Wait…");
+  assert.equal(typeInto(openDoubleQuote(), 'He said "'), "He said “");
+  assert.equal(typeInto(closeDoubleQuote(), 'He said “done"'), "He said “done”");
+  assert.equal(typeInto(openSingleQuote(), "She said '"), "She said ‘");
+  assert.equal(typeInto(closeSingleQuote(), "the dogs'"), "the dogs’");
+});
+check("the transformed characters are what gets stored, and survive the reader", () => {
+  const stored = "He said “hold” — then wait…";
+  assert.equal(inlinePlain(parseInline(stored)), stored);
+  assert.equal(stripMarkdown(stored), stored);
+});
+check("the editor schema is wired once, and typography only rewrites what it should", () => {
+  const extensions = buildEditorExtensions();
+  const names = extensions.map((extension) => extension.name);
+  assert.equal(new Set(names).size, names.length, `duplicate extensions: ${names.join(", ")}`);
+  for (const required of [
+    "paragraph",
+    "heading",
+    "textAlign",
+    "lineHeight",
+    "blockFormatting",
+    "subscript",
+    "superscript",
+    "highlight",
+    "inlineDelimiters",
+    "typography",
+  ]) {
+    assert.ok(names.includes(required), `the editor schema is missing ${required}`);
+  }
+
+  const typography = extensions.find((extension) => extension.name === "typography");
+  assert.ok(typography, "typography is not in the editor schema");
+  const options = (typography as { options: Record<string, unknown> }).options;
+  assert.equal(options.emDash, "—");
+  assert.equal(options.ellipsis, "…");
+  assert.equal(options.openDoubleQuote, "“");
+  assert.equal(options.closeDoubleQuote, "”");
+  assert.equal(options.openSingleQuote, "‘");
+  assert.equal(options.closeSingleQuote, "’");
+  // The rest of Tiptap's typography set would rewrite clinical text.
+  assert.equal(options.multiplication, false, "`2 x 3` must stay as typed");
+  assert.equal(options.superscriptTwo, false, "`10^2` must stay as typed");
+  assert.equal(options.rightArrow, false, "`->` must stay as typed");
 });
 
 console.log(`\n${passed} checks passed.`);

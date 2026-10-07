@@ -1,13 +1,28 @@
 "use client";
 
-import { mergeAttributes, Node, NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
+import { Extension, mergeAttributes, Node, NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { Heading } from "@tiptap/extension-heading";
+import { Paragraph } from "@tiptap/extension-paragraph";
+import { TextAlign } from "@tiptap/extension-text-align";
+import { Subscript } from "@tiptap/extension-subscript";
+import { Superscript } from "@tiptap/extension-superscript";
+import { Highlight } from "@tiptap/extension-highlight";
+import { Typography } from "@tiptap/extension-typography";
 import { Table } from "@tiptap/extension-table";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import { Markdown } from "tiptap-markdown";
+import {
+  LINE_HEIGHTS,
+  serializeBlockAttributes,
+  splitBlockAttributes,
+  type LineHeight,
+  type TextAlignment,
+} from "@/lib/markdown/block-attributes";
+import { findInlineClose, INLINE_DELIMITERS, MARK_DELIMITERS } from "@/lib/markdown/inline-conventions";
 import { CALLOUT_VARIANTS, normalizeVariant, type CalloutVariant } from "@/lib/markdown/parser";
 import {
   clampWidth,
@@ -31,6 +46,17 @@ import { ImageView } from "@/components/editor/ImageView";
  *   table      →  GFM pipe table         (one paragraph per cell, header row first)
  *   codeBlock  →  ```lang                (`mermaid` renders a diagram)
  *
+ * Paragraph and heading formatting rides on the same kind of suffix:
+ *
+ *   paragraph  →  Text.{align=center line-height=1.5}
+ *   heading    →  ## Title {#id align=center}
+ *
+ * Inline emphasis the reader can show:
+ *
+ *   subscript  →  H~2~O
+ *   superscript→  m^2^
+ *   highlight  →  ==mark==
+ *
  * Deliberately NOT in the schema: strike, underline, hard breaks, font /
  * colour — nothing the reader cannot show, nothing that could be silently lost
  * on a round trip.
@@ -49,12 +75,16 @@ interface MarkdownState {
   closeBlock(node: unknown): void;
   ensureNewLine(): void;
   renderContent(node: unknown): void;
+  renderInline(node: unknown, fromBlockStart?: boolean): void;
+  repeat(text: string, count: number): string;
   wrapBlock(delim: string, firstDelim: string | null, node: unknown, render: () => void): void;
 }
 
 interface PMNodeLike {
   text?: string | null;
   attrs: Record<string, unknown>;
+  /** Present on real ProseMirror nodes; the paragraph serializer reads its size. */
+  content?: { size: number };
 }
 
 /* ------------------------------------------------------------------- text */
@@ -204,6 +234,11 @@ declare module "@tiptap/core" {
     footnote: {
       /** Insert a footnote reference at the cursor, ensuring a definition block exists. */
       insertFootnote: () => ReturnType;
+    };
+    lineHeight: {
+      /** Set the line spacing of the block (paragraph or heading) at the selection. */
+      setLineHeight: (lineHeight: LineHeight) => ReturnType;
+      unsetLineHeight: () => ReturnType;
     };
   }
 }
@@ -695,6 +730,240 @@ const TaskItem = Node.create({
   },
 });
 
+/* -------------------------------------------------------- block formatting */
+
+/**
+ * Line spacing as a block attribute (`line-height` on the paragraph/heading),
+ * with the three steps the toolbar offers. Tiptap's own TextAlign extension
+ * supplies text alignment the same way; both ride on the single stored `{…}`
+ * suffix that `lib/markdown/block-attributes.ts` defines.
+ */
+const LineHeight = Extension.create<{ types: string[] }>({
+  name: "lineHeight",
+  addOptions() {
+    return { types: [] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          lineHeight: {
+            default: null,
+            parseHTML: (element: HTMLElement) => {
+              const raw = element.style.lineHeight;
+              return (LINE_HEIGHTS as readonly string[]).includes(raw) ? (raw as LineHeight) : null;
+            },
+            renderHTML: (attributes: Record<string, unknown>) =>
+              attributes.lineHeight ? { style: `line-height: ${String(attributes.lineHeight)}` } : {},
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setLineHeight:
+        (lineHeight: LineHeight) =>
+        ({ commands }) =>
+          this.options.types.some((type) => commands.updateAttributes(type, { lineHeight })),
+      unsetLineHeight:
+        () =>
+        ({ commands }) =>
+          this.options.types.some((type) => commands.resetAttributes(type, "lineHeight")),
+    };
+  },
+});
+
+/** The stored `{align=… line-height=…}` suffix for a block, or `""`. */
+function blockFormattingSuffix(attrs: Record<string, unknown>): string {
+  return serializeBlockAttributes({
+    align: (attrs.textAlign as TextAlignment | null) ?? null,
+    lineHeight: (attrs.lineHeight as LineHeight | null) ?? null,
+  });
+}
+
+/**
+ * Paragraphs serialize exactly as prosemirror-markdown does, plus the suffix
+ * the reader reads back. An empty block carries no suffix — a `{align=…}` on a
+ * blank line would be prose, not formatting.
+ */
+const BlockParagraph = Paragraph.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.renderInline(node);
+          const suffix = (node.content?.size ?? 0) > 0 ? blockFormattingSuffix(node.attrs) : "";
+          if (suffix) state.write(suffix);
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
+const BlockHeading = Heading.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(`${state.repeat("#", Number(node.attrs.level ?? 1))} `);
+          state.renderInline(node, false);
+          // A heading's suffix follows a space, as `## Title {#id}` always has.
+          const suffix = (node.content?.size ?? 0) > 0 ? blockFormattingSuffix(node.attrs) : "";
+          if (suffix) state.write(` ${suffix}`);
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
+/** The last text node inside a block, or `null` when it holds no text. */
+function lastTextNode(element: HTMLElement): Text | null {
+  let found: Text | null = null;
+  const walker = element.ownerDocument.createTreeWalker(element, 4); // NodeFilter.SHOW_TEXT
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) found = node as Text;
+  return found;
+}
+
+/**
+ * Pre-parse pass over markdown-it's output: lift the trailing `{align=…}` group
+ * off a paragraph or heading and onto the element, where TextAlign and
+ * LineHeight's own `parseHTML` rules pick it up. A group no key recognises is
+ * left alone, and one that follows an `<img>` belongs to the image node — its
+ * own `{width=… align=…}` suffix.
+ */
+function applyBlockFormatting(element: HTMLElement) {
+  element.querySelectorAll<HTMLElement>("p, h1, h2, h3").forEach((block) => {
+    const text = lastTextNode(block);
+    if (!text) return;
+    if (text.previousElementSibling?.tagName === "IMG") return;
+
+    const parsed = splitBlockAttributes(text.data);
+    if (parsed.text === text.data) return; // nothing recognised: the text stands
+
+    text.data = parsed.text;
+    if (parsed.align) block.style.textAlign = parsed.align;
+    if (parsed.lineHeight) block.style.lineHeight = parsed.lineHeight;
+  });
+}
+
+const BlockFormatting = Extension.create({
+  name: "blockFormatting",
+  addStorage() {
+    return {
+      markdown: {
+        parse: { updateDOM: applyBlockFormatting },
+      },
+    };
+  },
+});
+
+/* ----------------------------------------------------- inline delimiters */
+
+/**
+ * markdown-it inline rules for `~sub~`, `^sup^` and `==mark==`.
+ *
+ * Written in house for the same reason the details and footnote rules are: the
+ * delimiters must mean exactly what `lib/markdown/inline.ts` says they mean, so
+ * both sides close a run with `findInlineClose` from
+ * `lib/markdown/inline-conventions.ts`. markdown-it emits `<sub>` / `<sup>` /
+ * `<mark>`, which the Tiptap marks below parse; the run's content is tokenized
+ * into the same stream, so `H~2~O` and `==**urgent**==` nest properly.
+ */
+function inlineDelimiterPlugin(md: unknown) {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const instance = md as any;
+  if (instance.__doveInlineDelimiters) return;
+  instance.__doveInlineDelimiters = true;
+
+  for (const spec of INLINE_DELIMITERS) {
+    instance.inline.ruler.before("emphasis", `dove_${spec.kind}`, (state: any, silent: boolean) => {
+      const start = state.pos;
+      const src: string = state.src;
+      if (!src.startsWith(spec.marker, start)) return false;
+      // `[^1]` is a footnote reference; `~~`, `^^` and `===` are not delimiters.
+      if (spec.marker === "^" && src[start - 1] === "[") return false;
+      if (src[start - 1] === spec.marker[0]) return false;
+
+      const close = findInlineClose(src, start + spec.marker.length, state.posMax, spec);
+      if (close === -1) return false;
+      if (silent) return true;
+
+      const open = state.push(`${spec.kind}_open`, spec.tag, 1);
+      open.markup = spec.marker;
+
+      // Tokenize the content in place, as markdown-it's own link rule does.
+      const outerPos = state.pos;
+      const outerMax = state.posMax;
+      state.pos = start + spec.marker.length;
+      state.posMax = close;
+      state.md.inline.tokenize(state);
+      state.pos = outerPos;
+      state.posMax = outerMax;
+
+      const shut = state.push(`${spec.kind}_close`, spec.tag, -1);
+      shut.markup = spec.marker;
+      state.pos = close + spec.marker.length;
+      return true;
+    });
+  }
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+}
+
+const InlineDelimiters = Extension.create({
+  name: "inlineDelimiters",
+  addStorage() {
+    return {
+      markdown: {
+        parse: { setup: inlineDelimiterPlugin },
+      },
+    };
+  },
+});
+
+/**
+ * The three marks, serialized with the same delimiters the reader parses. The
+ * elements markdown-it emits are exactly the tags these extensions already
+ * parse, so no `parseHTML` override is needed.
+ */
+const MarkdownSubscript = Subscript.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { ...MARK_DELIMITERS.subscript, expelEnclosingWhitespace: true },
+        parse: {},
+      },
+    };
+  },
+});
+
+const MarkdownSuperscript = Superscript.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { ...MARK_DELIMITERS.superscript, expelEnclosingWhitespace: true },
+        parse: {},
+      },
+    };
+  },
+});
+
+const MarkdownHighlight = Highlight.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { ...MARK_DELIMITERS.highlight, expelEnclosingWhitespace: true },
+        parse: {},
+      },
+    };
+  },
+});
+
 /* ---------------------------------------------------------------- builder */
 
 /** Links the reader will render: web, mail, phone, site-relative, in-page. */
@@ -708,14 +977,50 @@ function isAllowedLinkUri(url: string): boolean {
 export function buildEditorExtensions() {
   return [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3] }, // H1 is not offered in the toolbar but must survive a round trip
+      // Paragraphs and headings are re-declared below: their stored form
+      // carries the paragraph-formatting suffix.
+      paragraph: false,
+      heading: false,
       strike: false,
       underline: false,
       hardBreak: false,
       text: false, // replaced by MarkdownText below
       link: { openOnClick: false, autolink: false, isAllowedUri: isAllowedLinkUri },
     }),
+    BlockHeading.configure({ levels: [1, 2, 3] }), // H1 is not offered in the toolbar but must survive a round trip
+    BlockParagraph,
     MarkdownText,
+    // Paragraph formatting: alignment, line spacing, and the suffix that makes
+    // both survive a save → reload → render round trip.
+    TextAlign.configure({ types: ["heading", "paragraph"] }),
+    LineHeight.configure({ types: ["heading", "paragraph"] }),
+    BlockFormatting,
+    // Inline emphasis the reader can show.
+    MarkdownSubscript,
+    MarkdownSuperscript,
+    MarkdownHighlight,
+    InlineDelimiters,
+    Typography.configure({
+      // Smart quotes, em dashes and ellipses only. The rest of Tiptap's
+      // typography set would rewrite clinical text — `2 x 3` into `2 × 3`,
+      // `10^2` into `10²` — and fight the `^` superscript syntax.
+      leftArrow: false,
+      rightArrow: false,
+      copyright: false,
+      trademark: false,
+      servicemark: false,
+      registeredTrademark: false,
+      oneHalf: false,
+      oneQuarter: false,
+      threeQuarters: false,
+      plusMinus: false,
+      notEqual: false,
+      laquo: false,
+      raquo: false,
+      multiplication: false,
+      superscriptTwo: false,
+      superscriptThree: false,
+    }),
     ArticleImage,
     Callout,
     Details,

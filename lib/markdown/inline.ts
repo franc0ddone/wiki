@@ -7,23 +7,38 @@
  *
  * Supported: `code`, `**strong**`, `*emphasis*` (nested and combined, e.g.
  * `**bold *and italic***` and `***both***`), `[label](href)`, `![alt](src)`,
- * and backslash escapes (`\*`, `\|`, `\[` …). Underscore emphasis is
- * deliberately not supported: clinical text is full of `snake_case`-looking
- * identifiers and the editor's serializer only ever emits `*`.
+ * backslash escapes (`\*`, `\|`, `\[` …), and the three delimiter pairs from
+ * `lib/markdown/inline-conventions.ts` — `~sub~`, `^sup^` and `==mark==`.
+ * Underscore emphasis is deliberately not supported: clinical text is full of
+ * `snake_case`-looking identifiers and the editor's serializer only ever emits
+ * `*`.
  *
  * Emphasis follows the CommonMark flanking rule in simplified form: an opening
  * run must be followed by a non-space, a closing run must be preceded by one.
  * `2 * 3 * 4` is therefore arithmetic, not italics.
  */
 
+import { findInlineClose, INLINE_DELIMITERS } from "@/lib/markdown/inline-conventions";
+import type { InlineConventionKind, InlineDelimiterSpec } from "@/lib/markdown/inline-conventions";
+
 export type Inline =
   | { t: "text"; v: string }
   | { t: "code"; v: string }
   | { t: "strong"; c: Inline[] }
   | { t: "em"; c: Inline[] }
+  | { t: "subscript"; c: Inline[] }
+  | { t: "superscript"; c: Inline[] }
+  | { t: "highlight"; c: Inline[] }
   | { t: "link"; href: string; c: Inline[] }
   | { t: "image"; alt: string; src: string }
   | { t: "footnoteRef"; label: string };
+
+/** The convention kinds map 1:1 onto node types; this keeps the union narrow-able. */
+function conventionNode(kind: InlineConventionKind, children: Inline[]): Inline {
+  if (kind === "subscript") return { t: "subscript", c: children };
+  if (kind === "superscript") return { t: "superscript", c: children };
+  return { t: "highlight", c: children };
+}
 
 type Closer = "**" | "*";
 
@@ -116,6 +131,21 @@ function parseRun(
       }
     }
 
+    // `~sub~`, `^sup^`, `==mark==` — the delimiters shared with the editor.
+    // Before emphasis: none of these markers is `*`, but keeping them ahead of
+    // the `*` branch makes the precedence obvious.
+    const convention = conventionSpecAt(src, i);
+    if (convention) {
+      const open = i + convention.marker.length;
+      const close = findInlineClose(src, open, src.length, convention);
+      if (close !== -1) {
+        flush();
+        nodes.push(conventionNode(convention.kind, parseInline(src.slice(open, close))));
+        i = close + convention.marker.length;
+        continue;
+      }
+    }
+
     // Emphasis.
     if (ch === "*") {
       let run = 1;
@@ -164,6 +194,22 @@ function parseRun(
 
 function isSpace(ch: string | undefined): boolean {
   return ch === undefined || WHITESPACE.test(ch);
+}
+
+/**
+ * The delimiter run starting at `index`, if one starts there.
+ *
+ * Shares the reader's rules with the editor: `[^1]` stays a footnote
+ * reference, and a doubled marker (`~~`) is never a delimiter.
+ */
+function conventionSpecAt(src: string, index: number): InlineDelimiterSpec | null {
+  for (const spec of INLINE_DELIMITERS) {
+    if (!src.startsWith(spec.marker, index)) continue;
+    if (spec.marker === "^" && src[index - 1] === "[") continue;
+    if (src[index - 1] === spec.marker[0]) continue;
+    return spec;
+  }
+  return null;
 }
 
 function findBacktickRun(src: string, from: number, length: number): number {

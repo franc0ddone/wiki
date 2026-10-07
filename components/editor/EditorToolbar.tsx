@@ -5,11 +5,17 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useEditorState } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Asterisk,
   Bold,
   ChevronDown,
   Code,
   Heading2,
   Heading3,
+  Highlighter,
   ImagePlus,
   Info,
   Italic,
@@ -21,11 +27,13 @@ import {
   Minus,
   Quote,
   Redo2,
+  Subscript,
   Superscript,
   Table2,
   Undo2,
 } from "lucide-react";
 import { CALLOUT_LABELS } from "@/components/editor/extensions";
+import { LINE_HEIGHTS, LINE_HEIGHT_LABELS, type LineHeight } from "@/lib/markdown/block-attributes";
 import { CALLOUT_VARIANTS, type CalloutVariant } from "@/lib/markdown/parser";
 import { cx } from "@/lib/utils";
 
@@ -232,6 +240,17 @@ export function EditorToolbar({
       image: current.isActive("image"),
       table: current.isActive("table"),
       headerCell: current.isActive("tableHeader"),
+      subscript: current.isActive("subscript"),
+      superscript: current.isActive("superscript"),
+      highlight: current.isActive("highlight"),
+      alignLeft: current.isActive({ textAlign: "left" }),
+      alignCenter: current.isActive({ textAlign: "center" }),
+      alignRight: current.isActive({ textAlign: "right" }),
+      alignJustify: current.isActive({ textAlign: "justify" }),
+      lineHeight:
+        ((current.isActive("heading")
+          ? current.getAttributes("heading").lineHeight
+          : current.getAttributes("paragraph").lineHeight) as LineHeight | null) ?? null,
       canUndo: current.can().undo(),
       canRedo: current.can().redo(),
     }),
@@ -270,6 +289,15 @@ export function EditorToolbar({
         <ToolButton label="Italic" shortcut="Ctrl+I" active={state.italic} onClick={() => chain().toggleItalic().run()}>
           <Italic size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
+        <ToolButton label="Subscript" shortcut="Ctrl+," active={state.subscript} onClick={() => chain().toggleSubscript().run()}>
+          <Subscript size={16} strokeWidth={1.75} aria-hidden="true" />
+        </ToolButton>
+        <ToolButton label="Superscript" shortcut="Ctrl+." active={state.superscript} onClick={() => chain().toggleSuperscript().run()}>
+          <Superscript size={16} strokeWidth={1.75} aria-hidden="true" />
+        </ToolButton>
+        <ToolButton label="Highlight" shortcut="Ctrl+Shift+H" active={state.highlight} onClick={() => chain().toggleHighlight().run()}>
+          <Highlighter size={16} strokeWidth={1.75} aria-hidden="true" />
+        </ToolButton>
         <Divider />
         <ToolButton label="Heading 2" active={state.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()}>
           <Heading2 size={17} strokeWidth={1.75} aria-hidden="true" />
@@ -277,6 +305,43 @@ export function EditorToolbar({
         <ToolButton label="Heading 3" active={state.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()}>
           <Heading3 size={17} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
+        <Divider />
+        <div role="group" aria-label="Paragraph formatting" className="flex items-center gap-0.5">
+          <ToolButton label="Align left" shortcut="Ctrl+Shift+L" active={state.alignLeft} onClick={() => chain().toggleTextAlign("left").run()}>
+            <AlignLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          </ToolButton>
+          <ToolButton label="Align center" shortcut="Ctrl+Shift+E" active={state.alignCenter} onClick={() => chain().toggleTextAlign("center").run()}>
+            <AlignCenter size={16} strokeWidth={1.75} aria-hidden="true" />
+          </ToolButton>
+          <ToolButton label="Align right" shortcut="Ctrl+Shift+R" active={state.alignRight} onClick={() => chain().toggleTextAlign("right").run()}>
+            <AlignRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          </ToolButton>
+          <ToolButton label="Justify" shortcut="Ctrl+Shift+J" active={state.alignJustify} onClick={() => chain().toggleTextAlign("justify").run()}>
+            <AlignJustify size={16} strokeWidth={1.75} aria-hidden="true" />
+          </ToolButton>
+          <label htmlFor="line-spacing" className="sr-only">
+            Line spacing
+          </label>
+          <select
+            id="line-spacing"
+            value={state.lineHeight ?? ""}
+            title="Line spacing"
+            aria-label="Line spacing"
+            onChange={(event) =>
+              event.target.value === ""
+                ? chain().unsetLineHeight().run()
+                : chain().setLineHeight(event.target.value as LineHeight).run()
+            }
+            className="h-8 rounded-md border border-zinc-300/70 bg-white px-1.5 text-[12.5px] text-zinc-700 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+          >
+            <option value="">Line spacing</option>
+            {LINE_HEIGHTS.map((value) => (
+              <option key={value} value={value}>
+                {LINE_HEIGHT_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </div>
         <Divider />
         <ToolButton label="Bulleted list" active={state.bullet} onClick={() => chain().toggleBulletList().run()}>
           <List size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -306,7 +371,7 @@ export function EditorToolbar({
           <Link2 size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
         <ToolButton label="Footnote" onClick={() => chain().insertFootnote().run()}>
-          <Superscript size={16} strokeWidth={1.75} aria-hidden="true" />
+          <Asterisk size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
         <ToolButton
           label={state.image ? "Edit image alt text" : "Insert image"}

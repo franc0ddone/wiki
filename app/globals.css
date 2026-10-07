@@ -296,6 +296,21 @@ input[type="search"]::-webkit-search-decoration {
   color: #18181b;
 }
 
+/* Inline formatting the reader also renders: `==mark==` and `~sub~` / `^sup^`. */
+.dw-prose mark {
+  border-radius: 3px;
+  background: rgba(253, 230, 138, 0.7);
+  padding: 0 0.15em;
+  color: #18181b;
+}
+
+/* `sup:not(.dw-fn-ref)` leaves the footnote marker's own chip alone. */
+.dw-prose sub,
+.dw-prose sup:not(.dw-fn-ref) {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
 .dw-prose a {
   color: #0f766e;
   font-weight: 500;

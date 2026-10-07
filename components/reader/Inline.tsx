@@ -15,6 +15,10 @@ import {
  * Every node is a React element or a text string. There is no HTML string path
  * anywhere in the reader, so stored markdown can never become injected markup.
  * URLs pass an allowlist before they reach an `href` / `src`.
+ *
+ * Inline formatting: `**strong**`, `*emphasis*`, `~sub~`, `^sup^` and
+ * `==mark==` (the delimiter set is defined once, in
+ * `lib/markdown/inline-conventions.ts`).
  */
 
 export interface ReaderNav {
@@ -81,6 +85,27 @@ function renderNodes(
           <em key={key} className="italic text-zinc-800">
             {renderNodes(node.c, nav, `${key}.`, counts)}
           </em>
+        );
+      case "subscript":
+        return (
+          <sub key={key} className="text-[0.75em]">
+            {renderNodes(node.c, nav, `${key}.`, counts)}
+          </sub>
+        );
+      case "superscript":
+        return (
+          <sup key={key} className="text-[0.75em]">
+            {renderNodes(node.c, nav, `${key}.`, counts)}
+          </sup>
+        );
+      case "highlight":
+        return (
+          <mark
+            key={key}
+            className="rounded-[3px] bg-amber-200/70 px-[0.15em] text-zinc-900"
+          >
+            {renderNodes(node.c, nav, `${key}.`, counts)}
+          </mark>
         );
       case "footnoteRef": {
         const number = nav.footnoteNumbers?.get(node.label);

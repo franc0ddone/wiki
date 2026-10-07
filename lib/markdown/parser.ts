@@ -8,8 +8,8 @@
  * re-derives them).
  *
  * Syntax:
- *   # / ## / ###          headings; optional explicit id suffix `## Title {#custom-id}`
- *   paragraphs            lines joined with a space
+ *   # / ## / ###          headings; optional attribute suffix `## Title {#custom-id align=center}`
+ *   paragraphs            lines joined with a space; optional `{align=… line-height=…}` suffix
  *   - / * / 1.            lists, nested by indentation; `- [ ]` / `- [x]` task items
  *   | a | b |             pipe tables; a literal pipe inside a cell is `\|`
  *   > text                quote; `> [!note|tip|dosing|protocol|warning|critical]` callout
@@ -20,6 +20,11 @@
  */
 
 import { inlinePlain, parseInline } from "@/lib/markdown/inline";
+import {
+  splitBlockAttributes,
+  type LineHeight,
+  type TextAlignment,
+} from "@/lib/markdown/block-attributes";
 import {
   IMAGE_LINE_PATTERN,
   parseImageAttributes,
@@ -50,8 +55,24 @@ export interface ListBlock {
 }
 
 export type Block =
-  | { kind: "heading"; level: 1 | 2 | 3; id: string; text: string }
-  | { kind: "paragraph"; text: string }
+  | {
+      kind: "heading";
+      level: 1 | 2 | 3;
+      id: string;
+      text: string;
+      /** From the `{align=…}` suffix; `null` = the block default (left). */
+      align: TextAlignment | null;
+      /** From the `{line-height=…}` suffix; `null` = the paragraph default. */
+      lineHeight: LineHeight | null;
+    }
+  | {
+      kind: "paragraph";
+      text: string;
+      /** From the `{align=…}` suffix; `null` = the block default (left). */
+      align: TextAlignment | null;
+      /** From the `{line-height=…}` suffix; `null` = the paragraph default. */
+      lineHeight: LineHeight | null;
+    }
   | {
       kind: "image";
       alt: string;
@@ -85,7 +106,6 @@ export interface HeadingInfo {
 }
 
 const HEADING_RE = /^(#{1,3})\s+(.+?)\s*$/;
-const CUSTOM_ID_RE = /^(.*?)\s*\{#([A-Za-z0-9_-]+)\}$/;
 const LIST_ITEM_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const TASK_RE = /^\[([ xX])\](?:\s+(.*))?$/;
 const QUOTE_RE = /^\s*>\s?(.*)$/;
@@ -348,18 +368,14 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
 
     const heading = HEADING_RE.exec(line);
     if (heading) {
-      let text = heading[2].trim();
-      let explicit: string | null = null;
-      const custom = CUSTOM_ID_RE.exec(text);
-      if (custom && custom[1].length > 0) {
-        text = custom[1].trim();
-        explicit = custom[2];
-      }
+      const parsed = splitBlockAttributes(heading[2].trim());
       blocks.push({
         kind: "heading",
         level: heading[1].length as 1 | 2 | 3,
-        id: nextHeadingId(state, explicit ?? (slugify(text) || "section")),
-        text,
+        id: nextHeadingId(state, parsed.id ?? (slugify(parsed.text) || "section")),
+        text: parsed.text,
+        align: parsed.align,
+        lineHeight: parsed.lineHeight,
       });
       index += 1;
       continue;
@@ -450,7 +466,15 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
         }
       }
     } else {
-      blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+      // Block formatting rides on a trailing `{…}` group; a paragraph that
+      // carries none is stored byte-for-byte as written.
+      const parsed = splitBlockAttributes(paragraph.join(" "));
+      blocks.push({
+        kind: "paragraph",
+        text: parsed.text,
+        align: parsed.align,
+        lineHeight: parsed.lineHeight,
+      });
     }
   }
 
