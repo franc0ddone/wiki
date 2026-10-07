@@ -21,6 +21,7 @@ import {
   Minus,
   Quote,
   Redo2,
+  Superscript,
   Table2,
   Undo2,
 } from "lucide-react";
@@ -303,6 +304,9 @@ export function EditorToolbar({
         <Divider />
         <ToolButton label="Link" active={state.link} onClick={onLink}>
           <Link2 size={16} strokeWidth={1.75} aria-hidden="true" />
+        </ToolButton>
+        <ToolButton label="Footnote" onClick={() => chain().insertFootnote().run()}>
+          <Superscript size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
         <ToolButton
           label={state.image ? "Edit image alt text" : "Insert image"}

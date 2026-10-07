@@ -22,7 +22,8 @@ export type Inline =
   | { t: "strong"; c: Inline[] }
   | { t: "em"; c: Inline[] }
   | { t: "link"; href: string; c: Inline[] }
-  | { t: "image"; alt: string; src: string };
+  | { t: "image"; alt: string; src: string }
+  | { t: "footnoteRef"; label: string };
 
 type Closer = "**" | "*";
 
@@ -91,6 +92,17 @@ function parseRun(
         flush();
         nodes.push({ t: "image", alt: inlinePlain(parseInline(image.label)), src: image.href });
         i = image.end;
+        continue;
+      }
+    }
+    // Footnote reference `[^label]` — must win over the link branch below,
+    // which would otherwise leave the whole run as literal text.
+    if (ch === "[" && src[i + 1] === "^") {
+      const ref = /^\[\^([^\]\s]+)\]/.exec(src.slice(i));
+      if (ref) {
+        flush();
+        nodes.push({ t: "footnoteRef", label: ref[1] });
+        i += ref[0].length;
         continue;
       }
     }
@@ -225,6 +237,9 @@ export function inlinePlain(nodes: readonly Inline[]): string {
           return node.v;
         case "image":
           return node.alt;
+        case "footnoteRef":
+          // A citation marker is not prose; keep it out of heading/search text.
+          return "";
         default:
           return inlinePlain(node.c);
       }

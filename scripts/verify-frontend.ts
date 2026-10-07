@@ -7,7 +7,29 @@
  */
 import assert from "node:assert/strict";
 import { parseInline, inlinePlain } from "@/lib/markdown/inline";
-import { collectHeadings, extractToc, parseMarkdown, splitTableRow } from "@/lib/markdown/parser";
+import { collectFootnotes, collectHeadings, extractToc, parseMarkdown, splitTableRow } from "@/lib/markdown/parser";
+import {
+  IMAGE_MAX_WIDTH,
+  IMAGE_MIN_WIDTH,
+  clampWidth,
+  parseImageAttributes,
+  serializeImageSuffix,
+} from "@/lib/markdown/image-attributes";
+import {
+  parseFootnoteDefinition,
+  scanFootnoteReferences,
+  serializeFootnoteDefinition,
+  serializeFootnoteReference,
+} from "@/lib/markdown/footnotes";
+import {
+  BULLETIN_EXPIRY_DEFAULTS,
+  canPostPriority,
+  defaultExpiryFor,
+  expiryLabel,
+  priorityRequiresClinicalLead,
+  shouldClearAcksForUrgentEdit,
+  validateBulletinDraft,
+} from "@/lib/bulletin/lifecycle";
 import { extractHeadingIds, validateLinks } from "@/lib/links";
 import { validateArticle } from "@/lib/editor/validation";
 import { buildLinkRegistry } from "@/lib/links";
@@ -264,6 +286,134 @@ check("status guard recognises exactly the three lifecycle values", () => {
   assert.equal(isRoleRequestStatus("declined"), true);
   assert.equal(isRoleRequestStatus("open"), false);
   assert.equal(isRoleRequestStatus(1), false);
+});
+
+console.log("bulletin lifecycle");
+check("expiry defaults: urgent 72h, pinned 30d, normal none", () => {
+  const from = new Date("2026-01-01T00:00:00.000Z");
+  assert.equal(defaultExpiryFor("urgent", from)?.toISOString(), "2026-01-04T00:00:00.000Z");
+  assert.equal(defaultExpiryFor("pinned", from)?.toISOString(), "2026-01-31T00:00:00.000Z");
+  assert.equal(defaultExpiryFor("normal", from), null);
+  assert.equal(BULLETIN_EXPIRY_DEFAULTS.urgent, 72 * 60 * 60 * 1000);
+});
+check("expiry labels describe the effective window", () => {
+  assert.equal(expiryLabel("urgent"), "72 hours from now");
+  assert.equal(expiryLabel("pinned"), "30 days from now");
+  assert.equal(expiryLabel("normal"), "No expiry");
+});
+check("priority gate: normal is author+, urgent/pinned are clinical_lead+", () => {
+  assert.equal(canPostPriority("author", "normal"), true);
+  assert.equal(canPostPriority("author", "urgent"), false);
+  assert.equal(canPostPriority("clinical_lead", "urgent"), true);
+  assert.equal(canPostPriority(null, "normal"), false);
+  assert.equal(priorityRequiresClinicalLead("pinned"), true);
+  assert.equal(priorityRequiresClinicalLead("normal"), false);
+});
+check("editing an urgent notice with changed content clears acks", () => {
+  const urgent = { priority: "urgent" as const, title: "A", body_markdown: "B" };
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "urgent", title: "A", body_markdown: "B" }), false);
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "urgent", title: "A", body_markdown: "C" }), true);
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "normal", title: "A", body_markdown: "C" }), false);
+  assert.equal(
+    shouldClearAcksForUrgentEdit(
+      { priority: "normal", title: "A", body_markdown: "B" },
+      { priority: "normal", title: "Z", body_markdown: "Y" },
+    ),
+    false,
+  );
+});
+check("composer validation blocks the fields the API would refuse", () => {
+  const base = {
+    title: "T",
+    body_markdown: "B",
+    departments: ["ER"] as string[],
+    priority: "normal" as "normal" | "urgent" | "pinned",
+    expires_at: undefined as string | null | undefined,
+  };
+  const codes = (patch: Partial<typeof base>, canPostRestricted = false) =>
+    validateBulletinDraft({ ...base, ...patch }, { canPostRestricted }).errors.map((issue) => issue.code);
+  assert.deepEqual(codes({}), []);
+  assert.deepEqual(codes({ title: "   " }), ["title_empty"]);
+  assert.deepEqual(codes({ title: "x".repeat(301) }), ["title_too_long"]);
+  assert.deepEqual(codes({ body_markdown: "" }), ["body_empty"]);
+  assert.deepEqual(codes({ departments: [] }), ["no_departments"]);
+  assert.deepEqual(codes({ priority: "urgent" }), ["priority_forbidden"]);
+  assert.deepEqual(codes({ priority: "urgent" }, true), []);
+  assert.deepEqual(codes({ priority: "urgent", expires_at: null }, true), ["urgent_requires_expiry"]);
+});
+
+console.log("images");
+check("image suffix parses and serializes width + alignment (clamped)", () => {
+  assert.deepEqual(parseImageAttributes("width=480 align=center"), { width: 480, align: "center" });
+  assert.equal(serializeImageSuffix({ width: 480, align: "center" }), "{width=480 align=center}");
+  assert.equal(serializeImageSuffix({ width: null, align: null }), "");
+  assert.equal(clampWidth(10), IMAGE_MIN_WIDTH);
+  assert.equal(clampWidth(99999), IMAGE_MAX_WIDTH);
+  // Unknown keys and malformed alignments are ignored, never thrown on.
+  assert.deepEqual(parseImageAttributes("width=abc align=sideways"), { width: null, align: null });
+});
+check("image block parses caption/width/align; suffix-less images are unchanged", () => {
+  const [withAttrs] = parseMarkdown('![Crash cart](https://cdn.example/x.png "Figure 1"){width=480 align=right}');
+  assert.equal(withAttrs.kind, "image");
+  if (withAttrs.kind === "image") {
+    assert.equal(withAttrs.alt, "Crash cart");
+    assert.equal(withAttrs.src, "https://cdn.example/x.png");
+    assert.equal(withAttrs.title, "Figure 1");
+    assert.equal(withAttrs.width, 480);
+    assert.equal(withAttrs.align, "right");
+  }
+
+  const [plain] = parseMarkdown("![Crash cart](https://cdn.example/x.png)");
+  assert.equal(plain.kind, "image");
+  if (plain.kind === "image") {
+    assert.equal(plain.title, null);
+    assert.equal(plain.width, null);
+    assert.equal(plain.align, null);
+  }
+});
+
+console.log("footnotes");
+check("footnote helpers serialize and parse", () => {
+  assert.equal(serializeFootnoteReference("1"), "[^1]");
+  assert.equal(serializeFootnoteDefinition("1", "Text"), "[^1]: Text");
+  assert.deepEqual(parseFootnoteDefinition("[^note]: See protocol."), { label: "note", text: "See protocol." });
+  assert.equal(parseFootnoteDefinition("plain text"), null);
+  // Code spans are documentation, not citations.
+  assert.deepEqual(scanFootnoteReferences("a[^1] b `[^code]` c[^1]"), ["1", "1"]);
+});
+check("inline footnote reference parses to a node", () => {
+  const nodes = parseInline("See this[^1] and that[^2].");
+  assert.equal(nodes.filter((node) => node.t === "footnoteRef").length, 2);
+  assert.equal(inlinePlain(parseInline("[^1]")), "");
+});
+check("definition lines are pulled out of the body", () => {
+  const blocks = parseMarkdown("Text[^1].\n\n[^1]: Footnote text.");
+  assert.deepEqual(blocks.map((block) => block.kind), ["paragraph", "footnoteDefinition"]);
+});
+check("footnote graph numbers by first reference and degrades gracefully", () => {
+  const md = [
+    "First[^b] then[^a] again[^b] and a broken[^zzz].",
+    "",
+    "[^a]: Alpha definition.",
+    "[^b]: Beta definition.",
+    "[^unused]: Never cited.",
+  ].join("\n");
+  const index = collectFootnotes(parseMarkdown(md));
+  assert.deepEqual(index.order, ["b", "a"]);
+  assert.equal(index.numbers.get("b"), 1);
+  assert.equal(index.numbers.get("a"), 2);
+  assert.equal(index.definitions.get("b"), "Beta definition.");
+  assert.deepEqual(index.unresolved, ["zzz"]);
+  assert.deepEqual(index.unused.map((definition) => definition.label), ["unused"]);
+  // No references at all: nothing numbered, no crash.
+  assert.deepEqual(collectFootnotes(parseMarkdown("Just prose.")).order, []);
+});
+
+console.log("link picker search");
+check("the link picker's search finds a procedure fuzzily", () => {
+  const outcome = search(index, "parvo isolaton", { surfaces: ["articles"] });
+  assert.ok(outcome.bySurface.articles.length > 0, "no procedure matched a typo'd query");
+  assert.match(outcome.bySurface.articles[0]?.title ?? "", /parvo/i);
 });
 
 console.log(`\n${passed} checks passed.`);

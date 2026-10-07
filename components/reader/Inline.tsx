@@ -4,6 +4,10 @@ import { createContext, useContext, useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { parseInline } from "@/lib/markdown/inline";
 import type { Inline } from "@/lib/markdown/inline";
+import {
+  footnoteDefinitionId,
+  footnoteReferenceId,
+} from "@/lib/markdown/footnotes";
 
 /**
  * Inline markdown → React elements.
@@ -18,6 +22,10 @@ export interface ReaderNav {
   onOpenArticle?: (slug: string, anchor?: string) => boolean | void;
   /** Open the lightbox on the image with this `src`. */
   openImage?: (src: string) => void;
+  /** label → 1-based number, for the footnote references this reader has resolved. */
+  footnoteNumbers?: ReadonlyMap<string, number>;
+  /** Labels that actually have a definition; a reference without one is plain text. */
+  footnoteTargets?: ReadonlySet<string>;
 }
 
 export const ReaderNavContext = createContext<ReaderNav>({});
@@ -42,7 +50,12 @@ export function safeImageSrc(src: string): string | undefined {
 
 const PROCEDURE_PREFIX = "/procedures/";
 
-function renderNodes(nodes: readonly Inline[], nav: ReaderNav, keyPrefix: string): ReactNode[] {
+function renderNodes(
+  nodes: readonly Inline[],
+  nav: ReaderNav,
+  keyPrefix: string,
+  counts: Map<string, number>,
+): ReactNode[] {
   return nodes.map((node, index) => {
     const key = `${keyPrefix}${index}`;
     switch (node.t) {
@@ -60,15 +73,39 @@ function renderNodes(nodes: readonly Inline[], nav: ReaderNav, keyPrefix: string
       case "strong":
         return (
           <strong key={key} className="font-semibold text-zinc-900">
-            {renderNodes(node.c, nav, `${key}.`)}
+            {renderNodes(node.c, nav, `${key}.`, counts)}
           </strong>
         );
       case "em":
         return (
           <em key={key} className="italic text-zinc-800">
-            {renderNodes(node.c, nav, `${key}.`)}
+            {renderNodes(node.c, nav, `${key}.`, counts)}
           </em>
         );
+      case "footnoteRef": {
+        const number = nav.footnoteNumbers?.get(node.label);
+        // A reference with no definition degrades to its literal text.
+        if (number === undefined || !nav.footnoteTargets?.has(node.label)) {
+          return (
+            <span key={key} className="text-zinc-500">
+              {`[^${node.label}]`}
+            </span>
+          );
+        }
+        const occurrence = counts.get(node.label) ?? 0;
+        counts.set(node.label, occurrence + 1);
+        return (
+          <sup key={key} id={footnoteReferenceId(node.label, occurrence)}>
+            <a
+              href={`#${footnoteDefinitionId(node.label)}`}
+              aria-label={`Footnote ${number}`}
+              className="ml-0.5 rounded-[3px] px-0.5 text-[0.72em] font-semibold text-[#0F766E] no-underline transition-colors hover:bg-teal-50"
+            >
+              {number}
+            </a>
+          </sup>
+        );
+      }
       case "image": {
         const src = safeImageSrc(node.src);
         // eslint-disable-next-line @next/next/no-img-element -- origin is the hospital's object store, not a known next/image domain
@@ -76,7 +113,7 @@ function renderNodes(nodes: readonly Inline[], nav: ReaderNav, keyPrefix: string
       }
       case "link": {
         const href = safeHref(node.href);
-        const label = renderNodes(node.c, nav, `${key}.`);
+        const label = renderNodes(node.c, nav, `${key}.`, counts);
         if (!href) return <span key={key}>{label}</span>;
 
         const isExternal = /^https?:/i.test(href);
@@ -126,5 +163,5 @@ function renderNodes(nodes: readonly Inline[], nav: ReaderNav, keyPrefix: string
 export function InlineText({ text }: { text: string }) {
   const nav = useContext(ReaderNavContext);
   const nodes = useMemo(() => parseInline(text), [text]);
-  return <>{renderNodes(nodes, nav, "i")}</>;
+  return <>{renderNodes(nodes, nav, "i", new Map())}</>;
 }

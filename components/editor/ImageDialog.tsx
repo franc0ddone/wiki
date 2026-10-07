@@ -6,20 +6,30 @@ import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/
 import { ApiRequestError, uploadImage } from "@/lib/editor/api";
 
 /**
- * Image insertion: PHI confirmation → alt text → upload.
+ * Image insertion / editing: PHI confirmation → alt text (+ optional caption)
+ * → upload, or edits to an image already in the document.
  *
  * This is a hospital. Before any bytes leave the browser the author must state
  * whether the image shows patient information; "yes" stops the flow. Alt text
- * is required — the reader's figure caption and lightbox both depend on it —
- * and the same dialog edits the alt text of an image already in the document.
+ * is required — it is read aloud and is the figure's accessible name. The
+ * caption is optional and is what most readers will actually see under the
+ * picture; when it is blank the reader falls back to the alt text.
  */
 
 export type ImageDialogMode =
   | { kind: "insert"; file: File }
-  | { kind: "alt"; src: string; alt: string };
+  | { kind: "alt"; src: string; alt: string; title: string };
+
+export interface ImageDialogResult {
+  src: string;
+  alt: string;
+  /** Empty string means "no caption"; the editor stores `null`. */
+  title: string;
+}
 
 const ALT_MIN = 3;
 const ALT_MAX = 250;
+const CAPTION_MAX = 200;
 
 export function ImageDialog({
   mode,
@@ -28,13 +38,14 @@ export function ImageDialog({
   onClose,
 }: {
   mode: ImageDialogMode;
-  onInsert: (image: { src: string; alt: string }) => void;
-  onUpdateAlt: (alt: string) => void;
+  onInsert: (image: ImageDialogResult) => void;
+  onUpdateAlt: (image: { alt: string; title: string }) => void;
   onClose: () => void;
 }) {
   const isInsert = mode.kind === "insert";
   const [step, setStep] = useState<"phi" | "blocked" | "alt">(isInsert ? "phi" : "alt");
   const [alt, setAlt] = useState(mode.kind === "alt" ? mode.alt : "");
+  const [caption, setCaption] = useState(mode.kind === "alt" ? mode.title : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
@@ -48,25 +59,28 @@ export function ImageDialog({
   }, [mode.kind, previewUrl]);
 
   const trimmed = alt.trim();
+  const trimmedCaption = caption.trim();
   const altError =
     trimmed.length < ALT_MIN
       ? "Describe what the image shows, in a few words — it is read aloud to people who cannot see it."
       : trimmed.length > ALT_MAX
         ? `Alt text is ${trimmed.length} characters; keep it under ${ALT_MAX}.`
         : null;
+  const captionError =
+    trimmedCaption.length > CAPTION_MAX ? `Keep the caption under ${CAPTION_MAX} characters.` : null;
 
   const submit = async () => {
     setTouched(true);
-    if (altError) return;
+    if (altError || captionError) return;
     if (mode.kind === "alt") {
-      onUpdateAlt(trimmed);
+      onUpdateAlt({ alt: trimmed, title: trimmedCaption });
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const uploaded = await uploadImage(mode.file);
-      onInsert({ src: uploaded.url, alt: trimmed });
+      onInsert({ src: uploaded.url, alt: trimmed, title: trimmedCaption });
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError
@@ -78,7 +92,7 @@ export function ImageDialog({
   };
 
   const title =
-    step === "phi" ? "Patient information check" : step === "blocked" ? "This image can’t be added" : isInsert ? "Add image" : "Edit alt text";
+    step === "phi" ? "Patient information check" : step === "blocked" ? "This image can’t be added" : isInsert ? "Add image" : "Edit image";
 
   return (
     <Modal title={title} onClose={onClose} dismissible={!busy}>
@@ -146,7 +160,26 @@ export function ImageDialog({
               disabled={busy}
             />
             <p id="image-alt-help" className={`mt-1.5 text-xs leading-5 ${touched && altError ? "text-red-700" : "text-zinc-500"}`}>
-              {touched && altError ? altError : "Shown under the image and read by screen readers."}
+              {touched && altError ? altError : "Read by screen readers. Shown under the image when there is no caption."}
+            </p>
+          </div>
+          <div>
+            <label htmlFor="image-caption" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+              Caption <span className="font-normal text-zinc-500">(optional)</span>
+            </label>
+            <input
+              id="image-caption"
+              value={caption}
+              onChange={(event) => setCaption(event.target.value)}
+              aria-invalid={touched && captionError ? true : undefined}
+              aria-describedby="image-caption-help"
+              placeholder="e.g. Figure 2 — airway equipment in the crash cart"
+              maxLength={CAPTION_MAX + 40}
+              className={fieldClass}
+              disabled={busy}
+            />
+            <p id="image-caption-help" className={`mt-1.5 text-xs leading-5 ${touched && captionError ? "text-red-700" : "text-zinc-500"}`}>
+              {touched && captionError ? captionError : "Shown under the image. Leave blank to show the alt text instead."}
             </p>
           </div>
           {error ? (
@@ -160,7 +193,7 @@ export function ImageDialog({
             </button>
             <button type="submit" className={primaryButton} disabled={busy}>
               <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
-              {busy ? "Uploading…" : isInsert ? "Upload and insert" : "Save alt text"}
+              {busy ? "Uploading…" : isInsert ? "Upload and insert" : "Save image"}
             </button>
           </div>
         </form>
@@ -168,3 +201,5 @@ export function ImageDialog({
     </Modal>
   );
 }
+
+export default ImageDialog;

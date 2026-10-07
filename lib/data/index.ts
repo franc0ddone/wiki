@@ -37,13 +37,17 @@ export {
   getBulletins,
   getBulletinById,
   getBulletinAcks,
+  getAuthoredBulletinIds,
   findLinkedArticle,
   createBulletin,
+  updateBulletin,
+  deleteBulletin,
   acknowledgeBulletin,
   defaultExpiryFor,
   BULLETIN_EXPIRY_DEFAULTS,
   type BulletinFilters,
   type CreateBulletinInput,
+  type UpdateBulletinInput,
   type AckResult,
 } from "@/lib/data/bulletins";
 

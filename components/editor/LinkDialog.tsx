@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArticleSearch } from "@/components/editor/ArticleSearch";
+import type { ArticleSearchOption } from "@/components/editor/ArticleSearch";
 import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import type { LinkRegistry } from "@/lib/links";
 import { cx } from "@/lib/utils";
@@ -12,6 +14,9 @@ import { cx } from "@/lib/utils";
  *  - another procedure (and optionally one of its sections) → `/procedures/<slug>[#id]`
  *  - a section of this procedure → `#id`
  *  - a web / mail / phone address
+ *
+ * The procedure picker is a fuzzy search (`ArticleSearch`) over the wiki, not a
+ * dropdown — the `<select>` was unusable past a few dozen procedures.
  *
  * The result is plain markdown, validated again at save time by `validateLinks`.
  */
@@ -27,7 +32,7 @@ function detectKind(href: string): Kind {
 export function LinkDialog({
   initialHref,
   hasSelection,
-  articleOptions,
+  articles,
   registry,
   ownHeadingIds,
   onApply,
@@ -36,7 +41,7 @@ export function LinkDialog({
 }: {
   initialHref: string;
   hasSelection: boolean;
-  articleOptions: ReadonlyArray<{ slug: string; title: string }>;
+  articles: readonly ArticleSearchOption[];
   registry: LinkRegistry;
   ownHeadingIds: readonly string[];
   onApply: (link: { href: string; text: string }) => void;
@@ -114,25 +119,18 @@ export function LinkDialog({
         {kind === "procedure" ? (
           <div className="space-y-3">
             <div>
-              <label htmlFor="link-procedure" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-                Procedure
-              </label>
-              <select
-                id="link-procedure"
+              <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">Procedure</span>
+              <ArticleSearch
+                articles={articles}
                 value={slug}
-                onChange={(event) => {
-                  setSlug(event.target.value);
+                label="Procedure to link to"
+                autoFocus
+                onChange={(nextSlug, title) => {
+                  setSlug(nextSlug);
                   setAnchor("");
+                  if (nextSlug && !hasSelection && text.trim().length === 0) setText(title);
                 }}
-                className={fieldClass}
-              >
-                <option value="">Choose a procedure…</option>
-                {articleOptions.map((option) => (
-                  <option key={option.slug} value={option.slug}>
-                    {option.title}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             {slug && sectionsOfTarget.length > 0 ? (
               <div>

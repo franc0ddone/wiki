@@ -560,3 +560,51 @@ input[type="search"]::-webkit-search-decoration {
   background: rgba(13, 148, 136, 0.12);
   pointer-events: none;
 }
+
+/* ------------------------------------------------- figures (sized images) */
+
+.dw-figure {
+  margin: 1.5rem 0;
+}
+
+/* --------------------------------------------------------------- footnotes */
+
+/* The reference marker as it appears while editing. */
+.dw-fn-ref {
+  border-radius: 3px;
+  background: rgba(15, 118, 110, 0.1);
+  padding: 0 0.2em;
+  font-size: 0.72em;
+  font-weight: 600;
+  color: #0f766e;
+  user-select: none;
+}
+
+/* A definition block: a fixed label chip beside the editable text. */
+.dw-footnote-def {
+  display: flex;
+  gap: 0.5rem;
+  border: 1px solid rgba(212, 212, 216, 0.8);
+  border-radius: 10px;
+  background: #fafafa;
+  padding: 0.5rem 0.75rem;
+}
+
+.dw-footnote-def-label {
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f766e;
+  user-select: none;
+}
+
+.dw-footnote-def-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.dw-footnote-def-body > p {
+  margin: 0;
+}

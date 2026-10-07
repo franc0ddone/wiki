@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { OperationsHubClient } from "@/components/OperationsHubClient";
 import { auth } from "@/lib/auth";
-import { getArticles, getBulletins, getStaff } from "@/lib/data";
+import { getArticles, getAuthoredBulletinIds, getBulletins, getStaff } from "@/lib/data";
 import { getLatestRoleRequestForUser, listRoleRequests } from "@/lib/data/role-requests";
 import { canRequestAuthorAccess, canReviewRoleRequests } from "@/lib/role-requests";
-import { isRole, type Role } from "@/lib/roles";
+import { isRole, roleAtLeast, type Role } from "@/lib/roles";
 
 /**
  * Portal at `/portal` — a server component.
@@ -58,6 +58,11 @@ export default async function PortalPage({
     canReviewRoleRequests(role) ? listRoleRequests(["pending"]) : Promise.resolve([]),
   ]);
 
+  // Only a viewer who could edit a notice needs the list of notices they wrote.
+  const authoredBulletinIds = roleAtLeast(role, "author")
+    ? await getAuthoredBulletinIds(session.user.id)
+    : [];
+
   const articleParam = Array.isArray(params.article) ? params.article[0] : params.article;
 
   return (
@@ -66,7 +71,9 @@ export default async function PortalPage({
       bulletins={bulletins}
       staff={staff}
       viewerRole={role}
+      viewerId={session.user.id}
       viewer={{ name: session.user.name ?? "", email: session.user.email ?? "" }}
+      authoredBulletinIds={authoredBulletinIds}
       initialArticleSlug={articleParam ?? null}
       authorRequest={authorRequest}
       roleRequests={roleRequests}

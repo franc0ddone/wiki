@@ -19,6 +19,7 @@ import { InlineText, ReaderNavContext, safeImageSrc } from "@/components/reader/
 import type { ReaderNav } from "@/components/reader/Inline";
 import { Lightbox } from "@/components/reader/Lightbox";
 import {
+  collectFootnotes,
   collectImages,
   extractToc,
   parseMarkdown,
@@ -28,6 +29,8 @@ import {
   type ListBlock,
   type TocEntry,
 } from "@/lib/markdown/parser";
+import type { ImageAlign } from "@/lib/markdown/image-attributes";
+import { footnoteDefinitionId, footnoteReferenceId } from "@/lib/markdown/footnotes";
 import { cx } from "@/lib/utils";
 
 /**
@@ -188,7 +191,19 @@ function renderList(list: ListBlock, key: string | number, depth = 0): ReactNode
   );
 }
 
-function ArticleFigure({ src, alt }: { src: string; alt: string }) {
+function ArticleFigure({
+  src,
+  alt,
+  title,
+  width,
+  align,
+}: {
+  src: string;
+  alt: string;
+  title: string | null;
+  width: number | null;
+  align: ImageAlign | null;
+}) {
   const safe = safeImageSrc(src);
   const nav = useContext(ReaderNavContext);
   if (!safe) {
@@ -198,13 +213,23 @@ function ArticleFigure({ src, alt }: { src: string; alt: string }) {
       </p>
     );
   }
+  // A caption (the Markdown title) wins; an image with none keeps the old
+  // behaviour of showing its alt text under the figure.
+  const caption = title && title.trim().length > 0 ? title : alt;
+  const alignment = align === "left" ? "mr-auto" : align === "right" ? "ml-auto" : "mx-auto";
+  const captionAlign = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
   return (
     <figure className="space-y-2 print:break-inside-avoid">
       <button
         type="button"
         onClick={() => nav.openImage?.(safe)}
         aria-label={`Enlarge image: ${alt}`}
-        className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:cursor-auto"
+        style={width !== null ? { width: `${width}px`, maxWidth: "100%" } : undefined}
+        className={cx(
+          "block cursor-zoom-in overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:cursor-auto",
+          width === null && "w-full",
+          alignment,
+        )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- origin is the hospital's object store */}
         <img
@@ -215,7 +240,7 @@ function ArticleFigure({ src, alt }: { src: string; alt: string }) {
           className="mx-auto max-h-[28rem] w-auto max-w-full object-contain"
         />
       </button>
-      <figcaption className="text-center text-[13px] leading-5 text-zinc-500">{alt}</figcaption>
+      <figcaption className={cx("text-[13px] leading-5 text-zinc-500", captionAlign)}>{caption}</figcaption>
     </figure>
   );
 }
@@ -265,7 +290,25 @@ function renderBlock(block: Block, key: number): ReactNode {
       );
 
     case "image":
-      return <ArticleFigure key={key} src={block.src} alt={block.alt} />;
+      return (
+        <ArticleFigure
+          key={key}
+          src={block.src}
+          alt={block.alt}
+          title={block.title}
+          width={block.width}
+          align={block.align}
+        />
+      );
+
+    case "footnoteDefinition":
+      // Referenced definitions are pulled into the numbered section; a
+      // definition nobody cites is shown as the plain line that was written.
+      return (
+        <p key={key} className={cx(BODY_TEXT, "text-zinc-500")}>
+          <InlineText text={`[^${block.label}]: ${block.text}`} />
+        </p>
+      );
 
     case "list":
       return renderList(block, key);
@@ -397,6 +440,8 @@ export function MarkdownReader({
   const blocks = useMemo(() => parseMarkdown(source), [source]);
   const toc = useMemo(() => extractToc(blocks), [blocks]);
   const images = useMemo(() => collectImages(blocks), [blocks]);
+  const footnotes = useMemo(() => collectFootnotes(blocks), [blocks]);
+  const footnoteTargets = useMemo(() => new Set(footnotes.order), [footnotes]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lightboxOpenerRef = useRef<HTMLElement | null>(null);
   const [spyId, setSpyId] = useState<string | null>(null);
@@ -408,6 +453,8 @@ export function MarkdownReader({
   const nav = useMemo<ReaderNav>(
     () => ({
       onOpenArticle,
+      footnoteNumbers: footnotes.numbers,
+      footnoteTargets,
       openImage: (src) => {
         const index = images.findIndex((image) => image.src === src);
         if (index >= 0) {
@@ -417,7 +464,7 @@ export function MarkdownReader({
         }
       },
     }),
-    [onOpenArticle, images],
+    [onOpenArticle, images, footnotes, footnoteTargets],
   );
 
   const closeLightbox = useCallback(() => {
@@ -553,7 +600,40 @@ export function MarkdownReader({
           ) : null}
 
           <div className="max-w-3xl space-y-4 print:max-w-none">
-            {blocks.map((block, index) => renderBlock(block, index))}
+            {blocks.map((block, index) =>
+              block.kind === "footnoteDefinition" && footnotes.numbers.has(block.label)
+                ? null
+                : renderBlock(block, index),
+            )}
+
+            {footnotes.order.length > 0 ? (
+              <section aria-label="Footnotes" className="mt-8 border-t border-zinc-200 pt-5">
+                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                  Footnotes
+                </h2>
+                <ol className="space-y-2">
+                  {footnotes.order.map((label) => (
+                    <li
+                      key={label}
+                      id={footnoteDefinitionId(label)}
+                      className="scroll-mt-6 text-[14px] leading-relaxed text-zinc-700"
+                    >
+                      <span className="mr-1.5 font-semibold tabular-nums text-zinc-500">
+                        {footnotes.numbers.get(label)}.
+                      </span>
+                      <InlineText text={footnotes.definitions.get(label) ?? ""} />
+                      <a
+                        href={`#${footnoteReferenceId(label)}`}
+                        aria-label="Back to reference"
+                        className="ml-1 rounded text-[#0F766E] no-underline hover:underline"
+                      >
+                        ↩
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
           </div>
 
           {footer ? <footer className="mt-10">{footer}</footer> : null}

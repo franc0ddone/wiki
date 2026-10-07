@@ -20,6 +20,19 @@
  */
 
 import { inlinePlain, parseInline } from "@/lib/markdown/inline";
+import {
+  IMAGE_LINE_PATTERN,
+  parseImageAttributes,
+  type ImageAlign,
+} from "@/lib/markdown/image-attributes";
+import {
+  FOOTNOTE_DEFINITION_PATTERN,
+  buildFootnoteIndex,
+  parseFootnoteDefinition,
+  scanFootnoteReferences,
+  type FootnoteDefinition,
+  type FootnoteIndex,
+} from "@/lib/markdown/footnotes";
 
 export const CALLOUT_VARIANTS = ["note", "tip", "dosing", "protocol", "warning", "critical"] as const;
 export type CalloutVariant = (typeof CALLOUT_VARIANTS)[number];
@@ -39,7 +52,18 @@ export interface ListBlock {
 export type Block =
   | { kind: "heading"; level: 1 | 2 | 3; id: string; text: string }
   | { kind: "paragraph"; text: string }
-  | { kind: "image"; alt: string; src: string }
+  | {
+      kind: "image";
+      alt: string;
+      src: string;
+      /** Markdown title (`"caption"`), or `null`. */
+      title: string | null;
+      /** Pixel width from the `{width=…}` suffix, clamped, or `null`. */
+      width: number | null;
+      /** Alignment from the `{align=…}` suffix, or `null` (renders centred). */
+      align: ImageAlign | null;
+    }
+  | { kind: "footnoteDefinition"; label: string; text: string }
   | ({ kind: "list" } & ListBlock)
   | { kind: "table"; head: string[]; rows: string[][] }
   | { kind: "callout"; variant: CalloutVariant; paragraphs: string[] }
@@ -73,7 +97,7 @@ const DETAILS_OPEN_RE = /^\s*:::details(?:\s+(.*))?\s*$/;
 const DETAILS_CLOSE_RE = /^\s*:::\s*$/;
 const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
 const TABLE_DIVIDER_RE = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
-const IMAGE_LINE_RE = /^!\[((?:\\.|[^\]\\])*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/;
+const IMAGE_LINE_RE = IMAGE_LINE_PATTERN;
 
 /**
  * Heading/anchor slug. Exported (via `components/MarkdownReader`) so
@@ -151,7 +175,8 @@ function isBlockStart(line: string): boolean {
     RULE_RE.test(line) ||
     TABLE_ROW_RE.test(line) ||
     DETAILS_OPEN_RE.test(line) ||
-    DETAILS_CLOSE_RE.test(line)
+    DETAILS_CLOSE_RE.test(line) ||
+    FOOTNOTE_DEFINITION_PATTERN.test(line)
   );
 }
 
@@ -313,6 +338,14 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
       continue;
     }
 
+    // `[^label]: text` — pulled out of the body and rendered as a footnote.
+    const definition = parseFootnoteDefinition(line);
+    if (definition) {
+      blocks.push({ kind: "footnoteDefinition", label: definition.label, text: definition.text });
+      index += 1;
+      continue;
+    }
+
     const heading = HEADING_RE.exec(line);
     if (heading) {
       let text = heading[2].trim();
@@ -404,10 +437,15 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
       for (const entry of paragraph) {
         const image = IMAGE_LINE_RE.exec(entry);
         if (image) {
+          const attributes = parseImageAttributes(image[4] ?? null);
+          const title = image[3] !== undefined && image[3].length > 0 ? image[3] : null;
           blocks.push({
             kind: "image",
             alt: inlinePlain(parseInline(image[1])),
             src: image[2].replace(/\\([()])/g, "$1"),
+            title,
+            width: attributes.width,
+            align: attributes.align,
           });
         }
       }
@@ -454,4 +492,67 @@ export function collectImages(blocks: readonly Block[]): Array<{ src: string; al
     else if (block.kind === "details") images.push(...collectImages(block.blocks));
   }
   return images;
+}
+
+/* --------------------------------------------------------------- footnotes */
+
+/** Text-bearing runs of a block, used to find footnote references. */
+function blockTexts(block: Block): string[] {
+  switch (block.kind) {
+    case "paragraph":
+    case "heading":
+      return [block.text];
+    case "callout":
+    case "quote":
+      return block.paragraphs;
+    case "list":
+      return listTexts(block);
+    case "table":
+      return [...block.head, ...block.rows.flat()];
+    case "details":
+      return [block.summary, ...block.blocks.flatMap(blockTexts)];
+    case "code":
+    case "image":
+    case "rule":
+    case "footnoteDefinition":
+    default:
+      return [];
+  }
+}
+
+function listTexts(list: ListBlock): string[] {
+  return list.items.flatMap((item) => [
+    item.text,
+    ...(item.children ? listTexts(item.children) : []),
+  ]);
+}
+
+/**
+ * Resolve the footnote graph for a document: definitions (which are pulled out
+ * of the body), the reference order, and the numbers. `MarkdownReader` renders
+ * the numbered section from this; `scripts/verify-frontend.ts` asserts it.
+ */
+export function collectFootnotes(blocks: readonly Block[]): FootnoteIndex {
+  const definitions: FootnoteDefinition[] = [];
+  const references: string[] = [];
+
+  const walk = (list: readonly Block[]) => {
+    for (const block of list) {
+      if (block.kind === "footnoteDefinition") {
+        definitions.push({ label: block.label, text: block.text });
+        continue;
+      }
+      if (block.kind === "details") {
+        references.push(...scanFootnoteReferences(block.summary));
+        walk(block.blocks);
+        continue;
+      }
+      for (const text of blockTexts(block)) {
+        references.push(...scanFootnoteReferences(text));
+      }
+    }
+  };
+
+  walk(blocks);
+  return buildFootnoteIndex(references, definitions);
 }

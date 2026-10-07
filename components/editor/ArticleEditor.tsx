@@ -337,16 +337,23 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const handleImage = (selectedImage: boolean) => {
     if (!editor) return;
     if (selectedImage) {
-      const attrs = editor.getAttributes("image") as { src?: string; alt?: string };
-      if (attrs.src) setImageDialog({ kind: "alt", src: attrs.src, alt: attrs.alt ?? "" });
+      const attrs = editor.getAttributes("image") as { src?: string; alt?: string; title?: string | null };
+      if (attrs.src) {
+        setImageDialog({ kind: "alt", src: attrs.src, alt: attrs.alt ?? "", title: attrs.title ?? "" });
+      }
       return;
     }
     fileInputRef.current?.click();
   };
 
   const ownHeadingIds = useMemo(() => extractHeadingIds(debouncedMarkdown), [debouncedMarkdown]);
-  const articleOptions = useMemo(
-    () => registrySource.map((entry) => ({ slug: entry.slug, title: entry.title })).sort((a, b) => a.title.localeCompare(b.title)),
+  const articleSearchOptions = useMemo(
+    () =>
+      registrySource.map((entry) => ({
+        slug: entry.slug,
+        title: entry.title,
+        body_markdown: entry.body_markdown,
+      })),
     [registrySource],
   );
 
@@ -660,7 +667,7 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
         <LinkDialog
           initialHref={(editor.getAttributes("link").href as string | undefined) ?? ""}
           hasSelection={!editor.state.selection.empty || editor.isActive("link")}
-          articleOptions={articleOptions}
+          articles={articleSearchOptions}
           registry={baseRegistry}
           ownHeadingIds={ownHeadingIds}
           onClose={() => {
@@ -693,12 +700,20 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
             setImageDialog(null);
             editor.commands.focus();
           }}
-          onInsert={({ src, alt }) => {
-            editor.chain().focus().insertContent({ type: "image", attrs: { src, alt } }).run();
+          onInsert={({ src, alt, title }) => {
+            editor
+              .chain()
+              .focus()
+              .insertContent({ type: "image", attrs: { src, alt, title: title.length > 0 ? title : null } })
+              .run();
             setImageDialog(null);
           }}
-          onUpdateAlt={(alt) => {
-            editor.chain().focus().updateAttributes("image", { alt }).run();
+          onUpdateAlt={({ alt, title }) => {
+            editor
+              .chain()
+              .focus()
+              .updateAttributes("image", { alt, title: title.length > 0 ? title : null })
+              .run();
             setImageDialog(null);
           }}
         />

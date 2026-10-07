@@ -9,6 +9,12 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import { Markdown } from "tiptap-markdown";
 import { CALLOUT_VARIANTS, normalizeVariant, type CalloutVariant } from "@/lib/markdown/parser";
+import {
+  clampWidth,
+  serializeImageMarkdown,
+} from "@/lib/markdown/image-attributes";
+import { FootnoteDefinitionView } from "@/components/editor/FootnoteView";
+import { ImageView } from "@/components/editor/ImageView";
 
 /**
  * The editor's schema: Markdown in, Markdown out.
@@ -20,13 +26,14 @@ import { CALLOUT_VARIANTS, normalizeVariant, type CalloutVariant } from "@/lib/m
  *   callout    →  > [!variant]\n> text
  *   details    →  :::details Summary … :::
  *   taskList   →  - [ ] / - [x]
- *   image      →  ![alt](url)            (block-level, alt always present)
+ *   image      →  ![alt](url "caption"){width=N align=X}   (block-level)
+ *   footnote   →  [^label] and [^label]: text
  *   table      →  GFM pipe table         (one paragraph per cell, header row first)
  *   codeBlock  →  ```lang                (`mermaid` renders a diagram)
  *
  * Deliberately NOT in the schema: strike, underline, hard breaks, font /
- * colour / alignment — nothing the reader cannot show, nothing that could be
- * silently lost on a round trip.
+ * colour — nothing the reader cannot show, nothing that could be silently lost
+ * on a round trip.
  *
  * `tiptap-markdown` is configured with `html: false`: it never emits or parses
  * raw HTML, matching the reader's no-raw-HTML posture.
@@ -92,7 +99,30 @@ const ArticleImage = Node.create({
     return {
       src: { default: null },
       alt: { default: "" },
+      /** The caption, stored as the Markdown image title. */
       title: { default: null },
+      /** Pixel width from the `{width=…}` suffix; `null` = intrinsic. */
+      width: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const raw = element.getAttribute("data-width");
+          if (!raw) return null;
+          const parsed = Number.parseInt(raw, 10);
+          return Number.isFinite(parsed) ? clampWidth(parsed) : null;
+        },
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.width ? { "data-width": String(attributes.width) } : {},
+      },
+      /** Alignment from the `{align=…}` suffix; `null` = centred. */
+      align: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const raw = element.getAttribute("data-align");
+          return raw === "left" || raw === "center" || raw === "right" ? raw : null;
+        },
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.align ? { "data-align": String(attributes.align) } : {},
+      },
     };
   },
   parseHTML() {
@@ -101,15 +131,50 @@ const ArticleImage = Node.create({
   renderHTML({ HTMLAttributes }) {
     return ["img", mergeAttributes(HTMLAttributes, { class: "dw-image", loading: "lazy" })];
   },
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageView);
+  },
   addStorage() {
     return {
       markdown: {
         serialize(state: MarkdownState, node: PMNodeLike) {
-          const src = String(node.attrs.src ?? "").replace(/\s/g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
-          state.write(`![${state.esc(String(node.attrs.alt ?? ""))}](${src})`);
+          state.write(
+            serializeImageMarkdown({
+              alt: state.esc(String(node.attrs.alt ?? "")),
+              src: String(node.attrs.src ?? ""),
+              title: node.attrs.title ? String(node.attrs.title) : null,
+              width: node.attrs.width === null || node.attrs.width === undefined ? null : Number(node.attrs.width),
+              align: (node.attrs.align as "left" | "center" | "right" | null) ?? null,
+            }),
+          );
           state.closeBlock(node);
         },
-        parse: {},
+        parse: {
+          // markdown-it renders `![alt](src "cap"){width=480}` as an <img> whose
+          // trailing `{…}` becomes ordinary text; lift the suffix onto the img
+          // so the block-image rule can match it cleanly.
+          updateDOM(element: HTMLElement) {
+            element.querySelectorAll("img").forEach((img) => {
+              const next = img.nextSibling;
+              if (!next || next.nodeType !== 3) return;
+              const text = next.textContent ?? "";
+              const match = /^\s*\{([^}]*)\}/.exec(text);
+              if (!match) return;
+              for (const part of match[1].split(/\s+/)) {
+                const [key, value] = part.split("=");
+                if (key === "width" && value) {
+                  const width = Number.parseInt(value, 10);
+                  if (Number.isFinite(width)) img.setAttribute("data-width", String(clampWidth(width)));
+                } else if (key === "align" && (value === "left" || value === "center" || value === "right")) {
+                  img.setAttribute("data-align", value);
+                }
+              }
+              const remainder = text.slice(match[0].length);
+              if (remainder.length > 0) next.textContent = remainder;
+              else next.remove();
+            });
+          },
+        },
       },
     };
   },
@@ -135,6 +200,10 @@ declare module "@tiptap/core" {
     };
     details: {
       insertDetails: () => ReturnType;
+    };
+    footnote: {
+      /** Insert a footnote reference at the cursor, ensuring a definition block exists. */
+      insertFootnote: () => ReturnType;
     };
   }
 }
@@ -366,6 +435,195 @@ const Details = Node.create<DetailsOptionsLike>({
   },
 });
 
+/* --------------------------------------------------------------- footnotes */
+
+/**
+ * markdown-it block rule for `[^label]: text`.
+ *
+ * Without this, markdown-it swallows the line as a CommonMark *link reference
+ * definition* (label `^label`, destination `text`) and renders nothing. The rule
+ * runs before `reference` and emits a `div[data-type="footnote-definition"]`
+ * carrying the label, with the remaining text as a paragraph.
+ */
+function footnotePlugin(md: unknown) {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const instance = md as any;
+  if (instance.__doveFootnotes) return;
+  instance.__doveFootnotes = true;
+
+  instance.block.ruler.before(
+    "reference",
+    "dove_footnote",
+    (state: any, startLine: number, endLine: number, silent: boolean) => {
+      const start = state.bMarks[startLine] + state.tShift[startLine];
+      const max = state.eMarks[startLine];
+      const match = /^\[\^([^\]\s]+)\]:[ \t]?(.*)$/.exec(state.src.slice(start, max));
+      if (!match) return false;
+      if (silent) return true;
+
+      const open = state.push("dove_footnote_open", "div", 1);
+      open.block = true;
+      open.attrs = [
+        ["data-type", "footnote-definition"],
+        ["data-label", match[1]],
+      ];
+      open.map = [startLine, startLine + 1];
+
+      const paragraphOpen = state.push("paragraph_open", "p", 1);
+      paragraphOpen.block = true;
+      // Parse the text into `children` only. Setting `content` alongside
+      // `children` makes markdown-it render the text twice.
+      const inline = state.push("inline", "", 0);
+      inline.map = [startLine, startLine + 1];
+      inline.children = [];
+      state.md.inline.parse(match[2], state.md, state.env, inline.children);
+      const paragraphClose = state.push("paragraph_close", "p", -1);
+      paragraphClose.block = true;
+
+      const close = state.push("dove_footnote_close", "div", -1);
+      close.block = true;
+      state.line = startLine + 1;
+      return true;
+    },
+    { alt: ["paragraph", "reference", "blockquote", "list"] },
+  );
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+}
+
+const FootnoteReference = Node.create({
+  name: "footnoteReference",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      label: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-footnote-ref"),
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.label ? { "data-footnote-ref": String(attributes.label) } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "sup[data-footnote-ref]" }];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return ["sup", mergeAttributes(HTMLAttributes, { class: "dw-fn-ref" }), String(node.attrs.label ?? "")];
+  },
+  addCommands() {
+    return {
+      insertFootnote:
+        () =>
+        ({ editor, commands }) => {
+          const labels = new Set<string>();
+          editor.state.doc.descendants((node) => {
+            if (node.type.name === "footnoteReference" || node.type.name === "footnoteDefinition") {
+              const label = node.attrs.label;
+              if (typeof label === "string" && label.length > 0) labels.add(label);
+            }
+            return true;
+          });
+
+          let next = 1;
+          while (labels.has(String(next))) next += 1;
+          const label = String(next);
+
+          commands.insertContent({ type: "footnoteReference", attrs: { label } });
+          commands.insertContentAt(editor.state.doc.content.size, {
+            type: "footnoteDefinition",
+            attrs: { label },
+            content: [{ type: "paragraph" }],
+          });
+          return true;
+        },
+    };
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(`[^${String(node.attrs.label ?? "")}]`);
+        },
+        parse: {
+          updateDOM(element: HTMLElement) {
+            const doc = element.ownerDocument;
+            const walker = doc.createTreeWalker(element, 4); // NodeFilter.SHOW_TEXT
+            const targets: Text[] = [];
+            let current = walker.nextNode();
+            while (current) {
+              const text = current as Text;
+              const parent = text.parentElement;
+              if (parent && !parent.closest("code, pre, sup[data-footnote-ref]") && /\[\^[^\]\s]+\]/.test(text.data)) {
+                targets.push(text);
+              }
+              current = walker.nextNode();
+            }
+
+            for (const text of targets) {
+              const parts = text.data.split(/(\[\^[^\]\s]+\])/g);
+              const fragment = doc.createDocumentFragment();
+              for (const part of parts) {
+                const match = /^\[\^([^\]\s]+)\]$/.exec(part);
+                if (match) {
+                  const sup = doc.createElement("sup");
+                  sup.setAttribute("data-footnote-ref", match[1]);
+                  sup.textContent = match[1];
+                  fragment.appendChild(sup);
+                } else if (part.length > 0) {
+                  fragment.appendChild(doc.createTextNode(part));
+                }
+              }
+              text.replaceWith(fragment);
+            }
+          },
+        },
+      },
+    };
+  },
+});
+
+const FootnoteDefinition = Node.create({
+  name: "footnoteDefinition",
+  group: "block",
+  content: "paragraph",
+  defining: true,
+  addAttributes() {
+    return {
+      label: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-label"),
+        renderHTML: (attributes: Record<string, unknown>) =>
+          attributes.label ? { "data-label": String(attributes.label) } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="footnote-definition"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "footnote-definition" }), 0];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(FootnoteDefinitionView);
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(`[^${String(node.attrs.label ?? "")}]: `);
+          state.renderContent(node);
+          state.closeBlock(node);
+        },
+        parse: {
+          setup: footnotePlugin,
+        },
+      },
+    };
+  },
+});
+
 /* ------------------------------------------------------------- task lists */
 
 const TaskList = Node.create({
@@ -461,6 +719,8 @@ export function buildEditorExtensions() {
     ArticleImage,
     Callout,
     Details,
+    FootnoteReference,
+    FootnoteDefinition,
     TaskList,
     TaskItem,
     Table.configure({ resizable: false }),

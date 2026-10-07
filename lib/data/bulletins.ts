@@ -3,7 +3,15 @@ import { getDb } from "@/lib/db";
 import { ApiError } from "@/lib/api";
 import { toBulletin } from "@/lib/data/mappers";
 import { getArticleById } from "@/lib/data/articles";
+import { roleAtLeast, type Role } from "@/lib/roles";
+import {
+  BULLETIN_EXPIRY_DEFAULTS,
+  defaultExpiryFor,
+  shouldClearAcksForUrgentEdit,
+} from "@/lib/bulletin/lifecycle";
 import type { Bulletin, Department, KnowledgeArticle } from "@/types/portal";
+
+export { BULLETIN_EXPIRY_DEFAULTS, defaultExpiryFor };
 
 /**
  * Bulletin access — the drop-in replacement for the `BULLETINS` slice of
@@ -110,28 +118,9 @@ export async function findLinkedArticle(bulletin: Bulletin): Promise<KnowledgeAr
 
 /* ----------------------------------------------------------------- expiry */
 
-const HOUR_MS = 60 * 60 * 1000;
-
-/**
- * Default time-to-live per priority, used when the client posts no
- * `expires_at`.
- *
- * The rule this encodes: nothing accumulates forever. An `urgent` notice is a
- * shift-level instruction — 72 hours is the documented default. A `pinned`
- * notice is a standing reminder that still has to be re-affirmed — 30 days.
- * A `normal` notice is a plain announcement and may be posted without an
- * expiry at all.
- */
-export const BULLETIN_EXPIRY_DEFAULTS: Record<BulletinPriority, number | null> = {
-  urgent: 72 * HOUR_MS,
-  pinned: 30 * 24 * HOUR_MS,
-  normal: null,
-};
-
-export function defaultExpiryFor(priority: BulletinPriority, from: Date = new Date()): Date | null {
-  const ttl = BULLETIN_EXPIRY_DEFAULTS[priority];
-  return ttl === null ? null : new Date(from.getTime() + ttl);
-}
+// The expiry rule now lives in `lib/bulletin/lifecycle.ts` — pure, so the
+// composer UI and `scripts/verify-frontend.ts` share one definition. Re-exported
+// above so existing importers of `lib/data/bulletins` keep working unchanged.
 
 /* ---------------------------------------------------------------- writing */
 
@@ -257,4 +246,139 @@ export async function getBulletinAcks(bulletinId: string): Promise<
     name: row.user.name,
     acked_at: row.ackedAt.toISOString(),
   }));
+}
+
+/* ------------------------------------------------------------ editing */
+
+/**
+ * The bulletins this user authored — lets the board show edit/delete only on a
+ * notice its viewer may actually change. The API re-checks regardless.
+ */
+export async function getAuthoredBulletinIds(userId: string): Promise<string[]> {
+  const rows = await getDb().bulletin.findMany({
+    where: { authorId: userId },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
+}
+
+export interface UpdateBulletinInput {
+  title?: string;
+  body_markdown?: string;
+  departments?: string[];
+  priority?: BulletinPriority;
+  expires_at?: Date | null;
+  linked_article_id?: string | null;
+}
+
+function assertBulletinMayBeChanged(
+  actor: { id: string; role: string },
+  authorId: string,
+  verb: "edit" | "delete",
+): void {
+  const isLead = roleAtLeast(actor.role as Role, "clinical_lead");
+  if (isLead || authorId === actor.id) return;
+  throw new ApiError(403, `Only the author of a notice, or a clinical lead, may ${verb} it.`, {
+    code: "forbidden",
+    details: { requiredRole: "clinical_lead", actualRole: actor.role },
+  });
+}
+
+/**
+ * Edit a bulletin. Fields are validated like POST. Two rules worth naming:
+ *
+ *  - **Expiry.** An explicit `expires_at` wins; otherwise the current expiry is
+ *    kept, unless the priority changed — then the new priority's default is
+ *    applied. An `urgent` notice can never end up without an expiry.
+ *  - **Acknowledgements.** Editing an `urgent` notice with changed content
+ *    clears its acks, in the same transaction: staff must re-acknowledge the
+ *    changed alert. `normal` / `pinned` edits keep theirs.
+ */
+export async function updateBulletin(
+  id: string,
+  patch: UpdateBulletinInput,
+  actor: { id: string; role: string },
+): Promise<Bulletin> {
+  const db = getDb();
+
+  const current = await db.bulletin.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      authorId: true,
+      title: true,
+      bodyMarkdown: true,
+      departments: true,
+      priority: true,
+      expiresAt: true,
+      linkedArticleId: true,
+    },
+  });
+  if (!current) throw new ApiError(404, `No bulletin with id \`${id}\` exists.`);
+
+  assertBulletinMayBeChanged(actor, current.authorId, "edit");
+
+  const nextTitle = patch.title ?? current.title;
+  const nextBody = patch.body_markdown ?? current.bodyMarkdown;
+  const nextDepartments = patch.departments ?? current.departments;
+  const nextPriority = patch.priority ?? current.priority;
+  const nextLinked =
+    patch.linked_article_id === undefined ? current.linkedArticleId : patch.linked_article_id;
+
+  if (nextLinked) {
+    const linked = await db.article.findUnique({ where: { id: nextLinked }, select: { id: true } });
+    if (!linked) {
+      throw new ApiError(422, "The article named in `linked_article_id` does not exist.", {
+        code: "linked_article_not_found",
+        details: { field: "linked_article_id" },
+      });
+    }
+  }
+
+  let nextExpires: Date | null;
+  if (patch.expires_at !== undefined) nextExpires = patch.expires_at;
+  else if (nextPriority !== current.priority) nextExpires = defaultExpiryFor(nextPriority, new Date());
+  else nextExpires = current.expiresAt;
+
+  if (nextPriority === "urgent" && nextExpires === null) {
+    throw new ApiError(
+      422,
+      "An `urgent` bulletin must expire. Provide `expires_at` or omit it for the 72-hour default.",
+      { code: "urgent_requires_expiry", details: { field: "expires_at" } },
+    );
+  }
+
+  const clearAcks = shouldClearAcksForUrgentEdit(
+    { priority: current.priority, title: current.title, body_markdown: current.bodyMarkdown },
+    { priority: nextPriority, title: nextTitle, body_markdown: nextBody },
+  );
+
+  const updated = await db.$transaction(async (tx) => {
+    if (clearAcks) {
+      await tx.bulletinAck.deleteMany({ where: { bulletinId: id } });
+    }
+    return tx.bulletin.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        bodyMarkdown: nextBody,
+        departments: nextDepartments,
+        priority: nextPriority,
+        linkedArticleId: nextLinked,
+        expiresAt: nextExpires,
+      },
+      include: { author: AUTHOR_SELECT },
+    });
+  });
+
+  return toBulletin(updated);
+}
+
+/** Delete a bulletin (its acks cascade at the database). Author or `clinical_lead`+. */
+export async function deleteBulletin(id: string, actor: { id: string; role: string }): Promise<void> {
+  const db = getDb();
+  const current = await db.bulletin.findUnique({ where: { id }, select: { id: true, authorId: true } });
+  if (!current) throw new ApiError(404, `No bulletin with id \`${id}\` exists.`);
+  assertBulletinMayBeChanged(actor, current.authorId, "delete");
+  await db.bulletin.delete({ where: { id } });
 }
