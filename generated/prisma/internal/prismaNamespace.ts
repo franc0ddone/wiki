@@ -402,6 +402,7 @@ export const ModelName = {
   ArticleVersion: 'ArticleVersion',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
+  RoleRequest: 'RoleRequest',
   StaffMember: 'StaffMember',
   SearchLog: 'SearchLog'
 } as const
@@ -419,7 +420,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "article" | "articleVersion" | "bulletin" | "bulletinAck" | "staffMember" | "searchLog"
+    modelProps: "user" | "article" | "articleVersion" | "bulletin" | "bulletinAck" | "roleRequest" | "staffMember" | "searchLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -793,6 +794,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    RoleRequest: {
+      payload: Prisma.$RoleRequestPayload<ExtArgs>
+      fields: Prisma.RoleRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RoleRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RoleRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.RoleRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RoleRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        findMany: {
+          args: Prisma.RoleRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>[]
+        }
+        create: {
+          args: Prisma.RoleRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        createMany: {
+          args: Prisma.RoleRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RoleRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.RoleRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        update: {
+          args: Prisma.RoleRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.RoleRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RoleRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RoleRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.RoleRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RoleRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.RoleRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRoleRequest>
+        }
+        groupBy: {
+          args: Prisma.RoleRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RoleRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RoleRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RoleRequestCountAggregateOutputType> | number
+        }
+      }
+    }
     StaffMember: {
       payload: Prisma.$StaffMemberPayload<ExtArgs>
       fields: Prisma.StaffMemberFieldRefs
@@ -1052,6 +1127,20 @@ export const BulletinAckScalarFieldEnum = {
 export type BulletinAckScalarFieldEnum = (typeof BulletinAckScalarFieldEnum)[keyof typeof BulletinAckScalarFieldEnum]
 
 
+export const RoleRequestScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  requestedRole: 'requestedRole',
+  status: 'status',
+  note: 'note',
+  decidedById: 'decidedById',
+  decidedAt: 'decidedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type RoleRequestScalarFieldEnum = (typeof RoleRequestScalarFieldEnum)[keyof typeof RoleRequestScalarFieldEnum]
+
+
 export const StaffMemberScalarFieldEnum = {
   id: 'id',
   systemId: 'systemId',
@@ -1209,6 +1298,20 @@ export type EnumBulletinPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<
  * Reference to a field of type 'BulletinPriority[]'
  */
 export type ListEnumBulletinPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BulletinPriority[]'>
+    
+
+
+/**
+ * Reference to a field of type 'RoleRequestStatus'
+ */
+export type EnumRoleRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RoleRequestStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'RoleRequestStatus[]'
+ */
+export type ListEnumRoleRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RoleRequestStatus[]'>
     
 
 
@@ -1423,6 +1526,7 @@ export type GlobalOmitConfig = {
   articleVersion?: Prisma.ArticleVersionOmit
   bulletin?: Prisma.BulletinOmit
   bulletinAck?: Prisma.BulletinAckOmit
+  roleRequest?: Prisma.RoleRequestOmit
   staffMember?: Prisma.StaffMemberOmit
   searchLog?: Prisma.SearchLogOmit
 }

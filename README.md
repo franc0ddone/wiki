@@ -30,6 +30,19 @@ npm run dev
 
 Open http://localhost:3000.
 
+## Surfaces and access
+
+- `/` is the **public** sign-in / sign-up landing. A signed-in visitor is
+  redirected straight to the portal.
+- `/portal` is the portal itself (bulletins, knowledge base, staff directory),
+  behind authentication. `/procedures/<slug>` and `/articles/*` also require a
+  session.
+- **Self-registration is domain-gated.** Only addresses on the hospital domain
+  can create an account, and new accounts are always `staff`. The domain is one
+  constant — `HOSPITAL_EMAIL_DOMAIN` (default `dovelewis.org`) in
+  `lib/registration.ts`. A `staff` member can request the `author` role from the
+  account menu; a clinical lead approves it.
+
 ## Documentation
 
 - `BACKEND.md` — the Prisma/PostgreSQL schema, API routes, auth/RBAC, uploads,

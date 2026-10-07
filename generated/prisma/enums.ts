@@ -54,3 +54,12 @@ export const ShiftPreference = {
 } as const
 
 export type ShiftPreference = (typeof ShiftPreference)[keyof typeof ShiftPreference]
+
+
+export const RoleRequestStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  declined: 'declined'
+} as const
+
+export type RoleRequestStatus = (typeof RoleRequestStatus)[keyof typeof RoleRequestStatus]

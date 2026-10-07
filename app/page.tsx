@@ -1,52 +1,39 @@
-import { OperationsHubClient } from "@/components/OperationsHubClient";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { AuthLanding } from "@/components/auth/AuthLanding";
 import { auth } from "@/lib/auth";
-import { getArticles, getBulletins, getStaff } from "@/lib/data";
-import { isRole } from "@/lib/roles";
 
 /**
- * Portal entry point — a server component.
+ * Root `/` — the public sign-in / sign-up landing page.
  *
- * `lib/data/*` opens a database connection, so the fetch happens here and the
- * three datasets are handed to the client shell as props. Field shapes are
- * identical to the phase-1 fixtures (`lib/data/mappers.ts` guarantees it), so
- * the views render exactly as they did against `lib/mock-data.ts`.
+ * Branded, unauthenticated, and the only page that renders without a session.
+ * A signed-in visitor is sent straight to the portal, so `/` is never a dead
+ * end for a live session (the `callbackUrl` they came with is preserved when
+ * one is present, so a deep link still lands where it was aimed).
  *
- * The signed-in role is passed down only to decide which edit affordances to
- * *show* (authors see "Edit" / "New procedure"; read-only roles see none). The
- * API enforces the same rules regardless.
- *
- * `?article=<slug>` opens a procedure on load — `/procedures/<slug>` links
- * (which is what markdown cross-references use) redirect here.
- *
- * `force-dynamic` is deliberate: a live wiki must reflect the current database,
- * not a build-time snapshot — and it keeps `next build` from trying to reach
- * the database to prerender the page.
+ * `force-dynamic` because the redirect depends on the request's session cookie.
  */
 export const dynamic = "force-dynamic";
 
-export default async function OperationsHubPage({
+export const metadata: Metadata = {
+  title: "Sign in · Dove Wiki",
+  description: "Sign in to Dove Wiki — the operations hub for Dove Lewis Emergency Animal Hospital.",
+};
+
+export default async function LandingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ article?: string | string[] }>;
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
 }) {
-  const [articles, bulletins, staff, session, params] = await Promise.all([
-    getArticles(),
-    getBulletins(),
-    getStaff(),
-    auth(),
-    searchParams,
-  ]);
+  const [session, params] = await Promise.all([auth(), searchParams]);
+  const fromParam = Array.isArray(params.callbackUrl) ? params.callbackUrl[0] : params.callbackUrl;
+  // Only same-origin, absolute-path targets are honoured — an open redirect is
+  // not worth the convenience.
+  const callbackUrl = fromParam && fromParam.startsWith("/") && !fromParam.startsWith("//") ? fromParam : "/portal";
 
-  const role = session?.user?.role;
-  const articleParam = Array.isArray(params.article) ? params.article[0] : params.article;
+  if (session?.user?.id) {
+    redirect(callbackUrl);
+  }
 
-  return (
-    <OperationsHubClient
-      articles={articles}
-      bulletins={bulletins}
-      staff={staff}
-      viewerRole={isRole(role) ? role : null}
-      initialArticleSlug={articleParam ?? null}
-    />
-  );
+  return <AuthLanding callbackUrl={callbackUrl} />;
 }

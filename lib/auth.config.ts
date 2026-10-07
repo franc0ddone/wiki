@@ -13,6 +13,12 @@ import type { Role } from "@/lib/roles";
  *
  * Callbacks here only move data that is already inside the JWT: no lookup is
  * needed, which is also why the session stays valid without a round trip.
+ *
+ * **The session carries identity and role, and nothing about the sign-in
+ * method.** `proxy.ts`, `requireRole()`, and the editor's role checks all read
+ * `session.user.id` and `session.user.role`; none of them inspects how the user
+ * authenticated. Keeping that true is what lets a later hospital SSO be added
+ * without touching any downstream code.
  */
 
 declare module "next-auth" {
@@ -40,6 +46,9 @@ export const authConfig = {
   // refuses to build callback URLs. Set AUTH_TRUST_HOST=false to opt out.
   trustHost: process.env.AUTH_TRUST_HOST !== "false",
   session: { strategy: "jwt" },
+  // The landing page IS the sign-in page: point every Auth.js redirect
+  // (sign-in, sign-out, access denied) at `/`.
+  pages: { signIn: "/" },
   // Providers are attached in lib/auth.ts.
   providers: [],
   callbacks: {
@@ -49,12 +58,18 @@ export const authConfig = {
       if (user) {
         token.sub = user.id;
         token.role = (user as { role?: Role }).role;
+        // Name and email are copied here too so the account menu and the
+        // editor viewer can render an identity without a database round trip.
+        token.name = user.name ?? null;
+        token.email = user.email ?? null;
       }
       return token;
     },
     session({ session, token }) {
       if (token.sub) session.user.id = token.sub;
       if (typeof token.role === "string") session.user.role = token.role as Role;
+      if (typeof token.name === "string") session.user.name = token.name;
+      if (typeof token.email === "string") session.user.email = token.email;
       return session;
     },
   },

@@ -47,6 +47,17 @@ export type Bulletin = Prisma.BulletinModel
  */
 export type BulletinAck = Prisma.BulletinAckModel
 /**
+ * Model RoleRequest
+ * A staff member's self-service request for the `author` role.
+ * 
+ * The row records *who asked* and *who decided*, never a client-supplied
+ * target role beyond the single permitted value: `requestedRole` is written
+ * as `author` by the API and its client never sets it. Promotion happens by
+ * updating `User.role` on approval — there is no self-promotion path, and no
+ * request can ever name `clinical_lead` or `admin`.
+ */
+export type RoleRequest = Prisma.RoleRequestModel
+/**
  * Model StaffMember
  * 
  */

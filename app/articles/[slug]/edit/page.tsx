@@ -4,7 +4,6 @@ import { ArticleEditorLoader } from "@/components/editor/ArticleEditorLoader";
 import { EditorUnavailable } from "@/components/editor/EditorUnavailable";
 import { getArticleBySlug, getArticles } from "@/lib/data";
 import { getArticleReviewerId, getReviewerOptions, requireEditorViewer } from "@/lib/editor/server";
-import { roleAtLeast } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Edit procedure · Dove Wiki" };
@@ -13,9 +12,14 @@ export const metadata: Metadata = { title: "Edit procedure · Dove Wiki" };
  * `/articles/<slug>/edit` — loads the current `body_markdown` and saves through
  * `PATCH /api/articles/<slug>`.
  *
- * A *published* procedure is live: changing it republishes it, which only a
- * clinical lead may do. Authors get an explanation instead of an editor whose
- * every save would be refused.
+ * Any `author` may edit any procedure, published or not. Saving a published
+ * procedure republishes it: the PATCH omits `status`, so `updateArticle` keeps
+ * it published and snapshots a new immutable version. Publishing a *draft* is
+ * the clinical act that still needs `clinical_lead`+, and the editor surfaces
+ * that refusal honestly rather than hiding it.
+ *
+ * `requireEditorViewer` floors the page at `author`; that is the only gate this
+ * page needs.
  */
 export default async function EditArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -25,7 +29,7 @@ export default async function EditArticlePage({ params }: { params: Promise<{ sl
       <EditorUnavailable
         title="Editing procedures needs the author role"
         message="Your account can read procedures but not change them."
-        backHref={`/?article=${encodeURIComponent(slug)}`}
+        backHref={`/portal?article=${encodeURIComponent(slug)}`}
         backLabel="Back to the procedure"
       />
     );
@@ -38,17 +42,6 @@ export default async function EditArticlePage({ params }: { params: Promise<{ sl
     getArticleReviewerId(slug),
   ]);
   if (!article) notFound();
-
-  if (article.status === "published" && !roleAtLeast(viewer.role, "clinical_lead")) {
-    return (
-      <EditorUnavailable
-        title="This procedure is live"
-        message="Changing a published procedure republishes it, which needs the clinical lead role. Ask a clinical lead to make the change, or to return it to draft."
-        backHref={`/?article=${encodeURIComponent(slug)}`}
-        backLabel="Back to the procedure"
-      />
-    );
-  }
 
   return (
     <ArticleEditorLoader

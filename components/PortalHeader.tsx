@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { BookOpen, Check, ChevronDown, Megaphone, Search, Users } from "lucide-react";
 import type { PortalView } from "@/types/portal";
 import { useSearchShortcutLabel } from "@/lib/platform";
@@ -24,6 +24,8 @@ export interface PortalHeaderProps {
   title?: string;
   /** Subtle facility / product subtext under the wordmark. */
   facilityName?: string;
+  /** Rendered at the far right of the bar, after the section menu (e.g. the account menu). */
+  rightSlot?: ReactNode;
 }
 
 interface ViewOption {
@@ -60,6 +62,7 @@ export function PortalHeader({
   onOpenSearch,
   title = "Dove Wiki",
   facilityName = "Clinical operations · Dove Lewis Emergency Animal Hospital",
+  rightSlot,
 }: PortalHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuId = useId();
@@ -283,6 +286,8 @@ export function PortalHeader({
             </div>
           ) : null}
         </div>
+
+        {rightSlot}
       </div>
     </header>
   );

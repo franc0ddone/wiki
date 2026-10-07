@@ -56,6 +56,7 @@ export const ModelName = {
   ArticleVersion: 'ArticleVersion',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
+  RoleRequest: 'RoleRequest',
   StaffMember: 'StaffMember',
   SearchLog: 'SearchLog'
 } as const
@@ -146,6 +147,20 @@ export const BulletinAckScalarFieldEnum = {
 } as const
 
 export type BulletinAckScalarFieldEnum = (typeof BulletinAckScalarFieldEnum)[keyof typeof BulletinAckScalarFieldEnum]
+
+
+export const RoleRequestScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  requestedRole: 'requestedRole',
+  status: 'status',
+  note: 'note',
+  decidedById: 'decidedById',
+  decidedAt: 'decidedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type RoleRequestScalarFieldEnum = (typeof RoleRequestScalarFieldEnum)[keyof typeof RoleRequestScalarFieldEnum]
 
 
 export const StaffMemberScalarFieldEnum = {

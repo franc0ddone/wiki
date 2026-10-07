@@ -58,6 +58,8 @@ Two migrations:
    rewrite a published version. If a retention policy is ever introduced,
    `ALTER TABLE article_versions DISABLE TRIGGER article_versions_no_delete;` is
    the deliberate, reviewable step — don't drop the function silently.
+3. `…_role_requests` — the `role_requests` table and its `RoleRequestStatus`
+   enum (the "request author access" flow).
 
 `updateArticle` therefore *inserts* versions only, and `GET …/versions` is the
 only reader.
@@ -75,6 +77,7 @@ All documented in `.env.example`. Summary:
 | `AUTH_TRUST_HOST` | Trust `X-Forwarded-*` from the reverse proxy (default on) |
 | `DEV_CREDENTIALS_ENABLED` | Dev email+password sign-in; turn **off** once an IdP is live |
 | `SEED_DEFAULT_PASSWORD` | Password given to every seeded account (dev only) |
+| `HOSPITAL_EMAIL_DOMAIN` | Domain self-registration accepts (default `dovelewis.org`); read once in `lib/registration.ts` |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_DISPLAY_NAME` | Hospital IdP; the provider activates only when all three required values are set |
 | `S3_ENDPOINT` `S3_REGION` `S3_BUCKET` `S3_ACCESS_KEY` `S3_SECRET_KEY` `S3_PUBLIC_BASE_URL` `S3_FORCE_PATH_STYLE` `S3_KEY_PREFIX` | Upload storage |
 | `UPLOAD_MAX_BYTES` | Per-file ceiling, default 10 MB |
@@ -108,6 +111,10 @@ All JSON, all timestamps UTC (ISO-8601 on the wire; the portal formats them in
 | `POST` | `/api/uploads` | `author` |
 | `GET` | `/api/users` | `admin` |
 | `PATCH` | `/api/users/[id]` | `admin` |
+| `POST` | `/api/auth/register` | public (domain-gated, rate-limited) |
+| `GET` | `/api/role-requests` (`?status=`) | `clinical_lead` |
+| `POST` | `/api/role-requests` | `staff` |
+| `PATCH` | `/api/role-requests/[id]` | `clinical_lead` |
 | `*` | `/api/auth/[...nextauth]` | public (Auth.js's own endpoints) |
 
 Errors are uniform: `{ "error": "…", "code": "…", "details": { … } }`.
@@ -178,14 +185,37 @@ above passes.
 
 Path-specific policy in the proxy:
 
-- `GET`/`HEAD`/`OPTIONS` on anything → any authenticated user.
-- Other methods → `author`+, with two documented exceptions:
-  - `POST /api/search-log` → `staff`+. Telemetry comes from every search box; a
-    write-only-for-authors rule would mean nobody's searches were ever logged
-    and the dead-search review would have no data.
-  - `POST /api/bulletins/[id]/ack` → `staff`+. Acknowledging an urgent alert is
-    a staff action, not a content-authoring one.
-- `/api/users*` → `admin`.
+- **Public:** `/` (the sign-in / sign-up landing), `/api/auth/*` (Auth.js's own
+  endpoints, plus the domain-gated `POST /api/auth/register`), and static assets
+  (excluded by the matcher).
+- **Everything else requires a session.** A page request without one is
+  redirected to `/` with a `callbackUrl`; an API request gets a `401`.
+- API methods then get the role floor:
+  - `GET`/`HEAD`/`OPTIONS` on anything → any authenticated user.
+  - Other methods → `author`+, with three documented exceptions:
+    - `POST /api/search-log` → `staff`+. Telemetry comes from every search box; a
+      write-only-for-authors rule would mean nobody's searches were ever logged
+      and the dead-search review would have no data.
+    - `POST /api/bulletins/[id]/ack` → `staff`+. Acknowledging an urgent alert is
+      a staff action, not a content-authoring one.
+    - `POST /api/role-requests` → `staff`+. Raising a request is what a plain
+      staff member is *for*; the route still re-checks `requireRole("staff")`, and
+      deciding a request needs `clinical_lead`+.
+  - `/api/users*` → `admin`.
+
+### Self-registration and the author-access flow
+
+- **`POST /api/auth/register`** is the only public write. It enforces the
+  hospital domain (`HOSPITAL_EMAIL_DOMAIN`, one constant in `lib/registration.ts`),
+  hashes with the seed's bcrypt cost, ignores any client-supplied role (accounts
+  are always `staff`), and is rate-limited per IP (`lib/rate-limit.ts` — in
+  process, so a restart resets it; a shared store/WAF is the durable answer).
+- **`role_requests`** records a staff member's request for `author`. The POST
+  body carries no role: `resolveRequestedRole` (`lib/role-requests.ts`) accepts
+  only the literal `"author"` and refuses anything else with 422
+  `role_not_requestable`. Approving calls `roleAfterApproval`, which only ever
+  raises a rank and only up to the requested role — no self-promotion, no
+  demotion.
 
 ### The credentials provider, and swapping in the hospital IdP
 
@@ -195,14 +225,23 @@ that authenticates against the `User` table with bcrypt. Seeded accounts get
 
 To move to the hospital IdP, set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and
 `OIDC_CLIENT_SECRET`; the OIDC provider registers itself and
-`DEV_CREDENTIALS_ENABLED=false` retires the password path. **One caveat, stated
-plainly:** an OIDC deployment wants Auth.js's database adapter (`Account`,
-`Session`, `VerificationToken` models) for account linking and provider-initiated
-logout. Those models are **not** in this phase's schema because the schema was
-specified explicitly and the JWT strategy needs none of them. Adding them is a
-normal `prisma migrate` change plus `@auth/prisma-adapter`; the `jwt`/`session`
-callbacks in `lib/auth.config.ts` and the role-rank machinery do not change.
-Role assignment from an IdP claim belongs in the `signIn` callback.
+`DEV_CREDENTIALS_ENABLED=false` retires the password path.
+
+**Link-by-email is already implemented.** `lib/auth.ts`'s `signIn` and `jwt`
+callbacks resolve an SSO email to the existing local `User` row and put that
+row's id + role into the token, so a person has one account no matter how they
+signed in. An SSO email with no local account is refused — the marked adapter
+stub is where to add auto-provisioning and an IdP-group → `Role` mapping.
+Nothing downstream branches on the sign-in method (only `lib/auth.ts` reads
+`account.provider`); the session carries id + role only.
+
+**One caveat, stated plainly:** an OIDC deployment may still want Auth.js's
+database adapter (`Account`, `Session`, `VerificationToken` models) for
+provider-initiated logout and refresh-token persistence. Those models are **not**
+in this phase's schema because the schema was specified explicitly and the JWT
+strategy needs none of them. Adding them is a normal `prisma migrate` change plus
+`@auth/prisma-adapter`; the `jwt`/`session` callbacks in `lib/auth.config.ts` and
+the role-rank machinery do not change.
 
 ---
 

@@ -75,9 +75,80 @@ function buildProviders(): Provider[] {
 /** bcrypt hash of a value nobody can supply, used only to equalize timing. */
 const DUMMY_HASH = "$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZBpLp0eQ2h9O0n3n6Z1qQO0h0k1W1u";
 
+/* ---------------------------------------------------------- SSO link-by-email */
+
+/**
+ * Link-by-email: the one SSO requirement that must hold *now*.
+ *
+ * When hospital IT turns on OIDC, a sign-in arrives with an email that may
+ * already have a local `User` row — every account in this portal was created by
+ * the credentials provider, by an admin, or by the domain-gated registration
+ * flow. Auth.js must **link to that row instead of creating a duplicate**, so a
+ * person has one identity, one role, and one audit trail no matter how they
+ * signed in.
+ *
+ * There is no database adapter in this phase (the JWT strategy needs none), so
+ * "linking" lives in the two callbacks below rather than in adapter plumbing:
+ *
+ *  1. `signIn` refuses an SSO email with no local account. IT provisions the
+ *     `User` row first; roles are granted by admins only and an SSO login must
+ *     not conjure one. **← This is the marked adapter stub: when the IdP is
+ *     configured, replace the refusal with auto-provisioning and map an IdP
+ *     group to a portal `Role` here.**
+ *  2. `jwt` swaps the token subject for the *local* user id and copies the local
+ *     role, so `proxy.ts` and `requireRole()` see exactly the id + role a
+ *     password sign-in would have produced.
+ *
+ * The invariant this preserves: **nothing downstream branches on auth method.**
+ * The session carries id + role only; `proxy.ts`, `requireRole()`, and the
+ * editor's checks never inspect how the user signed in.
+ */
+async function resolveSsoIdentity(email: string): Promise<{ id: string; role: Role } | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const row = await getDb().user.findUnique({
+    where: { email: normalized },
+    select: { id: true, role: true },
+  });
+  return row ? { id: row.id, role: row.role as Role } : null;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: buildProviders(),
+  callbacks: {
+    ...authConfig.callbacks,
+
+    // Guard for the external provider. Credentials authenticate against the
+    // `User` row already, so they are exempt.
+    async signIn({ user, account }) {
+      if (account && account.provider !== "credentials") {
+        const email = typeof user.email === "string" ? user.email : "";
+        const identity = await resolveSsoIdentity(email);
+        if (!identity) return false;
+      }
+      return true;
+    },
+
+    // The link itself: an SSO sign-in adopts the existing local identity.
+    async jwt(params) {
+      const { token, user, account } = params;
+
+      if (user && account && account.provider !== "credentials") {
+        const email = typeof user.email === "string" ? user.email : "";
+        const identity = await resolveSsoIdentity(email);
+        if (identity) {
+          token.sub = identity.id;
+          token.role = identity.role;
+          token.name = user.name ?? token.name ?? null;
+          token.email = email.trim().toLowerCase();
+          return token;
+        }
+      }
+
+      return authConfig.callbacks.jwt(params);
+    },
+  },
 });
 
 /** The authenticated principal, as the API layer needs it. */

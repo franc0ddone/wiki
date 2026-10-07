@@ -24,9 +24,11 @@ import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { PortalHeader } from "@/components/PortalHeader";
 import { ReferencedBy } from "@/components/ReferencedBy";
 import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
+import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { matchesDepartment } from "@/lib/data/filters";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
 import { roleAtLeast, type Role } from "@/lib/roles";
+import type { RoleRequestSummary } from "@/lib/role-requests";
 import { buildSearchIndex, searchSurface } from "@/lib/search";
 import type { SearchHit, SearchSurface } from "@/lib/search";
 import { FACILITY_TIME_ZONE, cx, formatDate, formatDateTime } from "@/lib/utils";
@@ -46,7 +48,7 @@ import {
 /**
  * Interactive shell for the portal.
  *
- * The three data sets are fetched on the server (`app/page.tsx` via
+ * The three data sets are fetched on the server (`app/portal/page.tsx` via
  * `lib/data/*`) and handed in as props; everything interactive — view
  * switching, search, department filtering, list/detail selection, the
  * personnel drawer — lives here so the page itself can stay a server
@@ -65,8 +67,14 @@ export interface OperationsHubClientProps {
   staff: readonly StaffMember[];
   /** The signed-in user's role; `null` when there is no session. Gates edit affordances only (the API enforces it regardless). */
   viewerRole?: Role | null;
+  /** Signed-in identity, for the account menu. */
+  viewer?: { name: string; email: string } | null;
   /** Open this procedure on load (`/procedures/<slug>` redirects here). */
   initialArticleSlug?: string | null;
+  /** The viewer's own latest author-access request (present for `staff` only). */
+  authorRequest?: RoleRequestSummary | null;
+  /** The open author-access queue (present for `clinical_lead`+ only). */
+  roleRequests?: readonly RoleRequestSummary[];
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -509,7 +517,10 @@ export function OperationsHubClient({
   bulletins,
   staff,
   viewerRole = null,
+  viewer = null,
   initialArticleSlug = null,
+  authorRequest = null,
+  roleRequests = [],
 }: OperationsHubClientProps) {
   const [activeView, setActiveView] = useState<PortalView>(() =>
     initialArticleSlug && articles.some((article) => article.slug === initialArticleSlug)
@@ -530,9 +541,14 @@ export function OperationsHubClient({
   const pendingAnchor = useRef<string | null>(null);
 
   const isAuthor = viewerRole !== null && roleAtLeast(viewerRole, "author");
-  /** A published procedure is changed by republishing it, which only a clinical lead may do. */
-  const canEditArticle = (article: KnowledgeArticle) =>
-    isAuthor && (article.status !== "published" || (viewerRole !== null && roleAtLeast(viewerRole, "clinical_lead")));
+  /**
+   * An author may edit any procedure, including a published one: a plain save of
+   * a live procedure republishes it (the API snapshots a new immutable version),
+   * and `updateArticle` already permits that at `author`+. Publishing a *draft*
+   * still needs `clinical_lead`+, which the editor and the API both enforce.
+   * There is no per-article condition left, so the edit affordance simply tracks
+   * the role.
+   */
 
   const handleViewChange = (view: PortalView) => {
     setActiveView(view);
@@ -668,6 +684,16 @@ export function OperationsHubClient({
         activeView={activeView}
         onViewChange={handleViewChange}
         onOpenSearch={() => setPaletteOpen(true)}
+        rightSlot={
+          viewerRole ? (
+            <AuthorAccessMenu
+              viewerRole={viewerRole}
+              viewer={viewer}
+              authorRequest={authorRequest}
+              roleRequests={roleRequests}
+            />
+          ) : null
+        }
       />
 
       <main className="flex min-h-0 flex-1 flex-col print:block">
@@ -750,7 +776,7 @@ export function OperationsHubClient({
               selectedArticle ? (
                 <ArticleDetail
                   article={selectedArticle}
-                  canEdit={canEditArticle(selectedArticle)}
+                  canEdit={isAuthor}
                   onOpenHistory={() => setHistoryOpen(true)}
                   onOpenArticleBySlug={openArticleBySlug}
                   onOpenBulletin={openBulletin}

@@ -14,6 +14,21 @@ import { buildLinkRegistry } from "@/lib/links";
 import { stripMarkdown } from "@/lib/search/strip-markdown";
 import { expandQuery, SYNONYMS } from "@/lib/search/synonyms";
 import { buildSearchIndex, search } from "@/lib/search";
+import {
+  HOSPITAL_EMAIL_DOMAIN,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_REJECTION_MESSAGE,
+  isHospitalEmail,
+  normalizeEmail,
+  passwordProblem,
+} from "@/lib/registration";
+import {
+  canRequestAuthorAccess,
+  canReviewRoleRequests,
+  isRoleRequestStatus,
+  resolveRequestedRole,
+  roleAfterApproval,
+} from "@/lib/role-requests";
 import { KNOWLEDGE_ARTICLES, BULLETINS, STAFF_DIRECTORY } from "@/lib/mock-data";
 
 let passed = 0;
@@ -193,6 +208,62 @@ check("broken slug and broken anchor block; skipped heading level only warns", (
   const r = validateArticle({ ...base, markdown: "### Jump\n\n[a](/procedures/nope) [b](#nowhere)" }, registry);
   assert.deepEqual(r.errors.map((e) => e.code), ["link_unknown_article", "link_unknown_anchor"]);
   assert.deepEqual(r.warnings.map((e) => e.code), ["heading_level_skipped"]);
+});
+
+console.log("registration policy");
+check("hospital domain accepts the configured domain only", () => {
+  assert.equal(isHospitalEmail(`nurse@${HOSPITAL_EMAIL_DOMAIN}`), true);
+  assert.equal(isHospitalEmail(`NURSE@${HOSPITAL_EMAIL_DOMAIN.toUpperCase()}`), true);
+  // A different domain, and the classic suffix trick, are both refused.
+  assert.equal(isHospitalEmail("nurse@gmail.com"), false);
+  assert.equal(isHospitalEmail(`nurse@not${HOSPITAL_EMAIL_DOMAIN}.evil.com`), false);
+  assert.equal(isHospitalEmail(`nurse@${HOSPITAL_EMAIL_DOMAIN}.evil.com`), false);
+  assert.equal(isHospitalEmail("no-at-sign"), false);
+  assert.equal(isHospitalEmail(`@${HOSPITAL_EMAIL_DOMAIN}`), false);
+});
+check("email is normalised to the stored form", () => {
+  assert.equal(normalizeEmail("  Nurse@DoveLewis.ORG  "), "nurse@dovelewis.org");
+});
+check("password floor is enforced", () => {
+  assert.equal(passwordProblem("short"), PASSWORD_REJECTION_MESSAGE);
+  assert.equal(passwordProblem("long-enough-1"), null);
+  assert.equal(passwordProblem("x".repeat(PASSWORD_MAX_LENGTH + 1)), "Keep the password under 200 characters.");
+});
+
+console.log("author-access requests");
+check("only `staff` may request, only `clinical_lead`+ may review", () => {
+  assert.equal(canRequestAuthorAccess("staff"), true);
+  assert.equal(canRequestAuthorAccess("readonly"), false);
+  assert.equal(canRequestAuthorAccess("author"), false);
+  assert.equal(canRequestAuthorAccess(null), false);
+
+  assert.equal(canReviewRoleRequests("clinical_lead"), true);
+  assert.equal(canReviewRoleRequests("admin"), true);
+  assert.equal(canReviewRoleRequests("staff"), false);
+  assert.equal(canReviewRoleRequests("author"), false);
+});
+check("the request endpoint accepts only the author role", () => {
+  assert.equal(resolveRequestedRole(undefined), "author");
+  assert.equal(resolveRequestedRole("author"), "author");
+  // Anything that would self-promote is refused, not downgraded.
+  assert.equal(resolveRequestedRole("admin"), null);
+  assert.equal(resolveRequestedRole("clinical_lead"), null);
+  assert.equal(resolveRequestedRole("readonly"), null);
+  assert.equal(resolveRequestedRole(42), null);
+});
+check("approval promotes upward, never sideways or down", () => {
+  assert.equal(roleAfterApproval("staff", "author"), "author");
+  assert.equal(roleAfterApproval("author", "author"), "author");
+  // A grant never demotes a higher role, and never skips past the requested one.
+  assert.equal(roleAfterApproval("clinical_lead", "author"), "clinical_lead");
+  assert.equal(roleAfterApproval("admin", "author"), "admin");
+});
+check("status guard recognises exactly the three lifecycle values", () => {
+  assert.equal(isRoleRequestStatus("pending"), true);
+  assert.equal(isRoleRequestStatus("approved"), true);
+  assert.equal(isRoleRequestStatus("declined"), true);
+  assert.equal(isRoleRequestStatus("open"), false);
+  assert.equal(isRoleRequestStatus(1), false);
 });
 
 console.log(`\n${passed} checks passed.`);

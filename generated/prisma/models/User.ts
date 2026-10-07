@@ -203,6 +203,8 @@ export type UserWhereInput = {
   authoredBulletins?: Prisma.BulletinListRelationFilter
   articleVersions?: Prisma.ArticleVersionListRelationFilter
   bulletinAcks?: Prisma.BulletinAckListRelationFilter
+  roleRequests?: Prisma.RoleRequestListRelationFilter
+  decidedRoleRequests?: Prisma.RoleRequestListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -218,6 +220,8 @@ export type UserOrderByWithRelationInput = {
   authoredBulletins?: Prisma.BulletinOrderByRelationAggregateInput
   articleVersions?: Prisma.ArticleVersionOrderByRelationAggregateInput
   bulletinAcks?: Prisma.BulletinAckOrderByRelationAggregateInput
+  roleRequests?: Prisma.RoleRequestOrderByRelationAggregateInput
+  decidedRoleRequests?: Prisma.RoleRequestOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -236,6 +240,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   authoredBulletins?: Prisma.BulletinListRelationFilter
   articleVersions?: Prisma.ArticleVersionListRelationFilter
   bulletinAcks?: Prisma.BulletinAckListRelationFilter
+  roleRequests?: Prisma.RoleRequestListRelationFilter
+  decidedRoleRequests?: Prisma.RoleRequestListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -277,6 +283,8 @@ export type UserCreateInput = {
   authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -292,6 +300,8 @@ export type UserUncheckedCreateInput = {
   authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUpdateInput = {
@@ -307,6 +317,8 @@ export type UserUpdateInput = {
   authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -322,6 +334,8 @@ export type UserUncheckedUpdateInput = {
   authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -482,6 +496,36 @@ export type UserUpdateOneRequiredWithoutBulletinAcksNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutBulletinAcksInput, Prisma.UserUpdateWithoutBulletinAcksInput>, Prisma.UserUncheckedUpdateWithoutBulletinAcksInput>
 }
 
+export type UserCreateNestedOneWithoutRoleRequestsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRoleRequestsInput, Prisma.UserUncheckedCreateWithoutRoleRequestsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRoleRequestsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutDecidedRoleRequestsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedCreateWithoutDecidedRoleRequestsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutDecidedRoleRequestsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutRoleRequestsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRoleRequestsInput, Prisma.UserUncheckedCreateWithoutRoleRequestsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRoleRequestsInput
+  upsert?: Prisma.UserUpsertWithoutRoleRequestsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRoleRequestsInput, Prisma.UserUpdateWithoutRoleRequestsInput>, Prisma.UserUncheckedUpdateWithoutRoleRequestsInput>
+}
+
+export type UserUpdateOneWithoutDecidedRoleRequestsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedCreateWithoutDecidedRoleRequestsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutDecidedRoleRequestsInput
+  upsert?: Prisma.UserUpsertWithoutDecidedRoleRequestsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutDecidedRoleRequestsInput, Prisma.UserUpdateWithoutDecidedRoleRequestsInput>, Prisma.UserUncheckedUpdateWithoutDecidedRoleRequestsInput>
+}
+
 export type UserCreateWithoutAuthoredArticlesInput = {
   id?: string
   email: string
@@ -494,6 +538,8 @@ export type UserCreateWithoutAuthoredArticlesInput = {
   authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateWithoutAuthoredArticlesInput = {
@@ -508,6 +554,8 @@ export type UserUncheckedCreateWithoutAuthoredArticlesInput = {
   authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserCreateOrConnectWithoutAuthoredArticlesInput = {
@@ -527,6 +575,8 @@ export type UserCreateWithoutReviewedArticlesInput = {
   authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateWithoutReviewedArticlesInput = {
@@ -541,6 +591,8 @@ export type UserUncheckedCreateWithoutReviewedArticlesInput = {
   authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserCreateOrConnectWithoutReviewedArticlesInput = {
@@ -571,6 +623,8 @@ export type UserUpdateWithoutAuthoredArticlesInput = {
   authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuthoredArticlesInput = {
@@ -585,6 +639,8 @@ export type UserUncheckedUpdateWithoutAuthoredArticlesInput = {
   authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUpsertWithoutReviewedArticlesInput = {
@@ -610,6 +666,8 @@ export type UserUpdateWithoutReviewedArticlesInput = {
   authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutReviewedArticlesInput = {
@@ -624,6 +682,8 @@ export type UserUncheckedUpdateWithoutReviewedArticlesInput = {
   authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserCreateWithoutArticleVersionsInput = {
@@ -638,6 +698,8 @@ export type UserCreateWithoutArticleVersionsInput = {
   reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
   authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateWithoutArticleVersionsInput = {
@@ -652,6 +714,8 @@ export type UserUncheckedCreateWithoutArticleVersionsInput = {
   reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
   authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserCreateOrConnectWithoutArticleVersionsInput = {
@@ -682,6 +746,8 @@ export type UserUpdateWithoutArticleVersionsInput = {
   reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
   authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutArticleVersionsInput = {
@@ -696,6 +762,8 @@ export type UserUncheckedUpdateWithoutArticleVersionsInput = {
   reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
   authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserCreateWithoutAuthoredBulletinsInput = {
@@ -710,6 +778,8 @@ export type UserCreateWithoutAuthoredBulletinsInput = {
   reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateWithoutAuthoredBulletinsInput = {
@@ -724,6 +794,8 @@ export type UserUncheckedCreateWithoutAuthoredBulletinsInput = {
   reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserCreateOrConnectWithoutAuthoredBulletinsInput = {
@@ -754,6 +826,8 @@ export type UserUpdateWithoutAuthoredBulletinsInput = {
   reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuthoredBulletinsInput = {
@@ -768,6 +842,8 @@ export type UserUncheckedUpdateWithoutAuthoredBulletinsInput = {
   reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserCreateWithoutBulletinAcksInput = {
@@ -782,6 +858,8 @@ export type UserCreateWithoutBulletinAcksInput = {
   reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
   authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserUncheckedCreateWithoutBulletinAcksInput = {
@@ -796,6 +874,8 @@ export type UserUncheckedCreateWithoutBulletinAcksInput = {
   reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
   authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
 export type UserCreateOrConnectWithoutBulletinAcksInput = {
@@ -826,6 +906,8 @@ export type UserUpdateWithoutBulletinAcksInput = {
   reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
   authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutBulletinAcksInput = {
@@ -840,6 +922,168 @@ export type UserUncheckedUpdateWithoutBulletinAcksInput = {
   reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
   authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
+}
+
+export type UserCreateWithoutRoleRequestsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
+}
+
+export type UserUncheckedCreateWithoutRoleRequestsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
+}
+
+export type UserCreateOrConnectWithoutRoleRequestsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRoleRequestsInput, Prisma.UserUncheckedCreateWithoutRoleRequestsInput>
+}
+
+export type UserCreateWithoutDecidedRoleRequestsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutDecidedRoleRequestsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutDecidedRoleRequestsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedCreateWithoutDecidedRoleRequestsInput>
+}
+
+export type UserUpsertWithoutRoleRequestsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRoleRequestsInput, Prisma.UserUncheckedUpdateWithoutRoleRequestsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRoleRequestsInput, Prisma.UserUncheckedCreateWithoutRoleRequestsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRoleRequestsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRoleRequestsInput, Prisma.UserUncheckedUpdateWithoutRoleRequestsInput>
+}
+
+export type UserUpdateWithoutRoleRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRoleRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUncheckedUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
+}
+
+export type UserUpsertWithoutDecidedRoleRequestsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedUpdateWithoutDecidedRoleRequestsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedCreateWithoutDecidedRoleRequestsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutDecidedRoleRequestsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutDecidedRoleRequestsInput, Prisma.UserUncheckedUpdateWithoutDecidedRoleRequestsInput>
+}
+
+export type UserUpdateWithoutDecidedRoleRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutDecidedRoleRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUncheckedUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -853,6 +1097,8 @@ export type UserCountOutputType = {
   authoredBulletins: number
   articleVersions: number
   bulletinAcks: number
+  roleRequests: number
+  decidedRoleRequests: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -861,6 +1107,8 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   authoredBulletins?: boolean | UserCountOutputTypeCountAuthoredBulletinsArgs
   articleVersions?: boolean | UserCountOutputTypeCountArticleVersionsArgs
   bulletinAcks?: boolean | UserCountOutputTypeCountBulletinAcksArgs
+  roleRequests?: boolean | UserCountOutputTypeCountRoleRequestsArgs
+  decidedRoleRequests?: boolean | UserCountOutputTypeCountDecidedRoleRequestsArgs
 }
 
 /**
@@ -908,6 +1156,20 @@ export type UserCountOutputTypeCountBulletinAcksArgs<ExtArgs extends runtime.Typ
   where?: Prisma.BulletinAckWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRoleRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RoleRequestWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountDecidedRoleRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RoleRequestWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -922,6 +1184,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   authoredBulletins?: boolean | Prisma.User$authoredBulletinsArgs<ExtArgs>
   articleVersions?: boolean | Prisma.User$articleVersionsArgs<ExtArgs>
   bulletinAcks?: boolean | Prisma.User$bulletinAcksArgs<ExtArgs>
+  roleRequests?: boolean | Prisma.User$roleRequestsArgs<ExtArgs>
+  decidedRoleRequests?: boolean | Prisma.User$decidedRoleRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -962,6 +1226,8 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   authoredBulletins?: boolean | Prisma.User$authoredBulletinsArgs<ExtArgs>
   articleVersions?: boolean | Prisma.User$articleVersionsArgs<ExtArgs>
   bulletinAcks?: boolean | Prisma.User$bulletinAcksArgs<ExtArgs>
+  roleRequests?: boolean | Prisma.User$roleRequestsArgs<ExtArgs>
+  decidedRoleRequests?: boolean | Prisma.User$decidedRoleRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -975,6 +1241,14 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     authoredBulletins: Prisma.$BulletinPayload<ExtArgs>[]
     articleVersions: Prisma.$ArticleVersionPayload<ExtArgs>[]
     bulletinAcks: Prisma.$BulletinAckPayload<ExtArgs>[]
+    /**
+     * Requests this user has raised (the "request author access" flow).
+     */
+    roleRequests: Prisma.$RoleRequestPayload<ExtArgs>[]
+    /**
+     * Requests this user has decided (clinical leads and admins).
+     */
+    decidedRoleRequests: Prisma.$RoleRequestPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1396,6 +1670,8 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   authoredBulletins<T extends Prisma.User$authoredBulletinsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$authoredBulletinsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   articleVersions<T extends Prisma.User$articleVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$articleVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArticleVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   bulletinAcks<T extends Prisma.User$bulletinAcksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$bulletinAcksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAckPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  roleRequests<T extends Prisma.User$roleRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$roleRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  decidedRoleRequests<T extends Prisma.User$decidedRoleRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$decidedRoleRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1942,6 +2218,54 @@ export type User$bulletinAcksArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.BulletinAckScalarFieldEnum | Prisma.BulletinAckScalarFieldEnum[]
+}
+
+/**
+ * User.roleRequests
+ */
+export type User$roleRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RoleRequest
+   */
+  select?: Prisma.RoleRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RoleRequest
+   */
+  omit?: Prisma.RoleRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RoleRequestInclude<ExtArgs> | null
+  where?: Prisma.RoleRequestWhereInput
+  orderBy?: Prisma.RoleRequestOrderByWithRelationInput | Prisma.RoleRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RoleRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RoleRequestScalarFieldEnum | Prisma.RoleRequestScalarFieldEnum[]
+}
+
+/**
+ * User.decidedRoleRequests
+ */
+export type User$decidedRoleRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RoleRequest
+   */
+  select?: Prisma.RoleRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RoleRequest
+   */
+  omit?: Prisma.RoleRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RoleRequestInclude<ExtArgs> | null
+  where?: Prisma.RoleRequestWhereInput
+  orderBy?: Prisma.RoleRequestOrderByWithRelationInput | Prisma.RoleRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RoleRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RoleRequestScalarFieldEnum | Prisma.RoleRequestScalarFieldEnum[]
 }
 
 /**

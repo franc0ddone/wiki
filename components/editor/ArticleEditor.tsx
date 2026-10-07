@@ -53,6 +53,13 @@ import {
  * additionally refuses anyone below `clinical_lead` (that refusal is shown
  * verbatim, not hidden behind a disabled button).
  *
+ * **Editing a live procedure.** An `author` may open and edit a published
+ * procedure. Their save is a *plain* save — it omits `status` — so the API keeps
+ * the procedure published and snapshots a new immutable version (a
+ * republication). Only a `clinical_lead`+ sees "Save & republish", which sends
+ * the explicit `status: "published"`. Both leave the procedure live; neither
+ * lets an author publish a *draft*, which remains a clinical act.
+ *
  * Every save that changes the title or body needs a change summary; it becomes
  * the version's changelog when the procedure is published. Versions are
  * immutable — this page edits the *current* text, never an old version.
@@ -282,7 +289,7 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
         setLastIntent(null);
 
         if (action === "publish") {
-          router.push(`/?article=${encodeURIComponent(saved.slug)}`);
+          router.push(`/portal?article=${encodeURIComponent(saved.slug)}`);
           return;
         }
         showFeedback({
@@ -357,7 +364,7 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
       <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-zinc-200/80 bg-white/80 px-4 backdrop-blur-md sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href={slug ? `/?article=${encodeURIComponent(slug)}` : "/"}
+            href={slug ? `/portal?article=${encodeURIComponent(slug)}` : "/portal"}
             className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
           >
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
@@ -617,9 +624,18 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
               ) : null}
 
               {!isNew && status === "published" ? (
-                <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("publish")}>
-                  {busy === "publish" ? "Republishing…" : "Save & republish"}
-                </button>
+                canPublish ? (
+                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("publish")}>
+                    {busy === "publish" ? "Republishing…" : "Save & republish"}
+                  </button>
+                ) : (
+                  // An author's save omits `status`, so the procedure stays
+                  // published and a new version is recorded — republication
+                  // without the clinical-lead-only explicit publish.
+                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("save")}>
+                    {busy === "save" ? "Saving…" : "Save changes"}
+                  </button>
+                )
               ) : null}
             </div>
           </div>

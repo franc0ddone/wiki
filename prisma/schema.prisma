@@ -59,6 +59,14 @@ enum ShiftPreference {
   Overnight
 }
 
+/// Lifecycle of a self-service request for the `author` role. `pending` is open,
+/// `approved` promoted the requester, `declined` closed it without a change.
+enum RoleRequestStatus {
+  pending
+  approved
+  declined
+}
+
 // --------------------------------------------------------------------- users
 
 model User {
@@ -86,6 +94,11 @@ model User {
   authoredBulletins Bulletin[]
   articleVersions  ArticleVersion[]
   bulletinAcks     BulletinAck[]
+
+  /// Requests this user has raised (the "request author access" flow).
+  roleRequests        RoleRequest[] @relation("RoleRequestRequester")
+  /// Requests this user has decided (clinical leads and admins).
+  decidedRoleRequests RoleRequest[] @relation("RoleRequestDecider")
 
   @@map("users")
 }
@@ -206,6 +219,43 @@ model BulletinAck {
   @@unique([bulletinId, userId])
   @@index([bulletinId])
   @@map("bulletin_acks")
+}
+
+// ----------------------------------------------------------- role requests
+
+/// A staff member's self-service request for the `author` role.
+///
+/// The row records *who asked* and *who decided*, never a client-supplied
+/// target role beyond the single permitted value: `requestedRole` is written
+/// as `author` by the API and its client never sets it. Promotion happens by
+/// updating `User.role` on approval — there is no self-promotion path, and no
+/// request can ever name `clinical_lead` or `admin`.
+model RoleRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId        String @map("user_id") @db.Uuid
+  /// Always `author` today; a column rather than a literal so the flow can
+  /// grow without a schema change, while `lib/role-requests.ts` keeps the
+  /// endpoint pinned to the one value it will accept.
+  requestedRole Role   @default(author) @map("requested_role")
+
+  status RoleRequestStatus @default(pending)
+
+  /// Free-text note attached when the request is decided (a decline reason, or
+  /// an approval remark). Null while the request is open.
+  note String?
+
+  decidedById String?   @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime? @map("decided_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User  @relation("RoleRequestRequester", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("RoleRequestDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([userId])
+  @@map("role_requests")
 }
 
 // --------------------------------------------------------------------- staff
