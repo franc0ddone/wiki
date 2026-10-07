@@ -31,6 +31,8 @@ import { isRole, roleAtLeast, type Role } from "@/lib/roles";
  *
  * `force-dynamic` is deliberate: a live wiki must reflect the current database,
  * not a build-time snapshot.
+ * franco oddone. 
+ * 
  */
 export const dynamic = "force-dynamic";
 
