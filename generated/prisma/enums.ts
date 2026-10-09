@@ -63,3 +63,12 @@ export const RoleRequestStatus = {
 } as const
 
 export type RoleRequestStatus = (typeof RoleRequestStatus)[keyof typeof RoleRequestStatus]
+
+
+export const BulletinFormat = {
+  notice: 'notice',
+  announcement: 'announcement',
+  featured: 'featured'
+} as const
+
+export type BulletinFormat = (typeof BulletinFormat)[keyof typeof BulletinFormat]

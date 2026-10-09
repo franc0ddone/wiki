@@ -2,7 +2,8 @@
  * Paragraph / heading formatting attributes — pure and framework-free.
  *
  * Markdown has no block-alignment or line-height syntax, so the stored form
- * extends plain Markdown with the same bracketed suffix images already use:
+ * extends plain Markdown with the same bracketed `{…}` suffix images already
+ * use (the grammar itself lives in `lib/markdown/attribute-grammar.ts`):
  *
  *   Keep the clamp in the top drawer.{align=center line-height=1.5}
  *
@@ -18,6 +19,8 @@
  * index's text extractor and `scripts/verify-frontend.ts` all read these
  * helpers, so the stored syntax has exactly one definition.
  */
+
+import { splitTrailingAttributeGroup } from "@/lib/markdown/attribute-grammar";
 
 export const TEXT_ALIGNMENTS = ["left", "center", "right", "justify"] as const;
 export type TextAlignment = (typeof TEXT_ALIGNMENTS)[number];
@@ -44,9 +47,8 @@ export interface ParsedBlockAttributes extends BlockAttributes {
   id: string | null;
 }
 
-/** The trailing brace group, if the line ends with one. */
-const ATTRIBUTE_GROUP_RE = /\{([^{}]*)\}\s*$/;
-const HEADING_ID_TOKEN_RE = /^#[A-Za-z0-9_-]+$/;
+/** Heading id tokens are `#name` where `name` is `[A-Za-z0-9_-]+`. */
+const HEADING_ID_RE = /^[A-Za-z0-9_-]+$/;
 
 export function isTextAlignment(value: string): value is TextAlignment {
   return (TEXT_ALIGNMENTS as readonly string[]).includes(value);
@@ -64,7 +66,7 @@ export function isLineHeight(value: string): value is LineHeight {
  */
 export function splitBlockAttributes(text: string): ParsedBlockAttributes {
   const unchanged: ParsedBlockAttributes = { text, align: null, lineHeight: null, id: null };
-  const group = ATTRIBUTE_GROUP_RE.exec(text);
+  const group = splitTrailingAttributeGroup(text);
   if (!group) return unchanged;
 
   let align: TextAlignment | null = null;
@@ -72,33 +74,29 @@ export function splitBlockAttributes(text: string): ParsedBlockAttributes {
   let id: string | null = null;
   let recognised = false;
 
-  for (const token of group[1].trim().split(/\s+/)) {
-    if (!token) continue;
-    if (HEADING_ID_TOKEN_RE.test(token)) {
-      id = token.slice(1);
-      recognised = true;
+  for (const token of group.tokens) {
+    if (token.id !== null) {
+      if (HEADING_ID_RE.test(token.id)) {
+        id = token.id;
+        recognised = true;
+      }
       continue;
     }
-    const eq = token.indexOf("=");
-    if (eq === -1) continue;
-    const key = token.slice(0, eq);
-    const value = token.slice(eq + 1);
-    if (key === "align" && isTextAlignment(value)) {
-      align = value;
+    if (token.key === "align" && token.value !== null && isTextAlignment(token.value)) {
+      align = token.value;
       recognised = true;
-    } else if (key === "line-height" && isLineHeight(value)) {
-      lineHeight = value;
+    } else if (token.key === "line-height" && token.value !== null && isLineHeight(token.value)) {
+      lineHeight = token.value;
       recognised = true;
     }
   }
 
   if (!recognised) return unchanged;
 
-  const stripped = text.slice(0, group.index).trimEnd();
   // `{align=center}` on a line of its own is a brace group, not a block of text.
-  if (stripped.length === 0) return unchanged;
+  if (group.rest.length === 0) return unchanged;
 
-  return { text: stripped, align, lineHeight, id };
+  return { text: group.rest, align, lineHeight, id };
 }
 
 /** The same split, for callers that only want the text. */

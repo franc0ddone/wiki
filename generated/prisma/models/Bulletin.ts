@@ -29,6 +29,9 @@ export type BulletinMinAggregateOutputType = {
   title: string | null
   bodyMarkdown: string | null
   priority: $Enums.BulletinPriority | null
+  format: $Enums.BulletinFormat | null
+  kicker: string | null
+  deck: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
@@ -41,6 +44,9 @@ export type BulletinMaxAggregateOutputType = {
   title: string | null
   bodyMarkdown: string | null
   priority: $Enums.BulletinPriority | null
+  format: $Enums.BulletinFormat | null
+  kicker: string | null
+  deck: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
@@ -54,6 +60,9 @@ export type BulletinCountAggregateOutputType = {
   bodyMarkdown: number
   departments: number
   priority: number
+  format: number
+  kicker: number
+  deck: number
   linkedArticleId: number
   authorId: number
   publishedAt: number
@@ -68,6 +77,9 @@ export type BulletinMinAggregateInputType = {
   title?: true
   bodyMarkdown?: true
   priority?: true
+  format?: true
+  kicker?: true
+  deck?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -80,6 +92,9 @@ export type BulletinMaxAggregateInputType = {
   title?: true
   bodyMarkdown?: true
   priority?: true
+  format?: true
+  kicker?: true
+  deck?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -93,6 +108,9 @@ export type BulletinCountAggregateInputType = {
   bodyMarkdown?: true
   departments?: true
   priority?: true
+  format?: true
+  kicker?: true
+  deck?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -179,6 +197,9 @@ export type BulletinGroupByOutputType = {
   bodyMarkdown: string
   departments: string[]
   priority: $Enums.BulletinPriority
+  format: $Enums.BulletinFormat
+  kicker: string | null
+  deck: string | null
   linkedArticleId: string | null
   authorId: string
   publishedAt: Date
@@ -213,6 +234,9 @@ export type BulletinWhereInput = {
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -221,6 +245,7 @@ export type BulletinWhereInput = {
   linkedArticle?: Prisma.XOR<Prisma.ArticleNullableScalarRelationFilter, Prisma.ArticleWhereInput> | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
+  reactions?: Prisma.BulletinReactionListRelationFilter
 }
 
 export type BulletinOrderByWithRelationInput = {
@@ -229,6 +254,9 @@ export type BulletinOrderByWithRelationInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
+  deck?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -237,6 +265,7 @@ export type BulletinOrderByWithRelationInput = {
   linkedArticle?: Prisma.ArticleOrderByWithRelationInput
   author?: Prisma.UserOrderByWithRelationInput
   acks?: Prisma.BulletinAckOrderByRelationAggregateInput
+  reactions?: Prisma.BulletinReactionOrderByRelationAggregateInput
 }
 
 export type BulletinWhereUniqueInput = Prisma.AtLeast<{
@@ -248,6 +277,9 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -256,6 +288,7 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   linkedArticle?: Prisma.XOR<Prisma.ArticleNullableScalarRelationFilter, Prisma.ArticleWhereInput> | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
+  reactions?: Prisma.BulletinReactionListRelationFilter
 }, "id">
 
 export type BulletinOrderByWithAggregationInput = {
@@ -264,6 +297,9 @@ export type BulletinOrderByWithAggregationInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
+  deck?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -283,6 +319,9 @@ export type BulletinScalarWhereWithAggregatesInput = {
   bodyMarkdown?: Prisma.StringWithAggregatesFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   priority?: Prisma.EnumBulletinPriorityWithAggregatesFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatWithAggregatesFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
+  deck?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableWithAggregatesFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidWithAggregatesFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeWithAggregatesFilter<"Bulletin"> | Date | string
@@ -296,12 +335,16 @@ export type BulletinCreateInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateInput = {
@@ -310,12 +353,16 @@ export type BulletinUncheckedCreateInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUpdateInput = {
@@ -324,12 +371,16 @@ export type BulletinUpdateInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateInput = {
@@ -338,12 +389,16 @@ export type BulletinUncheckedUpdateInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinCreateManyInput = {
@@ -352,6 +407,9 @@ export type BulletinCreateManyInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
@@ -365,6 +423,9 @@ export type BulletinUpdateManyMutationInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -376,6 +437,9 @@ export type BulletinUncheckedUpdateManyInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -399,6 +463,9 @@ export type BulletinCountOrderByAggregateInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
+  deck?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -411,6 +478,9 @@ export type BulletinMaxOrderByAggregateInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
+  deck?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -423,6 +493,9 @@ export type BulletinMinOrderByAggregateInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
+  deck?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -532,6 +605,10 @@ export type EnumBulletinPriorityFieldUpdateOperationsInput = {
   set?: $Enums.BulletinPriority
 }
 
+export type EnumBulletinFormatFieldUpdateOperationsInput = {
+  set?: $Enums.BulletinFormat
+}
+
 export type BulletinCreateNestedOneWithoutAcksInput = {
   create?: Prisma.XOR<Prisma.BulletinCreateWithoutAcksInput, Prisma.BulletinUncheckedCreateWithoutAcksInput>
   connectOrCreate?: Prisma.BulletinCreateOrConnectWithoutAcksInput
@@ -546,17 +623,35 @@ export type BulletinUpdateOneRequiredWithoutAcksNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.BulletinUpdateToOneWithWhereWithoutAcksInput, Prisma.BulletinUpdateWithoutAcksInput>, Prisma.BulletinUncheckedUpdateWithoutAcksInput>
 }
 
+export type BulletinCreateNestedOneWithoutReactionsInput = {
+  create?: Prisma.XOR<Prisma.BulletinCreateWithoutReactionsInput, Prisma.BulletinUncheckedCreateWithoutReactionsInput>
+  connectOrCreate?: Prisma.BulletinCreateOrConnectWithoutReactionsInput
+  connect?: Prisma.BulletinWhereUniqueInput
+}
+
+export type BulletinUpdateOneRequiredWithoutReactionsNestedInput = {
+  create?: Prisma.XOR<Prisma.BulletinCreateWithoutReactionsInput, Prisma.BulletinUncheckedCreateWithoutReactionsInput>
+  connectOrCreate?: Prisma.BulletinCreateOrConnectWithoutReactionsInput
+  upsert?: Prisma.BulletinUpsertWithoutReactionsInput
+  connect?: Prisma.BulletinWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.BulletinUpdateToOneWithWhereWithoutReactionsInput, Prisma.BulletinUpdateWithoutReactionsInput>, Prisma.BulletinUncheckedUpdateWithoutReactionsInput>
+}
+
 export type BulletinCreateWithoutAuthorInput = {
   id?: string
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutAuthorInput = {
@@ -565,11 +660,15 @@ export type BulletinUncheckedCreateWithoutAuthorInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutAuthorInput = {
@@ -607,6 +706,9 @@ export type BulletinScalarWhereInput = {
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -620,11 +722,15 @@ export type BulletinCreateWithoutLinkedArticleInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
@@ -633,11 +739,15 @@ export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutLinkedArticleInput = {
@@ -672,11 +782,15 @@ export type BulletinCreateWithoutAcksInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
+  reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutAcksInput = {
@@ -685,11 +799,15 @@ export type BulletinUncheckedCreateWithoutAcksInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutAcksInput = {
@@ -714,11 +832,15 @@ export type BulletinUpdateWithoutAcksInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
+  reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutAcksInput = {
@@ -727,11 +849,99 @@ export type BulletinUncheckedUpdateWithoutAcksInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
+}
+
+export type BulletinCreateWithoutReactionsInput = {
+  id?: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.BulletinCreatedepartmentsInput | string[]
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
+  publishedAt: Date | string
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
+  author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
+  acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+}
+
+export type BulletinUncheckedCreateWithoutReactionsInput = {
+  id?: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.BulletinCreatedepartmentsInput | string[]
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
+  linkedArticleId?: string | null
+  authorId: string
+  publishedAt: Date | string
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+}
+
+export type BulletinCreateOrConnectWithoutReactionsInput = {
+  where: Prisma.BulletinWhereUniqueInput
+  create: Prisma.XOR<Prisma.BulletinCreateWithoutReactionsInput, Prisma.BulletinUncheckedCreateWithoutReactionsInput>
+}
+
+export type BulletinUpsertWithoutReactionsInput = {
+  update: Prisma.XOR<Prisma.BulletinUpdateWithoutReactionsInput, Prisma.BulletinUncheckedUpdateWithoutReactionsInput>
+  create: Prisma.XOR<Prisma.BulletinCreateWithoutReactionsInput, Prisma.BulletinUncheckedCreateWithoutReactionsInput>
+  where?: Prisma.BulletinWhereInput
+}
+
+export type BulletinUpdateToOneWithWhereWithoutReactionsInput = {
+  where?: Prisma.BulletinWhereInput
+  data: Prisma.XOR<Prisma.BulletinUpdateWithoutReactionsInput, Prisma.BulletinUncheckedUpdateWithoutReactionsInput>
+}
+
+export type BulletinUpdateWithoutReactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
+  author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
+  acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+}
+
+export type BulletinUncheckedUpdateWithoutReactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  authorId?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinCreateManyAuthorInput = {
@@ -740,6 +950,9 @@ export type BulletinCreateManyAuthorInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -752,11 +965,15 @@ export type BulletinUpdateWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutAuthorInput = {
@@ -765,11 +982,15 @@ export type BulletinUncheckedUpdateWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
@@ -778,6 +999,9 @@ export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -790,6 +1014,9 @@ export type BulletinCreateManyLinkedArticleInput = {
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  deck?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -802,11 +1029,15 @@ export type BulletinUpdateWithoutLinkedArticleInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
@@ -815,11 +1046,15 @@ export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
@@ -828,6 +1063,9 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -841,10 +1079,12 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
 
 export type BulletinCountOutputType = {
   acks: number
+  reactions: number
 }
 
 export type BulletinCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   acks?: boolean | BulletinCountOutputTypeCountAcksArgs
+  reactions?: boolean | BulletinCountOutputTypeCountReactionsArgs
 }
 
 /**
@@ -864,6 +1104,13 @@ export type BulletinCountOutputTypeCountAcksArgs<ExtArgs extends runtime.Types.E
   where?: Prisma.BulletinAckWhereInput
 }
 
+/**
+ * BulletinCountOutputType without action
+ */
+export type BulletinCountOutputTypeCountReactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BulletinReactionWhereInput
+}
+
 
 export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -871,6 +1118,9 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   bodyMarkdown?: boolean
   departments?: boolean
   priority?: boolean
+  format?: boolean
+  kicker?: boolean
+  deck?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -879,6 +1129,7 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   acks?: boolean | Prisma.Bulletin$acksArgs<ExtArgs>
+  reactions?: boolean | Prisma.Bulletin$reactionsArgs<ExtArgs>
   _count?: boolean | Prisma.BulletinCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bulletin"]>
 
@@ -888,6 +1139,9 @@ export type BulletinSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   bodyMarkdown?: boolean
   departments?: boolean
   priority?: boolean
+  format?: boolean
+  kicker?: boolean
+  deck?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -903,6 +1157,9 @@ export type BulletinSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   bodyMarkdown?: boolean
   departments?: boolean
   priority?: boolean
+  format?: boolean
+  kicker?: boolean
+  deck?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -918,6 +1175,9 @@ export type BulletinSelectScalar = {
   bodyMarkdown?: boolean
   departments?: boolean
   priority?: boolean
+  format?: boolean
+  kicker?: boolean
+  deck?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -925,11 +1185,12 @@ export type BulletinSelectScalar = {
   createdAt?: boolean
 }
 
-export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "priority" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt", ExtArgs["result"]["bulletin"]>
+export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "priority" | "format" | "kicker" | "deck" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt", ExtArgs["result"]["bulletin"]>
 export type BulletinInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   acks?: boolean | Prisma.Bulletin$acksArgs<ExtArgs>
+  reactions?: boolean | Prisma.Bulletin$reactionsArgs<ExtArgs>
   _count?: boolean | Prisma.BulletinCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type BulletinIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -947,6 +1208,7 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     linkedArticle: Prisma.$ArticlePayload<ExtArgs> | null
     author: Prisma.$UserPayload<ExtArgs>
     acks: Prisma.$BulletinAckPayload<ExtArgs>[]
+    reactions: Prisma.$BulletinReactionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -954,6 +1216,19 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     bodyMarkdown: string
     departments: string[]
     priority: $Enums.BulletinPriority
+    /**
+     * Presentation tier. `notice` is the ordinary layout; `announcement` and
+     * `featured` are celebratory posts (no ack button, reactions instead).
+     */
+    format: $Enums.BulletinFormat
+    /**
+     * Featured only: the small pill above the headline, e.g. "Pinned · Monthly".
+     */
+    kicker: string | null
+    /**
+     * Featured only: the warm one-liner under the headline (the standfirst).
+     */
+    deck: string | null
     linkedArticleId: string | null
     authorId: string
     /**
@@ -1363,6 +1638,7 @@ export interface Prisma__BulletinClient<T, Null = never, ExtArgs extends runtime
   linkedArticle<T extends Prisma.Bulletin$linkedArticleArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$linkedArticleArgs<ExtArgs>>): Prisma.Prisma__ArticleClient<runtime.Types.Result.GetResult<Prisma.$ArticlePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   author<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   acks<T extends Prisma.Bulletin$acksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$acksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAckPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reactions<T extends Prisma.Bulletin$reactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$reactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinReactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1397,6 +1673,9 @@ export interface BulletinFieldRefs {
   readonly bodyMarkdown: Prisma.FieldRef<"Bulletin", 'String'>
   readonly departments: Prisma.FieldRef<"Bulletin", 'String[]'>
   readonly priority: Prisma.FieldRef<"Bulletin", 'BulletinPriority'>
+  readonly format: Prisma.FieldRef<"Bulletin", 'BulletinFormat'>
+  readonly kicker: Prisma.FieldRef<"Bulletin", 'String'>
+  readonly deck: Prisma.FieldRef<"Bulletin", 'String'>
   readonly linkedArticleId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly authorId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly publishedAt: Prisma.FieldRef<"Bulletin", 'DateTime'>
@@ -1843,6 +2122,30 @@ export type Bulletin$acksArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.BulletinAckScalarFieldEnum | Prisma.BulletinAckScalarFieldEnum[]
+}
+
+/**
+ * Bulletin.reactions
+ */
+export type Bulletin$reactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BulletinReaction
+   */
+  select?: Prisma.BulletinReactionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BulletinReaction
+   */
+  omit?: Prisma.BulletinReactionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BulletinReactionInclude<ExtArgs> | null
+  where?: Prisma.BulletinReactionWhereInput
+  orderBy?: Prisma.BulletinReactionOrderByWithRelationInput | Prisma.BulletinReactionOrderByWithRelationInput[]
+  cursor?: Prisma.BulletinReactionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BulletinReactionScalarFieldEnum | Prisma.BulletinReactionScalarFieldEnum[]
 }
 
 /**

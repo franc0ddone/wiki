@@ -402,6 +402,8 @@ export const ModelName = {
   ArticleVersion: 'ArticleVersion',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
+  BulletinReaction: 'BulletinReaction',
+  ArticleAttachment: 'ArticleAttachment',
   RoleRequest: 'RoleRequest',
   StaffMember: 'StaffMember',
   SearchLog: 'SearchLog'
@@ -420,7 +422,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "article" | "articleVersion" | "bulletin" | "bulletinAck" | "roleRequest" | "staffMember" | "searchLog"
+    modelProps: "user" | "article" | "articleVersion" | "bulletin" | "bulletinAck" | "bulletinReaction" | "articleAttachment" | "roleRequest" | "staffMember" | "searchLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -794,6 +796,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    BulletinReaction: {
+      payload: Prisma.$BulletinReactionPayload<ExtArgs>
+      fields: Prisma.BulletinReactionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BulletinReactionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BulletinReactionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        findFirst: {
+          args: Prisma.BulletinReactionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BulletinReactionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        findMany: {
+          args: Prisma.BulletinReactionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>[]
+        }
+        create: {
+          args: Prisma.BulletinReactionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        createMany: {
+          args: Prisma.BulletinReactionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BulletinReactionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>[]
+        }
+        delete: {
+          args: Prisma.BulletinReactionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        update: {
+          args: Prisma.BulletinReactionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        deleteMany: {
+          args: Prisma.BulletinReactionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BulletinReactionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BulletinReactionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>[]
+        }
+        upsert: {
+          args: Prisma.BulletinReactionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BulletinReactionPayload>
+        }
+        aggregate: {
+          args: Prisma.BulletinReactionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBulletinReaction>
+        }
+        groupBy: {
+          args: Prisma.BulletinReactionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BulletinReactionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BulletinReactionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BulletinReactionCountAggregateOutputType> | number
+        }
+      }
+    }
+    ArticleAttachment: {
+      payload: Prisma.$ArticleAttachmentPayload<ExtArgs>
+      fields: Prisma.ArticleAttachmentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ArticleAttachmentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ArticleAttachmentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        findFirst: {
+          args: Prisma.ArticleAttachmentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ArticleAttachmentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        findMany: {
+          args: Prisma.ArticleAttachmentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>[]
+        }
+        create: {
+          args: Prisma.ArticleAttachmentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        createMany: {
+          args: Prisma.ArticleAttachmentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ArticleAttachmentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>[]
+        }
+        delete: {
+          args: Prisma.ArticleAttachmentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        update: {
+          args: Prisma.ArticleAttachmentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        deleteMany: {
+          args: Prisma.ArticleAttachmentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ArticleAttachmentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ArticleAttachmentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>[]
+        }
+        upsert: {
+          args: Prisma.ArticleAttachmentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleAttachmentPayload>
+        }
+        aggregate: {
+          args: Prisma.ArticleAttachmentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateArticleAttachment>
+        }
+        groupBy: {
+          args: Prisma.ArticleAttachmentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArticleAttachmentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ArticleAttachmentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArticleAttachmentCountAggregateOutputType> | number
+        }
+      }
+    }
     RoleRequest: {
       payload: Prisma.$RoleRequestPayload<ExtArgs>
       fields: Prisma.RoleRequestFieldRefs
@@ -1107,6 +1257,9 @@ export const BulletinScalarFieldEnum = {
   bodyMarkdown: 'bodyMarkdown',
   departments: 'departments',
   priority: 'priority',
+  format: 'format',
+  kicker: 'kicker',
+  deck: 'deck',
   linkedArticleId: 'linkedArticleId',
   authorId: 'authorId',
   publishedAt: 'publishedAt',
@@ -1125,6 +1278,31 @@ export const BulletinAckScalarFieldEnum = {
 } as const
 
 export type BulletinAckScalarFieldEnum = (typeof BulletinAckScalarFieldEnum)[keyof typeof BulletinAckScalarFieldEnum]
+
+
+export const BulletinReactionScalarFieldEnum = {
+  id: 'id',
+  bulletinId: 'bulletinId',
+  userId: 'userId',
+  emoji: 'emoji',
+  createdAt: 'createdAt'
+} as const
+
+export type BulletinReactionScalarFieldEnum = (typeof BulletinReactionScalarFieldEnum)[keyof typeof BulletinReactionScalarFieldEnum]
+
+
+export const ArticleAttachmentScalarFieldEnum = {
+  id: 'id',
+  articleId: 'articleId',
+  fileName: 'fileName',
+  fileKey: 'fileKey',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  uploadedById: 'uploadedById',
+  createdAt: 'createdAt'
+} as const
+
+export type ArticleAttachmentScalarFieldEnum = (typeof ArticleAttachmentScalarFieldEnum)[keyof typeof ArticleAttachmentScalarFieldEnum]
 
 
 export const RoleRequestScalarFieldEnum = {
@@ -1298,6 +1476,20 @@ export type EnumBulletinPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<
  * Reference to a field of type 'BulletinPriority[]'
  */
 export type ListEnumBulletinPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BulletinPriority[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BulletinFormat'
+ */
+export type EnumBulletinFormatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BulletinFormat'>
+    
+
+
+/**
+ * Reference to a field of type 'BulletinFormat[]'
+ */
+export type ListEnumBulletinFormatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BulletinFormat[]'>
     
 
 
@@ -1526,6 +1718,8 @@ export type GlobalOmitConfig = {
   articleVersion?: Prisma.ArticleVersionOmit
   bulletin?: Prisma.BulletinOmit
   bulletinAck?: Prisma.BulletinAckOmit
+  bulletinReaction?: Prisma.BulletinReactionOmit
+  articleAttachment?: Prisma.ArticleAttachmentOmit
   roleRequest?: Prisma.RoleRequestOmit
   staffMember?: Prisma.StaffMemberOmit
   searchLog?: Prisma.SearchLogOmit

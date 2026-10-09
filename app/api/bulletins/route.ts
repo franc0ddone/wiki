@@ -11,6 +11,11 @@ import {
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { createBulletin, getBulletins, type BulletinFilters } from "@/lib/data/bulletins";
+import {
+  DECK_MAX_LENGTH,
+  KICKER_MAX_LENGTH,
+  isBulletinFormat,
+} from "@/lib/bulletin/format";
 import { roleAtLeast } from "@/lib/roles";
 import type { Department } from "@/types/portal";
 
@@ -76,11 +81,23 @@ export async function POST(request: NextRequest) {
     const expiresAt = optionalDate(body, "expires_at");
     const linkedArticleId = optionalString(body, "linked_article_id");
 
+    // The presentation tier is one shared field; anything outside the enum is a
+    // 422. Omitted means `notice`.
+    const format = optionalString(body, "format") ?? "notice";
+    if (!isBulletinFormat(format)) {
+      throw new ApiError(422, "`format` must be one of `notice`, `announcement`, `featured`.", {
+        details: { field: "format" },
+      });
+    }
+
     const bulletin = await createBulletin({
       title: requireString(body, "title", { maxLength: 300 }),
       body_markdown: requireString(body, "body_markdown", { minLength: 1 }),
       departments: requireStringArray(body, "departments"),
       priority,
+      format,
+      kicker: optionalString(body, "kicker", { maxLength: KICKER_MAX_LENGTH }) ?? null,
+      deck: optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null,
       // `undefined` means "apply the priority default"; an explicit null means
       // the poster deliberately asked for no expiry (refused for `urgent`).
       expires_at: expiresAt,

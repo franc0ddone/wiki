@@ -18,6 +18,12 @@ import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { ApiRequestError, createBulletin, patchBulletin, type BulletinPayload } from "@/lib/bulletin/api";
 import {
+  BULLETIN_FORMATS,
+  BULLETIN_FORMAT_LABELS,
+  DECK_MAX_LENGTH,
+  KICKER_MAX_LENGTH,
+} from "@/lib/bulletin/format";
+import {
   BULLETIN_TITLE_MAX_LENGTH,
   canPostPriority,
   expiryLabel,
@@ -32,6 +38,7 @@ import {
   CLINICAL_DEPARTMENTS,
   DEPARTMENT_LABELS,
   type Bulletin,
+  type BulletinFormat,
   type BulletinPriority,
   type ClinicalDepartment,
   type KnowledgeArticle,
@@ -95,6 +102,9 @@ export default function BulletinComposer({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [departments, setDepartments] = useState<ClinicalDepartment[]>(initial?.departments ?? []);
   const [priority, setPriority] = useState<BulletinPriority>(initial?.priority ?? "normal");
+  const [format, setFormat] = useState<BulletinFormat>(initial?.format ?? "notice");
+  const [kicker, setKicker] = useState(initial?.kicker ?? "");
+  const [deck, setDeck] = useState(initial?.deck ?? "");
   const [expires, setExpires] = useState("");
   const [linkedSlug, setLinkedSlug] = useState(() => {
     if (!initial?.linked_sop_id) return "";
@@ -117,6 +127,8 @@ export default function BulletinComposer({
     buildEditorExtensions({
       onLink: () => setLinkDialogOpen(true),
       onImage: () => setImagePickerNonce((value) => value + 1),
+      // Bulletin-only blocks: CTA button, Steps, Spotlight.
+      bulletinBlocks: true,
     }),
   );
   const editor = useEditor({
@@ -196,6 +208,10 @@ export default function BulletinComposer({
       body_markdown: body,
       departments,
       priority,
+      format,
+      // Featured fields are only sent when the featured tier is chosen; an
+      // empty string is normalised to null by the API.
+      ...(format === "featured" ? { kicker: kicker.trim() || null, deck: deck.trim() || null } : {}),
       linked_article_id: linkedId,
     };
     const expiresIso = expiresAtIso();
@@ -350,6 +366,38 @@ export default function BulletinComposer({
                 ) : (
                   <div className="h-11 border-b border-zinc-200" />
                 )}
+                {editor ? (
+                  <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-200 bg-zinc-50/60 px-3 py-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-400">Insert</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editor.chain().focus().insertContent({ type: "ctaButton", attrs: { label: "Read more", href: "https://" } }).run()
+                      }
+                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                    >
+                      CTA button
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editor.chain().focus().insertContent({ type: "steps", attrs: { steps: [{ title: "", description: "" }] } }).run()
+                      }
+                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                    >
+                      Steps
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editor.chain().focus().insertContent({ type: "spotlight", attrs: { entries: [{ initials: "", name: "", label: "" }] } }).run()
+                      }
+                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                    >
+                      Spotlight
+                    </button>
+                  </div>
+                ) : null}
                 {editor && findOpen ? <FindReplaceBar editor={editor} onClose={() => setFindOpen(false)} /> : null}
                 <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
                   {editor ? (
@@ -441,6 +489,70 @@ export default function BulletinComposer({
               </p>
             ))}
           </div>
+        </div>
+
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">Format</span>
+          <div role="radiogroup" aria-label="Bulletin format" className="flex flex-wrap gap-1.5">
+            {BULLETIN_FORMATS.map((value) => {
+              const selected = format === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={busy}
+                  onClick={() => setFormat(value)}
+                  className={cx(
+                    "flex h-7 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                    selected
+                      ? "border-teal-600/40 bg-teal-50 text-teal-800"
+                      : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
+                  )}
+                >
+                  {BULLETIN_FORMAT_LABELS[value]}
+                </button>
+              );
+            })}
+          </div>
+          {format === "announcement" ? (
+            <p className="mt-1.5 text-xs leading-5 text-zinc-500">
+              Distinct hero rendering ships in prompt 6 — previews as a formal notice for now.
+            </p>
+          ) : null}
+          {format === "featured" ? (
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="bulletin-kicker" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+                  Kicker pill <span className="font-normal text-zinc-500">(optional)</span>
+                </label>
+                <input
+                  id="bulletin-kicker"
+                  value={kicker}
+                  maxLength={KICKER_MAX_LENGTH}
+                  onChange={(event) => setKicker(event.target.value)}
+                  placeholder="Pinned · Monthly"
+                  className={fieldClass}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <label htmlFor="bulletin-deck" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+                  Deck <span className="font-normal text-zinc-500">(optional)</span>
+                </label>
+                <input
+                  id="bulletin-deck"
+                  value={deck}
+                  maxLength={DECK_MAX_LENGTH}
+                  onChange={(event) => setDeck(event.target.value)}
+                  placeholder="A warm one-liner under the headline"
+                  className={fieldClass}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div>

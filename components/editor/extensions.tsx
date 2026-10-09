@@ -10,11 +10,13 @@ import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Typography } from "@tiptap/extension-typography";
+import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { Table } from "@tiptap/extension-table";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import { DragHandle } from "@tiptap/extension-drag-handle";
+import { Plugin } from "@tiptap/pm/state";
 import { Markdown } from "tiptap-markdown";
 import {
   LINE_HEIGHTS,
@@ -29,11 +31,26 @@ import {
   clampWidth,
   serializeImageMarkdown,
 } from "@/lib/markdown/image-attributes";
+import { splitCellSpan, serializeCellSpan } from "@/lib/markdown/cell-attributes";
+import {
+  CTA_LABEL_MAX_LENGTH,
+  SPOTLIGHT_OPEN_RE,
+  STEPS_OPEN_RE,
+  isValidCtaHref,
+  parseSpotlightLine,
+  parseStepLine,
+  serializeCtaMarkdown,
+  serializeSpotlightLine,
+  serializeStepLine,
+  type SpotlightEntryData,
+  type StepData,
+} from "@/lib/markdown/bulletin-blocks";
 import { FootnoteDefinitionView } from "@/components/editor/FootnoteView";
 import { ImageView } from "@/components/editor/ImageView";
 import { SlashCommands } from "@/components/editor/slash";
 import { FindHighlight } from "@/components/editor/findHighlight";
-import { createDragHandleElement } from "@/components/editor/dragHandle";
+import { createDragHandleElement, dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
+import { sanitizePastedHtml } from "@/lib/editor/paste-sanitize";
 
 /**
  * The editor's schema: Markdown in, Markdown out.
@@ -88,7 +105,11 @@ interface PMNodeLike {
   text?: string | null;
   attrs: Record<string, unknown>;
   /** Present on real ProseMirror nodes; the paragraph serializer reads its size. */
-  content?: { size: number };
+  content?: {
+    size: number;
+    childCount?: number;
+    forEach?: (callback: (node: PMNodeLike, offset: number, index: number) => void) => void;
+  };
 }
 
 /* ------------------------------------------------------------------- text */
@@ -968,6 +989,538 @@ const MarkdownHighlight = Highlight.extend({
   },
 });
 
+/* --------------------------------------------- bulletin-only block nodes */
+
+/*
+ * CTA button, Steps and Spotlight are registered only when
+ * `buildEditorExtensions({ bulletinBlocks: true })` — the bulletin composer
+ * passes it, the article editor does not — so they can never leak into an
+ * article. Each round-trips to the exact stored Markdown defined in
+ * `lib/markdown/bulletin-blocks.ts`, and each renders as a small editor card.
+ */
+
+function liftCtaBlocks(element: HTMLElement) {
+  element.querySelectorAll("p").forEach((paragraph) => {
+    const anchors = paragraph.querySelectorAll("a");
+    if (anchors.length !== 1) return;
+    const anchor = anchors[0];
+    let trailing = "";
+    let sibling = anchor.nextSibling;
+    while (sibling) {
+      trailing += sibling.textContent ?? "";
+      sibling = sibling.nextSibling;
+    }
+    if (!/^\s*\{\.cta\}\s*$/.test(trailing)) return;
+
+    const div = element.ownerDocument.createElement("div");
+    div.setAttribute("data-block", "cta");
+    div.setAttribute("data-label", anchor.textContent ?? "");
+    div.setAttribute("data-href", anchor.getAttribute("href") ?? "");
+    paragraph.replaceWith(div);
+  });
+}
+
+/** A markdown-it block rule for `:::steps` / `:::spotlight` (bulletin-only). */
+function bulletinFencePlugin(kind: "steps" | "spotlight") {
+  return function setup(md: unknown) {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const instance = md as any;
+    const guard = `__doveBulletin_${kind}`;
+    if (instance[guard]) return;
+    instance[guard] = true;
+
+    instance.block.ruler.before(
+      "fence",
+      `dove_bulletin_${kind}`,
+      (state: any, startLine: number, endLine: number, silent: boolean) => {
+        const start = state.bMarks[startLine] + state.tShift[startLine];
+        const max = state.eMarks[startLine];
+        const openRe = kind === "steps" ? STEPS_OPEN_RE : SPOTLIGHT_OPEN_RE;
+        if (!openRe.test(state.src.slice(start, max))) return false;
+        if (silent) return true;
+
+        let next = startLine + 1;
+        for (; next < endLine; next += 1) {
+          const line = state.src.slice(state.bMarks[next] + state.tShift[next], state.eMarks[next]).trim();
+          if (line === ":::") break;
+        }
+
+        const items: unknown[] = [];
+        for (let i = startLine + 1; i < next; i += 1) {
+          const line = state.src.slice(state.bMarks[i] + state.tShift[i], state.eMarks[i]);
+          const parsed = kind === "steps" ? parseStepLine(line) : parseSpotlightLine(line);
+          if (parsed) items.push(parsed);
+        }
+
+        const token = state.push(`dove_bulletin_${kind}`, "div", 0);
+        token.block = true;
+        token.attrs = [
+          ["data-block", kind],
+          [kind === "steps" ? "data-steps" : "data-spotlight", JSON.stringify(items)],
+        ];
+        token.map = [startLine, next];
+        state.line = next < endLine ? next + 1 : next;
+        return true;
+      },
+      { alt: ["paragraph", "reference", "blockquote", "list"] },
+    );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  };
+}
+
+function readSteps(node: PMNodeLike): StepData[] {
+  return Array.isArray(node.attrs.steps) ? (node.attrs.steps as StepData[]) : [];
+}
+function readEntries(node: PMNodeLike): SpotlightEntryData[] {
+  return Array.isArray(node.attrs.entries) ? (node.attrs.entries as SpotlightEntryData[]) : [];
+}
+
+function CtaButtonView({ node, updateAttributes, deleteNode }: NodeViewProps) {
+  const href = String(node.attrs.href ?? "");
+  const invalid = href.trim().length > 0 && !isValidCtaHref(href);
+  return (
+    <NodeViewWrapper className="dw-block dw-cta-block" data-block="cta">
+      <div contentEditable={false} className="flex flex-col gap-2 rounded-lg border border-zinc-300/60 bg-white p-3 sm:flex-row sm:items-center">
+        <input
+          aria-label="Button label"
+          value={String(node.attrs.label ?? "")}
+          maxLength={CTA_LABEL_MAX_LENGTH}
+          placeholder="Button label"
+          onChange={(event) => updateAttributes({ label: event.target.value })}
+          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+        />
+        <input
+          aria-label="Button link"
+          value={href}
+          placeholder="https://… or /portal/path"
+          onChange={(event) => updateAttributes({ href: event.target.value })}
+          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+        />
+        <button
+          type="button"
+          onClick={() => deleteNode()}
+          className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2.5 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+        >
+          Remove
+        </button>
+      </div>
+      {invalid ? (
+        <p role="alert" className="mt-1.5 text-xs text-red-700">
+          Link must start with https:// or a single “/” (a portal path).
+        </p>
+      ) : null}
+    </NodeViewWrapper>
+  );
+}
+
+function StepsView({ node, updateAttributes, deleteNode }: NodeViewProps) {
+  const steps = readSteps(node);
+  const replace = (next: StepData[]) => updateAttributes({ steps: next });
+  return (
+    <NodeViewWrapper className="dw-block dw-steps-block" data-block="steps">
+      <div contentEditable={false} className="space-y-2.5 rounded-lg border border-zinc-300/60 bg-white p-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">Steps</p>
+          <button
+            type="button"
+            onClick={() => replace([...steps, { title: "", description: "" }])}
+            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+          >
+            Add step
+          </button>
+        </div>
+        {steps.map((step, index) => (
+          <div key={index} className="flex items-start gap-2.5">
+            <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-teal-600/30 bg-teal-50 text-[12px] font-semibold tabular-nums text-[#0F766E]">
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <input
+                aria-label={`Step ${index + 1} title`}
+                value={step.title}
+                placeholder="Step title"
+                onChange={(event) => replace(steps.map((entry, i) => (i === index ? { ...entry, title: event.target.value } : entry)))}
+                className="h-8 w-full rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              />
+              <textarea
+                aria-label={`Step ${index + 1} description`}
+                value={step.description}
+                placeholder="Description"
+                rows={2}
+                onChange={(event) => replace(steps.map((entry, i) => (i === index ? { ...entry, description: event.target.value } : entry)))}
+                className="w-full resize-y rounded-md border border-zinc-300/60 bg-white px-2.5 py-1.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => replace(steps.filter((_, i) => i !== index))}
+              aria-label={`Remove step ${index + 1}`}
+              className="mt-1.5 h-7 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {steps.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => deleteNode()}
+            className="text-[12px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
+          >
+            Remove empty steps block
+          </button>
+        ) : null}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+function SpotlightView({ node, updateAttributes, deleteNode }: NodeViewProps) {
+  const entries = readEntries(node);
+  const replace = (next: SpotlightEntryData[]) => updateAttributes({ entries: next });
+  return (
+    <NodeViewWrapper className="dw-block dw-spotlight-block" data-block="spotlight">
+      <div contentEditable={false} className="space-y-2.5 rounded-lg border border-zinc-300/60 bg-white p-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">Spotlight</p>
+          <button
+            type="button"
+            onClick={() => replace([...entries, { initials: "", name: "", label: "" }])}
+            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+          >
+            Add entry
+          </button>
+        </div>
+        {entries.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              aria-label={`Entry ${index + 1} initials`}
+              value={entry.initials}
+              maxLength={3}
+              placeholder="AB"
+              onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, initials: event.target.value } : e)))}
+              className="h-8 w-12 shrink-0 rounded-md border border-zinc-300/60 bg-white px-2 text-center text-[13px] font-semibold uppercase text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+            />
+            <input
+              aria-label={`Entry ${index + 1} name`}
+              value={entry.name}
+              placeholder="Full name"
+              onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, name: event.target.value } : e)))}
+              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+            />
+            <input
+              aria-label={`Entry ${index + 1} label`}
+              value={entry.label}
+              placeholder="Label"
+              onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, label: event.target.value } : e)))}
+              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+            />
+            <button
+              type="button"
+              onClick={() => replace(entries.filter((_, i) => i !== index))}
+              aria-label={`Remove entry ${index + 1}`}
+              className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {entries.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => deleteNode()}
+            className="text-[12px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
+          >
+            Remove empty spotlight block
+          </button>
+        ) : null}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+const CtaButton = Node.create({
+  name: "ctaButton",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      label: {
+        default: "",
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-label") ?? "",
+        renderHTML: (attributes: Record<string, unknown>) => ({ "data-label": String(attributes.label ?? "") }),
+      },
+      href: {
+        default: "",
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-href") ?? "",
+        renderHTML: (attributes: Record<string, unknown>) => ({ "data-href": String(attributes.href ?? "") }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-block="cta"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-block": "cta", class: "dw-cta-block" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(CtaButtonView);
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(serializeCtaMarkdown(String(node.attrs.label ?? ""), String(node.attrs.href ?? "")));
+          state.closeBlock(node);
+        },
+        parse: { updateDOM: liftCtaBlocks },
+      },
+    };
+  },
+});
+
+const Steps = Node.create({
+  name: "steps",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      steps: {
+        default: [] as StepData[],
+        parseHTML: (element: HTMLElement) => {
+          try {
+            const raw = element.getAttribute("data-steps");
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        },
+        renderHTML: (attributes: Record<string, unknown>) => ({ "data-steps": JSON.stringify(attributes.steps ?? []) }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-block="steps"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-block": "steps", class: "dw-steps-block" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(StepsView);
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(":::steps\n");
+          readSteps(node).forEach((step, index) => state.write(`${serializeStepLine(step, index + 1)}\n`));
+          state.write(":::");
+          state.closeBlock(node);
+        },
+        parse: { setup: bulletinFencePlugin("steps") },
+      },
+    };
+  },
+});
+
+const Spotlight = Node.create({
+  name: "spotlight",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      entries: {
+        default: [] as SpotlightEntryData[],
+        parseHTML: (element: HTMLElement) => {
+          try {
+            const raw = element.getAttribute("data-spotlight");
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        },
+        renderHTML: (attributes: Record<string, unknown>) => ({
+          "data-spotlight": JSON.stringify(attributes.entries ?? []),
+        }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-block="spotlight"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-block": "spotlight", class: "dw-spotlight-block" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(SpotlightView);
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.write(":::spotlight\n");
+          readEntries(node).forEach((entry) => state.write(`${serializeSpotlightLine(entry)}\n`));
+          state.write(":::");
+          state.closeBlock(node);
+        },
+        parse: { setup: bulletinFencePlugin("spotlight") },
+      },
+    };
+  },
+});
+
+/* --------------------------------------------------------------- paste */
+
+/**
+ * Cleans pasted HTML (Word / Google Docs) before it reaches the schema. A
+ * ProseMirror plugin prop rather than an editor prop so it lives with the rest
+ * of the schema and both hosts get it for free.
+ */
+const PasteCleanup = Extension.create({
+  name: "pasteCleanup",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          transformPastedHTML: (html: string) => sanitizePastedHtml(html),
+        },
+      }),
+    ];
+  },
+});
+
+/* -------------------------------------------------------- merged cells */
+
+/**
+ * `{colspan=2}` / `{rowspan=N}` survive the round trip through per-cell
+ * attributes: the text suffix is lifted onto the cell element on parse, and the
+ * serializer writes it back after the cell's text. The `table` serializer is
+ * replaced outright because tiptap-markdown's default refuses to serialize any
+ * table with a spanned cell (it falls back to raw HTML, which `html: false`
+ * cannot emit).
+ */
+function cellSpanAttribute(name: "colspan" | "rowspan") {
+  return {
+    default: 1,
+    parseHTML: (element: HTMLElement) => {
+      const parsed = Number.parseInt(element.getAttribute(name) ?? "", 10);
+      return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+    },
+    renderHTML: (attributes: Record<string, unknown>) =>
+      Number(attributes[name]) > 1 ? { [name]: String(attributes[name]) } : {},
+  };
+}
+
+/** Lift a trailing `{colspan=…}` / `{rowspan=…}` off each cell's text. */
+function liftCellSpans(element: HTMLElement) {
+  element.querySelectorAll<HTMLElement>("th, td").forEach((cell) => {
+    const text = lastTextNode(cell);
+    if (!text) return;
+    const parsed = splitCellSpan(text.data);
+    if (parsed.colspan <= 1 && parsed.rowspan <= 1) return;
+    text.data = parsed.text;
+    if (parsed.colspan > 1) cell.setAttribute("colspan", String(parsed.colspan));
+    if (parsed.rowspan > 1) cell.setAttribute("rowspan", String(parsed.rowspan));
+  });
+}
+
+/** The child nodes of a block as an array (ProseMirror `Fragment.forEach`). */
+function nodeChildren(node: PMNodeLike): PMNodeLike[] {
+  const out: PMNodeLike[] = [];
+  node.content?.forEach?.((child: PMNodeLike) => {
+    out.push(child);
+  });
+  return out;
+}
+
+/** One pipe-table cell: its first paragraph rendered inline, then its span. */
+function writeCellContent(state: MarkdownState, cell: PMNodeLike) {
+  const first = nodeChildren(cell)[0];
+  if (first) state.renderInline(first);
+  const span = serializeCellSpan({
+    colspan: Number(cell.attrs.colspan ?? 1),
+    rowspan: Number(cell.attrs.rowspan ?? 1),
+  });
+  if (span) state.write(` ${span}`);
+}
+
+const MarkdownTable = Table.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          state.inTable = true;
+          nodeChildren(node).forEach((row, rowIndex) => {
+            const cells = nodeChildren(row);
+            state.write("| ");
+            cells.forEach((cell, cellIndex) => {
+              if (cellIndex) state.write(" | ");
+              writeCellContent(state, cell);
+            });
+            state.write(" |");
+            state.ensureNewLine();
+            if (rowIndex === 0) {
+              const delimiter = Array.from({ length: cells.length }).map(() => "---").join(" | ");
+              state.write(`| ${delimiter} |`);
+              state.ensureNewLine();
+            }
+          });
+          state.closeBlock(node);
+          state.inTable = false;
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
+const MarkdownTableCell = TableCell.extend({
+  content: "paragraph",
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      colspan: cellSpanAttribute("colspan"),
+      rowspan: cellSpanAttribute("rowspan"),
+    };
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          writeCellContent(state, node);
+        },
+        parse: { updateDOM: liftCellSpans },
+      },
+    };
+  },
+});
+
+const MarkdownTableHeader = TableHeader.extend({
+  content: "paragraph",
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      colspan: cellSpanAttribute("colspan"),
+      rowspan: cellSpanAttribute("rowspan"),
+    };
+  },
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownState, node: PMNodeLike) {
+          writeCellContent(state, node);
+        },
+        parse: { updateDOM: liftCellSpans },
+      },
+    };
+  },
+});
+
 /* ---------------------------------------------------------------- builder */
 
 /** Links the reader will render: web, mail, phone, site-relative, in-page. */
@@ -983,11 +1536,18 @@ export interface EditorExtensionOptions {
   onLink: () => void;
   /** Opens the host's hidden image file input → ImageDialog. */
   onImage: () => void;
+  /**
+   * Register the bulletin-only block nodes (CTA button, Steps, Spotlight).
+   * The bulletin composer passes `true`; the article editor leaves it unset, so
+   * those nodes can never appear in — or be pasted into — an article.
+   */
+  bulletinBlocks: boolean;
 }
 
 export function buildEditorExtensions(options: Partial<EditorExtensionOptions> = {}) {
   const onLink = options.onLink ?? (() => {});
   const onImage = options.onImage ?? (() => {});
+  const bulletinBlocks = options.bulletinBlocks === true;
   return [
     StarterKit.configure({
       // Paragraphs and headings are re-declared below: their stored form
@@ -998,6 +1558,9 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
       underline: false,
       hardBreak: false,
       text: false, // replaced by MarkdownText below
+      // Dropcursor is re-declared below with the house colour, so StarterKit's
+      // default instance is switched off to avoid a duplicate-name schema.
+      dropcursor: false,
       link: { openOnClick: false, autolink: false, isAllowedUri: isAllowedLinkUri },
     }),
     BlockHeading.configure({ levels: [1, 2, 3] }), // H1 is not offered in the toolbar but must survive a round trip
@@ -1041,12 +1604,13 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
     FootnoteDefinition,
     TaskList,
     TaskItem,
-    Table.configure({ resizable: false }),
+    MarkdownTable.configure({ resizable: false }),
     TableRow,
     // One paragraph per cell: that is all a Markdown pipe table can hold, and
-    // anything richer would be dropped on save.
-    TableHeader.extend({ content: "paragraph" }),
-    TableCell.extend({ content: "paragraph" }),
+    // anything richer would be dropped on save. Span attributes ride on the
+    // cell nodes so `{colspan=2}` / `{rowspan=N}` round-trip.
+    MarkdownTableHeader,
+    MarkdownTableCell,
     Markdown.configure({
       html: false,
       tightLists: true,
@@ -1061,29 +1625,28 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
     // the link dialog and the image file input live there.
     SlashCommands.configure({ onLink, onImage }),
     FindHighlight,
+    // Pasted Word / Google Docs HTML is reduced to the schema's own element set
+    // before it is parsed — no classes, styles, namespaces, VML, or images.
+    PasteCleanup,
+    // The drop indicator 5b shipped without: a 2px petroleum-teal line where a
+    // dragged block will land. No custom CSS class needed.
+    Dropcursor.configure({ color: "#0f766e", width: 2 }),
     DragHandle.configure({
       render: createDragHandleElement,
       // Nested handles are enabled so list items get one too; the default rules
       // already exclude table structure (rows/cells) and deprioritise the list
-      // wrapper, and the rule below additionally excludes footnote definitions
-      // (which must stay at the document tail) and anything nested in a table
-      // cell.
+      // wrapper, and the two rules below additionally (a) exclude footnote
+      // definitions and anything nested in a table and (b) make a callout /
+      // details drag as one unit rather than through its inner paragraphs.
       nested: {
         defaultRules: true,
         rules: [
-          {
-            id: "excludeFootnotesAndTables",
-            evaluate: ({ node, $pos }) => {
-              if (node.type.name === "footnoteDefinition") return 1000;
-              for (let depth = $pos.depth; depth > 0; depth -= 1) {
-                const name = $pos.node(depth).type.name;
-                if (name === "table" || name === "tableRow" || name === "tableCell" || name === "tableHeader") return 1000;
-              }
-              return 0;
-            },
-          },
+          { id: "excludeFootnotesAndTables", evaluate: excludeFootnotesAndTables },
+          { id: "dragWrappersAsUnit", evaluate: dragWrappersAsUnit },
         ],
       },
     }),
+    // Bulletin-only blocks, registered by flag so articles can never carry them.
+    ...(bulletinBlocks ? [CtaButton, Steps, Spotlight] : []),
   ];
 }

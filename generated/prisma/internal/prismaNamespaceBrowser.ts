@@ -56,6 +56,8 @@ export const ModelName = {
   ArticleVersion: 'ArticleVersion',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
+  BulletinReaction: 'BulletinReaction',
+  ArticleAttachment: 'ArticleAttachment',
   RoleRequest: 'RoleRequest',
   StaffMember: 'StaffMember',
   SearchLog: 'SearchLog'
@@ -129,6 +131,9 @@ export const BulletinScalarFieldEnum = {
   bodyMarkdown: 'bodyMarkdown',
   departments: 'departments',
   priority: 'priority',
+  format: 'format',
+  kicker: 'kicker',
+  deck: 'deck',
   linkedArticleId: 'linkedArticleId',
   authorId: 'authorId',
   publishedAt: 'publishedAt',
@@ -147,6 +152,31 @@ export const BulletinAckScalarFieldEnum = {
 } as const
 
 export type BulletinAckScalarFieldEnum = (typeof BulletinAckScalarFieldEnum)[keyof typeof BulletinAckScalarFieldEnum]
+
+
+export const BulletinReactionScalarFieldEnum = {
+  id: 'id',
+  bulletinId: 'bulletinId',
+  userId: 'userId',
+  emoji: 'emoji',
+  createdAt: 'createdAt'
+} as const
+
+export type BulletinReactionScalarFieldEnum = (typeof BulletinReactionScalarFieldEnum)[keyof typeof BulletinReactionScalarFieldEnum]
+
+
+export const ArticleAttachmentScalarFieldEnum = {
+  id: 'id',
+  articleId: 'articleId',
+  fileName: 'fileName',
+  fileKey: 'fileKey',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  uploadedById: 'uploadedById',
+  createdAt: 'createdAt'
+} as const
+
+export type ArticleAttachmentScalarFieldEnum = (typeof ArticleAttachmentScalarFieldEnum)[keyof typeof ArticleAttachmentScalarFieldEnum]
 
 
 export const RoleRequestScalarFieldEnum = {

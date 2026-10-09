@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { deleteBulletin, updateBulletin, type UpdateBulletinInput } from "@/lib/data/bulletins";
+import { DECK_MAX_LENGTH, KICKER_MAX_LENGTH, isBulletinFormat } from "@/lib/bulletin/format";
 import { roleAtLeast } from "@/lib/roles";
 
 /**
@@ -41,6 +42,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.linked_article_id !== undefined) {
       const linked = optionalString(body, "linked_article_id");
       patch.linked_article_id = linked && linked.length > 0 ? linked : null;
+    }
+
+    if (body.format !== undefined) {
+      const format = optionalString(body, "format");
+      if (!format || !isBulletinFormat(format)) {
+        throw new ApiError(422, "`format` must be one of `notice`, `announcement`, `featured`.", {
+          details: { field: "format" },
+        });
+      }
+      patch.format = format;
+    }
+
+    if (body.kicker !== undefined) {
+      patch.kicker = optionalString(body, "kicker", { maxLength: KICKER_MAX_LENGTH }) ?? null;
+    }
+
+    if (body.deck !== undefined) {
+      patch.deck = optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null;
     }
 
     if (body.priority !== undefined) {

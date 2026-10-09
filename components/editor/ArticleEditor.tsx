@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, History, OctagonAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, History, OctagonAlert, Paperclip } from "lucide-react";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
@@ -15,6 +15,8 @@ import { useImageDrop } from "@/components/editor/useImageDrop";
 import { buildEditorExtensions } from "@/components/editor/extensions";
 import { ImageDialog, type ImageDialogMode } from "@/components/editor/ImageDialog";
 import { LinkDialog } from "@/components/editor/LinkDialog";
+import { AttachmentDialog } from "@/components/editor/AttachmentDialog";
+import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
 import { fieldClass, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import {
@@ -138,6 +140,9 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const [imageDialog, setImageDialog] = useState<ImageDialogMode | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  // Bumped after an upload so the list re-fetches; also keys the list.
+  const [attachNonce, setAttachNonce] = useState(0);
   // Bumped by the slash menu's "image" item; the effect below opens the file
   // picker, so the extension never closes over a ref.
   const [imagePickerNonce, setImagePickerNonce] = useState(0);
@@ -551,6 +556,30 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
             }}
           />
 
+          {/* Attachments — authors attach reference files to the article. */}
+          <section aria-label="Attachments" className="rounded-xl border border-zinc-300/70 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.1em] text-zinc-500">Attachments</h2>
+              {slug ? (
+                <button
+                  type="button"
+                  className={cx(secondaryButton, "h-8 gap-1.5 px-2.5 text-[13px]")}
+                  onClick={() => setAttachOpen(true)}
+                >
+                  <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Attach file
+                </button>
+              ) : null}
+            </div>
+            {slug ? (
+              <div className="mt-3">
+                <ArticleAttachments key={attachNonce} slug={slug} />
+              </div>
+            ) : (
+              <p className="mt-2 text-[13px] text-zinc-500">Save this procedure as a draft before attaching files.</p>
+            )}
+          </section>
+
           {/* Problems */}
           {errorsFor("body").length > 0 ? (
             <section aria-labelledby="body-problems" className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3.5" role="alert">
@@ -767,6 +796,17 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
               .updateAttributes("image", { alt, title: title.length > 0 ? title : null })
               .run();
             setImageDialog(null);
+          }}
+        />
+      ) : null}
+
+      {attachOpen && slug ? (
+        <AttachmentDialog
+          slug={slug}
+          onClose={() => setAttachOpen(false)}
+          onUploaded={() => {
+            setAttachOpen(false);
+            setAttachNonce((value) => value + 1);
           }}
         />
       ) : null}

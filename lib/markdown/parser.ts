@@ -25,6 +25,16 @@ import {
   type LineHeight,
   type TextAlignment,
 } from "@/lib/markdown/block-attributes";
+import { splitCellSpan, type CellSpan } from "@/lib/markdown/cell-attributes";
+import {
+  CTA_LINE_PATTERN,
+  SPOTLIGHT_OPEN_RE,
+  STEPS_OPEN_RE,
+  parseSpotlightLine,
+  parseStepLine,
+  type SpotlightEntryData,
+  type StepData,
+} from "@/lib/markdown/bulletin-blocks";
 import {
   IMAGE_LINE_PATTERN,
   parseImageAttributes,
@@ -52,6 +62,11 @@ export interface ListItemNode {
 export interface ListBlock {
   ordered: boolean;
   items: ListItemNode[];
+}
+
+/** A pipe-table cell: its inline text plus any `{colspan=…}` / `{rowspan=…}`. */
+export interface TableCell extends CellSpan {
+  text: string;
 }
 
 export type Block =
@@ -86,12 +101,18 @@ export type Block =
     }
   | { kind: "footnoteDefinition"; label: string; text: string }
   | ({ kind: "list" } & ListBlock)
-  | { kind: "table"; head: string[]; rows: string[][] }
+  | { kind: "table"; head: TableCell[]; rows: TableCell[][] }
   | { kind: "callout"; variant: CalloutVariant; paragraphs: string[] }
   | { kind: "quote"; paragraphs: string[] }
   | { kind: "code"; text: string; lang: string }
   | { kind: "details"; summary: string; blocks: Block[] }
-  | { kind: "rule" };
+  | { kind: "rule" }
+  /** Bulletin-only: `[Label](href){.cta}` on its own line. */
+  | { kind: "cta"; label: string; href: string }
+  /** Bulletin-only: a `:::steps` block. Numbers derive from position. */
+  | { kind: "steps"; steps: StepData[] }
+  /** Bulletin-only: a `:::spotlight` block. */
+  | { kind: "spotlight"; entries: SpotlightEntryData[] };
 
 export interface TocEntry {
   id: string;
@@ -196,8 +217,49 @@ function isBlockStart(line: string): boolean {
     TABLE_ROW_RE.test(line) ||
     DETAILS_OPEN_RE.test(line) ||
     DETAILS_CLOSE_RE.test(line) ||
+    STEPS_OPEN_RE.test(line) ||
+    SPOTLIGHT_OPEN_RE.test(line) ||
+    CTA_LINE_PATTERN.test(line.trim()) ||
     FOOTNOTE_DEFINITION_PATTERN.test(line)
   );
+}
+
+/** The text of a pipe-table cell with any `{colspan=…}` / `{rowspan=…}` lifted into span fields. */
+function toTableCell(cell: string): TableCell {
+  const parsed = splitCellSpan(cell);
+  return { text: parsed.text, colspan: parsed.colspan, rowspan: parsed.rowspan };
+}
+
+/** Pad a row with empty cells until its column span reaches the table's width. */
+function padRow(row: TableCell[], columnSpan: number): TableCell[] {
+  const padded = [...row];
+  let current = padded.reduce((sum, cell) => sum + cell.colspan, 0);
+  while (current < columnSpan) {
+    padded.push({ text: "", colspan: 1, rowspan: 1 });
+    current += 1;
+  }
+  return padded;
+}
+
+/**
+ * Index of the bare `:::` that closes the fenced block opening at `open`
+ * (used by `:::steps` / `:::spotlight`; code fences are skipped over).
+ */
+function findFenceEnd(lines: readonly string[], open: number): number {
+  let inFence = false;
+  for (let i = open + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (inFence) {
+      if (FENCE_CLOSE_RE.test(line)) inFence = false;
+      continue;
+    }
+    if (FENCE_OPEN_RE.test(line)) {
+      inFence = true;
+      continue;
+    }
+    if (DETAILS_CLOSE_RE.test(line)) return i;
+  }
+  return lines.length;
 }
 
 /** Index of the `:::` that closes the details block opening at `open`, honouring nesting and fences. */
@@ -333,6 +395,32 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
       continue;
     }
 
+    // Bulletin-only fenced blocks: `:::steps` / `:::spotlight`, closed by a
+    // bare `:::`. Each inner line is parsed by the shared syntactic module.
+    if (STEPS_OPEN_RE.test(line)) {
+      const end = findFenceEnd(lines, index);
+      const steps: StepData[] = [];
+      for (let i = index + 1; i < end; i += 1) {
+        const step = parseStepLine(lines[i]);
+        if (step) steps.push(step);
+      }
+      blocks.push({ kind: "steps", steps });
+      index = end + 1;
+      continue;
+    }
+
+    if (SPOTLIGHT_OPEN_RE.test(line)) {
+      const end = findFenceEnd(lines, index);
+      const entries: SpotlightEntryData[] = [];
+      for (let i = index + 1; i < end; i += 1) {
+        const entry = parseSpotlightLine(lines[i]);
+        if (entry) entries.push(entry);
+      }
+      blocks.push({ kind: "spotlight", entries });
+      index = end + 1;
+      continue;
+    }
+
     const details = DETAILS_OPEN_RE.exec(line);
     if (details) {
       const end = findDetailsEnd(lines, index);
@@ -366,6 +454,14 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
       continue;
     }
 
+    // A bulletin CTA button on its own line: `[Label](href){.cta}`.
+    const cta = CTA_LINE_PATTERN.exec(line.trim());
+    if (cta) {
+      blocks.push({ kind: "cta", label: cta[1].trim(), href: cta[2] });
+      index += 1;
+      continue;
+    }
+
     const heading = HEADING_RE.exec(line);
     if (heading) {
       const parsed = splitBlockAttributes(heading[2].trim());
@@ -387,13 +483,14 @@ function parseBlocks(lines: readonly string[], state: ParseState): Block[] {
       index + 1 < lines.length &&
       TABLE_DIVIDER_RE.test(lines[index + 1])
     ) {
-      const head = splitTableRow(line);
+      const head = splitTableRow(line).map(toTableCell);
+      const columnSpan = head.reduce((sum, cell) => sum + cell.colspan, 0);
       index += 2;
-      const rows: string[][] = [];
+      const rows: TableCell[][] = [];
       while (index < lines.length && TABLE_ROW_RE.test(lines[index])) {
-        const cells = splitTableRow(lines[index]);
-        while (cells.length < head.length) cells.push("");
-        rows.push(cells.slice(0, head.length));
+        // Ragged rows (fewer cells than columns, e.g. after a colspan) are kept
+        // as written and padded with empty cells so nothing renders short.
+        rows.push(padRow(splitTableRow(lines[index]).map(toTableCell), columnSpan));
         index += 1;
       }
       blocks.push({ kind: "table", head, rows });
@@ -532,7 +629,7 @@ function blockTexts(block: Block): string[] {
     case "list":
       return listTexts(block);
     case "table":
-      return [...block.head, ...block.rows.flat()];
+      return [...block.head.map((cell) => cell.text), ...block.rows.flat().map((cell) => cell.text)];
     case "details":
       return [block.summary, ...block.blocks.flatMap(blockTexts)];
     case "code":

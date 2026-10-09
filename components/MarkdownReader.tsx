@@ -4,6 +4,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import {
+  ArrowUpRight,
   Check,
   ChevronRight,
   ClipboardList,
@@ -15,7 +16,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
-import { InlineText, ReaderNavContext, safeImageSrc } from "@/components/reader/Inline";
+import { InlineText, ReaderNavContext, safeHref, safeImageSrc } from "@/components/reader/Inline";
 import type { ReaderNav } from "@/components/reader/Inline";
 import { Lightbox } from "@/components/reader/Lightbox";
 import {
@@ -399,6 +400,85 @@ function renderBlock(block: Block, key: number): ReactNode {
 
     case "rule":
       return <hr key={key} className="border-zinc-100" />;
+
+    /* Bulletin-only blocks. They never appear in an article, but the reader is
+     * shared, so it renders them wherever the stored Markdown carries them. */
+    case "cta": {
+      const href = safeHref(block.href);
+      if (!href) {
+        // A target that fails the allowlist degrades to the stored line rather
+        // than rendering a link we would not stand behind.
+        return (
+          <p key={key} className={BODY_TEXT}>
+            {`[${block.label}](${block.href}){.cta}`}
+          </p>
+        );
+      }
+      return (
+        <p key={key} className="my-6">
+          <a
+            href={href}
+            {...(/^https?:/i.test(href) ? { rel: "noopener noreferrer" } : {})}
+            className="group inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1 print:border print:border-[#0F766E] print:bg-white print:text-[#0F766E]"
+          >
+            {block.label}
+            <ArrowUpRight size={15} strokeWidth={2} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" />
+          </a>
+        </p>
+      );
+    }
+
+    case "steps":
+      return (
+        <ol key={key} className="my-6 space-y-3 print:break-inside-avoid">
+          {block.steps.map((step, index) => (
+            <li key={index} className="flex gap-3.5">
+              <span
+                aria-hidden="true"
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-teal-600/30 bg-teal-50 text-[12px] font-semibold tabular-nums text-[#0F766E]"
+              >
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold leading-6 text-zinc-900">
+                  <InlineText text={step.title} />
+                </p>
+                {step.description.length > 0 ? (
+                  <p className={cx(BODY_TEXT, "mt-0.5")}>
+                    <InlineText text={step.description} />
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      );
+
+    case "spotlight":
+      return (
+        <div
+          key={key}
+          className="my-6 flex snap-x gap-3 overflow-x-auto pb-2 print:flex-wrap print:overflow-visible"
+        >
+          {block.entries.map((entry, index) => (
+            <div
+              key={index}
+              className="flex min-w-[12rem] shrink-0 snap-start items-center gap-3 rounded-xl border border-zinc-300/60 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] print:break-inside-avoid"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-[12.5px] font-semibold uppercase text-[#0F766E]"
+              >
+                {entry.initials}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[13.5px] font-semibold text-zinc-900">{entry.name}</span>
+                <span className="block truncate text-xs text-zinc-500">{entry.label}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      );
 
     default:
       return null;

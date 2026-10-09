@@ -25,6 +25,7 @@ import { PortalHeader } from "@/components/PortalHeader";
 import { ReferencedBy } from "@/components/ReferencedBy";
 import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
+import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
 import { deleteBulletin, listBulletins } from "@/lib/bulletin/api";
 import { matchesDepartment } from "@/lib/data/filters";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
@@ -412,6 +413,7 @@ function ArticleDetail({
                 onOpenBulletin={onOpenBulletin}
               />
             </div>
+            <ArticleAttachments slug={article.slug} />
             <p className="font-mono text-xs text-zinc-400">{article.slug}</p>
           </div>
         }

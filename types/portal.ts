@@ -89,12 +89,25 @@ export interface KnowledgeArticle {
 
 export type BulletinPriority = "normal" | "urgent" | "pinned";
 
+/**
+ * Presentation tier for a bulletin. Mirrors the Prisma `BulletinFormat` enum —
+ * keep the two in step. `notice` is the ordinary layout; `announcement` and
+ * `featured` are celebratory posts (no ack button, reactions instead).
+ */
+export type BulletinFormat = "notice" | "announcement" | "featured";
+
 /** A time-sensitive announcement posted to the bulletin board. */
 export interface Bulletin {
   id: string;
   title: string;
   departments: ClinicalDepartment[];
   priority: BulletinPriority;
+  /** Presentation tier. */
+  format: BulletinFormat;
+  /** Featured only: the small pill above the headline. */
+  kicker?: string | null;
+  /** Featured only: the stand-up one-liner under the headline. */
+  deck?: string | null;
   body_markdown: string;
   /** ISO 8601 timestamp. */
   created_at: string;

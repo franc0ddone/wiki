@@ -1,15 +1,41 @@
 /**
  * `npm run verify:frontend` — assertions for the pure (DOM-free) frontend
- * modules: the markdown parser, link validation, and the search engine.
+ * modules: the markdown parser, link validation, the search engine, the editor
+ * schema, and the batch-5c features (reactions, attachments, paste, bulletin
+ * blocks, merged cells, the drag handle).
  *
  * Browser behaviour (palette, editor, reader interactions) is verified
  * separately; this script covers everything that can be decided without one.
+ *
+ * The DB-backed checks (reactions, attachments, bulletin formats) run last and
+ * require a live PostgreSQL database: the script runs `prisma migrate deploy`
+ * against `DATABASE_URL_TEST` (or `DATABASE_URL`) as setup, and **fails loudly**
+ * when neither is configured — it never silently skips them.
  */
+import { config as loadEnv } from "dotenv";
+
+loadEnv({ path: ".env", quiet: true });
+loadEnv({ path: ".env.local", override: true, quiet: true });
+
+const VERIFY_DATABASE_URL = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
+if (!VERIFY_DATABASE_URL) {
+  console.error(
+    "verify:frontend needs a database for the reactions / attachments / format checks.\n" +
+      "Set DATABASE_URL_TEST (preferred) or DATABASE_URL to a disposable PostgreSQL database.",
+  );
+  process.exit(1);
+}
+process.env.DATABASE_URL = VERIFY_DATABASE_URL;
+
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { EditorState } from "@tiptap/pm/state";
 import type { Transaction } from "@tiptap/pm/state";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { Schema } from "@tiptap/pm/model";
+import { Dropcursor } from "@tiptap/extension-dropcursor";
 import {
   closeDoubleQuote,
   closeSingleQuote,
@@ -85,7 +111,58 @@ import {
 import { SLASH_ITEMS, filterSlashItems } from "@/components/editor/slashItems";
 import { canInsertDroppedImage } from "@/lib/editor/image-validation";
 import { findMatches, replaceAllInDoc, stepMatchIndex } from "@/lib/editor/find";
-import { shouldShowBubbleMenu } from "@/lib/editor/bubble";
+import { shouldShowBubbleMenu, bubbleMode, isSelectionInTable } from "@/lib/editor/bubble";
+import { ApiError } from "@/lib/api";
+import { getDb } from "@/lib/db";
+import {
+  BULLETIN_REACTION_EMOJIS,
+  isBulletinReactionEmoji,
+  summarizeReactions,
+} from "@/lib/bulletin/reactions";
+import {
+  BULLETIN_FORMATS,
+  DEFAULT_BULLETIN_FORMAT,
+  formatUsesAck,
+  isBulletinFormat,
+} from "@/lib/bulletin/format";
+import {
+  createBulletin,
+  getBulletinById,
+  getReactionSummary,
+  toggleReaction,
+} from "@/lib/data/bulletins";
+import { createArticle } from "@/lib/data/articles";
+import {
+  ALLOWED_ATTACHMENT_TYPES,
+  ATTACHMENT_MAX_BYTES,
+  assertAttachmentType,
+  assertPhiConfirmed,
+  detectAttachmentType,
+  readAttachmentStream,
+  sanitizeAttachmentFileName,
+} from "@/lib/attachments";
+import { createAttachment, getAttachmentForDownload, listAttachments } from "@/lib/data/attachments";
+import { PASTE_ALLOWED_TAGS, htmlIsClean, sanitizePastedHtml } from "@/lib/editor/paste-sanitize";
+import {
+  CTA_LINE_PATTERN,
+  initialsFromName,
+  isValidCtaHref,
+  parseSpotlightLine,
+  parseStepLine,
+  serializeBulletinBlocks,
+  serializeSpotlightLine,
+  serializeStepLine,
+} from "@/lib/markdown/bulletin-blocks";
+import {
+  isDefaultCellSpan,
+  parseCellSpan,
+  serializeCellSpan,
+  splitCellSpan,
+} from "@/lib/markdown/cell-attributes";
+import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
+import { BulletinHero } from "@/components/bulletin/BulletinHero";
+import { ClinicalTable } from "@/components/reader/ClinicalTable";
+import { dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -164,7 +241,7 @@ check("escaped pipes in table cells", () => {
   assert.deepEqual(splitTableRow("| a \\| b | c |"), ["a | b", "c"]);
   const [table] = parseMarkdown("| x | y |\n| --- | --- |\n| 1 \\| 2 | 3 |");
   assert.equal(table.kind, "table");
-  if (table.kind === "table") assert.deepEqual(table.rows[0], ["1 | 2", "3"]);
+  if (table.kind === "table") assert.deepEqual(table.rows[0].map((cell) => cell.text), ["1 | 2", "3"]);
 });
 check("explicit heading ids + duplicate suffixes", () => {
   const blocks = parseMarkdown("## Purpose {#why}\n\n## Purpose\n\n## Purpose");
@@ -804,4 +881,595 @@ check("shouldShowBubbleMenu needs a non-empty TextSelection outside code", () =>
   assert.equal(shouldShowBubbleMenu(nodeSel, false), false, "a NodeSelection (e.g. an image) hides the menu");
 });
 
-console.log(`\n${passed} checks passed.`);
+/* ==================================================== batch 5c: features === */
+
+console.log("bulletin reactions");
+
+check("the reaction allowlist is exactly the bounded ❤️🎉👍 set, in order", () => {
+  assert.equal(BULLETIN_REACTION_EMOJIS.length, 3);
+  assert.deepEqual([...BULLETIN_REACTION_EMOJIS], ["\u2764\uFE0F", "\uD83C\uDF89", "\uD83D\uDC4D"]);
+  assert.equal(isBulletinReactionEmoji(BULLETIN_REACTION_EMOJIS[0]), true);
+  assert.equal(isBulletinReactionEmoji("😀"), false);
+  assert.equal(isBulletinReactionEmoji(""), false);
+  assert.equal(isBulletinReactionEmoji(42), false);
+});
+
+check("summarizeReactions returns the allowlist order with viewer state", () => {
+  const summary = summarizeReactions(
+    [
+      { emoji: BULLETIN_REACTION_EMOJIS[2], userId: "u1" },
+      { emoji: BULLETIN_REACTION_EMOJIS[0], userId: "u2" },
+      { emoji: BULLETIN_REACTION_EMOJIS[2], userId: "u2" },
+      { emoji: "😀", userId: "u9" },
+    ],
+    "u1",
+  );
+  assert.deepEqual(
+    summary.map((entry) => [entry.emoji, entry.count, entry.viewer_reacted]),
+    [
+      [BULLETIN_REACTION_EMOJIS[0], 1, false],
+      [BULLETIN_REACTION_EMOJIS[1], 0, false],
+      [BULLETIN_REACTION_EMOJIS[2], 2, true],
+    ],
+  );
+});
+
+console.log("bulletin headline (Option C)");
+
+check("the headline rule renders 64px × 3px in #0f766e with the exact type", () => {
+  const html = renderToStaticMarkup(createElement(BulletinHeadline, { title: "Isolation bays" }));
+  assert.match(html, /text-\[34px\]/);
+  assert.match(html, /font-bold/);
+  assert.match(html, /tracking-\[-0\.02em\]/);
+  assert.match(html, /leading-\[1\.1\]/);
+  assert.match(html, /mt-\[14px\]/);
+  assert.match(html, /h-\[3px\]/);
+  assert.match(html, /w-16/);
+  assert.match(html, /rounded-\[2px\]/);
+  assert.match(html, /bg-\[#0f766e\]/);
+});
+
+console.log("bulletin format");
+
+check("the format vocabulary is one shared enum, default `notice`", () => {
+  assert.deepEqual([...BULLETIN_FORMATS], ["notice", "announcement", "featured"]);
+  assert.equal(DEFAULT_BULLETIN_FORMAT, "notice");
+  assert.equal(isBulletinFormat("notice"), true);
+  assert.equal(isBulletinFormat("announcement"), true);
+  assert.equal(isBulletinFormat("featured"), true);
+  assert.equal(isBulletinFormat("hero"), false);
+  assert.equal(isBulletinFormat(null), false);
+});
+
+check("celebratory tiers drop the acks; only `notice` keeps them", () => {
+  assert.equal(formatUsesAck("notice"), true);
+  assert.equal(formatUsesAck("announcement"), false);
+  assert.equal(formatUsesAck("featured"), false);
+});
+
+check("the featured hero is a flat teal band with no brand-blue anywhere", () => {
+  const html = renderToStaticMarkup(
+    createElement(BulletinHero, { title: "Employee of the Month", kicker: "Pinned · Monthly", deck: "Thank you for the long nights." }),
+  );
+  assert.match(html, /bg-\[#0f766e\]/);
+  assert.match(html, /Employee of the Month/);
+  assert.ok(!/#1E2A4A/i.test(html), "brand-blue leaked into the featured tree");
+});
+
+console.log("bulletin blocks");
+
+check("a CTA href allows https and a single leading slash, nothing else", () => {
+  assert.equal(isValidCtaHref("https://example.com/x"), true);
+  assert.equal(isValidCtaHref("/bulletins/abc"), true);
+  assert.equal(isValidCtaHref("mailto:a@b.org"), false);
+  assert.equal(isValidCtaHref("tel:123"), false);
+  assert.equal(isValidCtaHref("javascript:alert(1)"), false);
+  assert.equal(isValidCtaHref("//evil.example/x"), false);
+  assert.equal(isValidCtaHref("portal/path"), false);
+});
+
+check("steps and spotlight lines round-trip byte-for-byte", () => {
+  const step = { title: "Don gloves", description: "Then gown." };
+  assert.equal(serializeStepLine(step, 3), "3. **Don gloves** \u2014 Then gown.");
+  assert.deepEqual(parseStepLine(serializeStepLine(step, 3)), step);
+  const entry = { initials: "AB", name: "Ada Byron", label: "Employee of the Month" };
+  assert.deepEqual(parseSpotlightLine(serializeSpotlightLine(entry)), entry);
+  assert.equal(initialsFromName("Ada Byron"), "AB");
+  assert.equal(CTA_LINE_PATTERN.test("[Open](/bulletins/abc){.cta}"), true);
+  assert.equal(CTA_LINE_PATTERN.test("[Open](/bulletins/abc)"), false);
+});
+
+check("CTA / steps / spotlight survive a double Markdown round-trip", () => {
+  const source = [
+    "Welcome aboard.",
+    "",
+    "[Open the roster](/bulletins/abc){.cta}",
+    "",
+    ":::steps",
+    "1. **Triage** \u2014 check the airway first.",
+    "2. **Stabilise** \u2014 start fluids.",
+    ":::",
+    "",
+    ":::spotlight",
+    "- **AB** Ada Byron \u2014 Employee of the Month",
+    "- **CD** Cy Doe \u2014 Values award",
+    ":::",
+  ].join("\n");
+  const first = parseMarkdown(source);
+  const roundTrip = serializeBulletinBlocks(first);
+  const second = parseMarkdown(roundTrip);
+  const third = serializeBulletinBlocks(second);
+  assert.equal(third, roundTrip, "double round-trip drifted");
+  assert.deepEqual(first, second, "semantic equivalence after one round trip");
+  const kinds = first.map((block) => block.kind);
+  assert.ok(kinds.includes("cta") && kinds.includes("steps") && kinds.includes("spotlight"));
+});
+
+console.log("paste sanitizer");
+
+const WORD_FIXTURE =
+  "<html xmlns:o=\"urn:schemas-microsoft-com:office:office\"><head><meta charset=\"utf-8\"><style>.MsoNormal{margin:0}</style></head><body class=\"WordSection1\">" +
+  "<p class=\"MsoNormal\" style=\"font-size:11pt\">Start <b>now</b>.</p>" +
+  "<p class=\"MsoListParagraph\" style=\"mso-list:l0 level1 lfo1\"><span style=\"mso-list:Ignore\">\u00b7<span>&nbsp;</span></span>Gown up</p>" +
+  "<p class=\"MsoListParagraph\" style=\"mso-list:l0 level2 lfo1\"><span style=\"mso-list:Ignore\">o<span>&nbsp;</span></span>Gloves</p>" +
+  "<p class=\"MsoNormal\">Line<br>break</p>" +
+  "<p class=\"MsoListParagraph\" style=\"mso-list:l1 level1 lfo2\"><span style=\"mso-list:Ignore\">1.<span>&nbsp;</span></span>Ordered</p>" +
+  "<v:shape><v:imagedata src=\"file:///x.png\"/></v:shape><!-- a comment -->" +
+  "<img src=\"data:image/png;base64,AAAA\"></body></html>";
+
+const GDOCS_FIXTURE =
+  "<meta charset=\"utf-8\">" +
+  "<b id=\"docs-internal-guid-1\" style=\"font-weight:normal;\">" +
+  "<p dir=\"ltr\" style=\"line-height:1.38;margin-top:0pt\"><span style=\"font-size:11pt;font-weight:400\">Plain </span><span style=\"font-weight:700\">bold</span><span style=\"font-style:italic\"> italic</span>.</p>" +
+  "</b>" +
+  "<p dir=\"ltr\"><a href=\"https://example.com\" style=\"color:#1155cc\">link</a><img src=\"data:image/png;base64,AAAA\"></p>";
+
+check("a Word paste arrives clean (no classes, styles, namespaces, comments, VML, images)", () => {
+  const clean = sanitizePastedHtml(WORD_FIXTURE);
+  assert.ok(htmlIsClean(clean), `not clean: ${clean}`);
+  assert.ok(!/MsoListParagraph|mso-list|WordSection1/.test(clean));
+  assert.match(clean, /<strong>now<\/strong>/);
+  assert.ok(clean.includes("<ul>") && clean.includes("<li>") && clean.includes("<ol>"));
+  // Nested list: the level-2 item sits inside the level-1 item.
+  assert.match(clean, /Gown up<ul>/);
+  // <br> became a paragraph split.
+  assert.ok(clean.includes("<p>Line</p>") && clean.includes("<p>break</p>"));
+});
+
+check("a Google Docs paste arrives clean, keeping real emphasis", () => {
+  const clean = sanitizePastedHtml(GDOCS_FIXTURE);
+  assert.ok(htmlIsClean(clean), `not clean: ${clean}`);
+  assert.match(clean, /<strong>bold<\/strong>/);
+  assert.match(clean, /<em> italic<\/em>/);
+  assert.match(clean, /<a href="https:\/\/example\.com">link<\/a>/);
+  assert.ok(!/<b\b/.test(clean), "the Google Docs <b style=font-weight:normal> wrapper survived");
+});
+
+check("the paste element whitelist is exactly the schema's own set", () => {
+  assert.deepEqual(
+    [...PASTE_ALLOWED_TAGS],
+    ["p", "h1", "h2", "h3", "ul", "ol", "li", "strong", "em", "u", "a", "table", "thead", "tbody", "tr", "th", "td", "br", "hr"],
+  );
+});
+
+console.log("table cell merging");
+
+check("table cell spans parse to real colspan/rowspan (including header rows)", () => {
+  const [table] = parseMarkdown("| Group {colspan=2} | Notes |\n| --- | --- |\n| a | b | c |");
+  if (table.kind !== "table") throw new Error("expected a table");
+  assert.equal(table.head[0].text, "Group");
+  assert.equal(table.head[0].colspan, 2);
+  assert.equal(table.head[1].colspan, 1);
+  const html = renderToStaticMarkup(createElement(ClinicalTable, { head: table.head, rows: table.rows }));
+  assert.match(html, /colspan="2"/i);
+
+  const [rowspan] = parseMarkdown("| H {rowspan=2} | A |\n| --- | --- |\n| B | C |");
+  if (rowspan.kind !== "table") throw new Error("expected a table");
+  assert.equal(rowspan.head[0].rowspan, 2);
+  const rowspanHtml = renderToStaticMarkup(createElement(ClinicalTable, { head: rowspan.head, rows: rowspan.rows }));
+  assert.match(rowspanHtml, /rowspan="2"/i);
+});
+
+check("ragged rows from colspan parse without crashing and pad empty cells", () => {
+  const [table] = parseMarkdown("| A {colspan=2} | B |\n| --- | --- |\n| only |");
+  if (table.kind !== "table") throw new Error("expected a table");
+  assert.equal(table.rows[0].length, 3);
+  assert.equal(table.rows[0][1].text, "");
+  renderToStaticMarkup(createElement(ClinicalTable, { head: table.head, rows: table.rows }));
+});
+
+check("unmerge restores plain cells; the span helpers are inverses", () => {
+  const [plain] = parseMarkdown("| A | B |\n| --- | --- |\n| 1 | 2 |");
+  if (plain.kind !== "table") throw new Error("expected a table");
+  assert.ok(plain.head.every(isDefaultCellSpan));
+  assert.equal(serializeCellSpan(parseCellSpan("colspan=2 rowspan=3")), "{colspan=2 rowspan=3}");
+  assert.equal(serializeCellSpan({ colspan: 1, rowspan: 1 }), "");
+  const split = splitCellSpan("Header {colspan=2}");
+  assert.equal(split.text, "Header");
+  assert.equal(split.colspan, 2);
+  // Prose braces are not formatting.
+  assert.equal(splitCellSpan("Give {2 mg}").colspan, 1);
+});
+
+console.log("editor chrome: drag handle + drop cursor");
+
+const DRAG_SCHEMA = new Schema({
+  nodes: {
+    doc: { content: "block+" },
+    paragraph: { content: "inline*", group: "block" },
+    callout: { content: "paragraph+", group: "block" },
+    footnoteDefinition: { content: "paragraph", group: "block" },
+    table: { content: "tableRow+", group: "block" },
+    tableRow: { content: "tableCell+" },
+    tableCell: { content: "paragraph", isolating: true },
+    text: { group: "inline" },
+  },
+});
+
+check("dragWrappersAsUnit targets the wrapper, never its inner blocks", () => {
+  const inner = DRAG_SCHEMA.node("paragraph", null, [DRAG_SCHEMA.text("inside")]);
+  const callout = DRAG_SCHEMA.node("callout", null, [inner]);
+  const top = DRAG_SCHEMA.node("paragraph", null, [DRAG_SCHEMA.text("top")]);
+  const doc = DRAG_SCHEMA.node("doc", null, [callout, top]);
+
+  let topOffset = 0;
+  doc.forEach((node, offset) => {
+    if (node.type.name === "paragraph") topOffset = offset;
+  });
+
+  assert.equal(dragWrappersAsUnit({ node: inner, $pos: doc.resolve(3) }), 1000, "an inner paragraph must not be a drag target");
+  assert.equal(dragWrappersAsUnit({ node: callout, $pos: doc.resolve(1) }), 0, "the callout itself must be a drag target");
+  assert.equal(dragWrappersAsUnit({ node: top, $pos: doc.resolve(topOffset + 1) }), 0, "a top-level paragraph must be a drag target");
+});
+
+check("excludeFootnotesAndTables refuses footnote and table-nested targets", () => {
+  const footnote = DRAG_SCHEMA.node("footnoteDefinition", null, [DRAG_SCHEMA.node("paragraph", null, [])]);
+  const cell = DRAG_SCHEMA.node("tableCell", null, [DRAG_SCHEMA.node("paragraph", null, [DRAG_SCHEMA.text("c")])]);
+  const row = DRAG_SCHEMA.node("tableRow", null, [cell]);
+  const table = DRAG_SCHEMA.node("table", null, [row]);
+  const doc = DRAG_SCHEMA.node("doc", null, [footnote, table]);
+  assert.equal(excludeFootnotesAndTables({ node: footnote, $pos: doc.resolve(1) }), 1000);
+  const cellParagraph = cell.firstChild;
+  if (!cellParagraph) throw new Error("expected a cell paragraph");
+  assert.equal(excludeFootnotesAndTables({ node: cellParagraph, $pos: doc.resolve(footnote.nodeSize + 3) }), 1000);
+});
+
+check("the editor schema includes the configured drop cursor exactly once", () => {
+  const extensions = buildEditorExtensions();
+  const dropcursors = extensions.filter((extension) => extension.name === Dropcursor.name);
+  assert.equal(dropcursors.length, 1, "expected exactly one dropCursor extension");
+  const configured = Dropcursor.configure({ color: "#0f766e", width: 2 });
+  const options = configured.options as { color: string; width: number };
+  assert.equal(options.color, "#0f766e");
+  assert.equal(options.width, 2);
+});
+
+check("bulletin-only blocks are registered for bulletins and never for articles", () => {
+  const articleNames = buildEditorExtensions().map((extension) => extension.name);
+  const bulletinNames = buildEditorExtensions({ bulletinBlocks: true }).map((extension) => extension.name);
+  for (const name of ["ctaButton", "steps", "spotlight"]) {
+    assert.ok(!articleNames.includes(name), `${name} leaked into the article schema`);
+    assert.ok(bulletinNames.includes(name), `${name} missing from the bulletin schema`);
+  }
+});
+
+check("the editor carries custom table serializers (merged cells need them)", () => {
+  const extensions = buildEditorExtensions();
+  for (const name of ["table", "tableCell", "tableHeader"]) {
+    const extension = extensions.find((candidate) => candidate.name === name);
+    assert.ok(extension, `${name} is not in the editor schema`);
+    const markdown = (extension.storage as { markdown?: { serialize?: unknown } }).markdown;
+    assert.equal(typeof markdown?.serialize, "function", `${name} has no markdown serializer`);
+  }
+});
+
+console.log("editor chrome: bubble menu table mode");
+
+const BUBBLE_TABLE_SCHEMA = new Schema({
+  nodes: {
+    doc: { content: "block+" },
+    paragraph: { content: "inline*", group: "block" },
+    table: { content: "tableRow+", group: "block", tableRole: "table" },
+    tableRow: { content: "tableCell+", tableRole: "row" },
+    tableCell: { content: "paragraph", isolating: true, tableRole: "cell" },
+    text: { group: "inline" },
+  },
+});
+
+check("a table selection shows the merge/split menu; a paragraph shows the format menu", () => {
+  const cell = (text: string) =>
+    BUBBLE_TABLE_SCHEMA.node("tableCell", null, [
+      BUBBLE_TABLE_SCHEMA.node("paragraph", null, text ? [BUBBLE_TABLE_SCHEMA.text(text)] : []),
+    ]);
+  const doc = BUBBLE_TABLE_SCHEMA.node("doc", null, [
+    BUBBLE_TABLE_SCHEMA.node("table", null, [
+      BUBBLE_TABLE_SCHEMA.node("tableRow", null, [cell("a"), cell("b")]),
+      BUBBLE_TABLE_SCHEMA.node("tableRow", null, [cell("c"), cell("d")]),
+    ]),
+  ]);
+  const base = EditorState.create({ doc, schema: BUBBLE_TABLE_SCHEMA });
+  assert.equal(isSelectionInTable(base), true);
+
+  const tableState = EditorState.create({
+    doc,
+    schema: BUBBLE_TABLE_SCHEMA,
+    // A non-empty selection inside a table cell — positions 4..5 select "a"
+    // (doc → table(0) → row(1) → cell(2) → paragraph(3) → text(4)).
+    selection: TextSelection.create(doc, 4, 5),
+  });
+  assert.equal(shouldShowBubbleMenu(tableState, false), true, "a table selection must show the bubble");
+  assert.equal(bubbleMode(tableState, false), "table");
+
+  const paragraphSchema = new Schema({
+    nodes: {
+      doc: { content: "block+" },
+      paragraph: { content: "inline*", group: "block" },
+      text: { group: "inline" },
+    },
+  });
+  const pdoc = paragraphSchema.node("doc", null, [
+    paragraphSchema.node("paragraph", null, [paragraphSchema.text("hello world")]),
+  ]);
+  const formatState = EditorState.create({
+    doc: pdoc,
+    schema: paragraphSchema,
+    selection: TextSelection.create(pdoc, 1, 5),
+  });
+  assert.equal(bubbleMode(formatState, false), "format");
+});
+
+/* ==================================================== async / DB checks === */
+
+async function runDatabaseChecks(): Promise<void> {
+  console.log("database (migrate deploy + feature checks)");
+
+  // The 25 MB cap is enforced on the stream: oversize uploads abort mid-read.
+  let oversizeStatus = 0;
+  try {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(ATTACHMENT_MAX_BYTES));
+        controller.enqueue(new Uint8Array(1));
+        controller.close();
+      },
+    });
+    await readAttachmentStream(stream);
+  } catch (error) {
+    oversizeStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("an oversize upload is refused with 413 while streaming", () => assert.equal(oversizeStatus, 413));
+
+  const small = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2, 3]));
+      controller.close();
+    },
+  });
+  const bytes = await readAttachmentStream(small);
+  check("a small upload is buffered intact", () => assert.equal(bytes.length, 3));
+
+
+  // Setup: apply migrations to the test database. `deploy` is idempotent.
+  execFileSync("npx", ["prisma", "migrate", "deploy"], {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: VERIFY_DATABASE_URL },
+  });
+
+  const db = getDb();
+  const stamp = Date.now();
+  const userIds: string[] = [];
+
+  const author = await db.user.create({
+    data: {
+      email: `verify-5c-author-${stamp}@dovelewis.org`,
+      name: "Verify Author",
+      title: "Technician",
+      role: "author",
+    },
+  });
+  userIds.push(author.id);
+  const other = await db.user.create({
+    data: { email: `verify-5c-other-${stamp}@dovelewis.org`, name: "Verify Other", role: "staff" },
+  });
+  userIds.push(other.id);
+
+  /* ---- bulletin format round-trip (DB) ---- */
+
+  const bulletins = [];
+  for (const fmt of BULLETIN_FORMATS) {
+    bulletins.push(
+      await createBulletin({
+        title: `Format ${fmt}`,
+        body_markdown: "Body",
+        departments: ["ER"],
+        priority: "normal",
+        format: fmt,
+        kicker: fmt === "featured" ? "Kicker" : null,
+        deck: fmt === "featured" ? "Deck" : null,
+        author_id: author.id,
+      }),
+    );
+  }
+
+  for (const fmt of BULLETIN_FORMATS) {
+    const fetched = await getBulletinById(bulletins.find((b) => b.format === fmt)?.id ?? "", {
+      includeExpired: true,
+    });
+    check(`format \`${fmt}\` persists and round-trips through the data layer`, () => {
+      assert.equal(fetched?.format, fmt);
+    });
+  }
+
+  const defaulted = await createBulletin({
+    title: "Defaulted format",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "normal",
+    author_id: author.id,
+  });
+  check("an omitted format defaults to `notice`", () => assert.equal(defaulted.format, DEFAULT_BULLETIN_FORMAT));
+
+  check("an invalid format value is not a valid BulletinFormat (the route 422s it)", () => {
+    assert.equal(isBulletinFormat("spotlight"), false);
+  });
+
+  const featured = bulletins.find((b) => b.format === "featured");
+  check("the featured kicker/deck persist and round-trip", () => {
+    assert.equal(featured?.kicker, "Kicker");
+    assert.equal(featured?.deck, "Deck");
+  });
+
+  /* ---- reactions (DB) ---- */
+
+  const bulletin = featured ?? bulletins[0];
+  const emoji = BULLETIN_REACTION_EMOJIS[0];
+
+  const on = await toggleReaction(bulletin.id, other.id, emoji);
+  check("toggling a reaction on reports reacted:true and a count of 1", () => {
+    assert.equal(on.reacted, true);
+    assert.equal(on.summary.find((entry) => entry.emoji === emoji)?.count, 1);
+    assert.equal(on.summary.find((entry) => entry.emoji === emoji)?.viewer_reacted, true);
+  });
+
+  const off = await toggleReaction(bulletin.id, other.id, emoji);
+  check("toggling the same reaction again turns it off (count 0)", () => {
+    assert.equal(off.reacted, false);
+    assert.equal(off.summary.find((entry) => entry.emoji === emoji)?.count, 0);
+    assert.equal(off.summary.find((entry) => entry.emoji === emoji)?.viewer_reacted, false);
+  });
+
+  await db.bulletinReaction.create({ data: { bulletinId: bulletin.id, userId: other.id, emoji } });
+  let duplicated = false;
+  try {
+    await db.bulletinReaction.create({ data: { bulletinId: bulletin.id, userId: other.id, emoji } });
+  } catch {
+    duplicated = true;
+  }
+  check("the unique constraint blocks a duplicate reaction row", () => assert.equal(duplicated, true));
+  await db.bulletinReaction.deleteMany({ where: { bulletinId: bulletin.id } });
+
+  let emojiStatus = 0;
+  try {
+    await toggleReaction(bulletin.id, other.id, "\uD83D\uDE00");
+  } catch (error) {
+    emojiStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("an emoji outside the allowlist is refused with 422", () => assert.equal(emojiStatus, 422));
+
+  /* ---- articles: no reactions, attachments instead ---- */
+
+  const article = await createArticle({
+    title: `Verify article ${stamp}`,
+    body_markdown: "# Body\n\nText.",
+    departments: ["ER"],
+    author_id: author.id,
+  });
+
+  let articleReactionStatus = 0;
+  try {
+    await getReactionSummary(article.id, author.id);
+  } catch (error) {
+    articleReactionStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("reactions are bulletin-scoped (404 for an article id)", () => assert.equal(articleReactionStatus, 404));
+
+  /* ---- attachments (DB) ---- */
+
+  const pdf = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n", "latin1");
+  const { mime } = assertAttachmentType(pdf, "reference.pdf");
+  const record = await createAttachment({
+    slug: article.slug,
+    file_name: `reference-${stamp}.pdf`,
+    file_key: `attachments/${stamp}/reference.pdf`,
+    mime_type: mime,
+    size_bytes: pdf.length,
+    uploaded_by_id: author.id,
+  });
+  check("an attachment record round-trips without exposing its storage key", () => {
+    assert.equal(record.mime_type, "application/pdf");
+    assert.equal(record.file_name, `reference-${stamp}.pdf`);
+    assert.ok(!Object.prototype.hasOwnProperty.call(record, "file_key"));
+  });
+
+  const listed = await listAttachments(article.slug);
+  check("listing an article's attachments returns the record", () => {
+    assert.ok(listed.some((entry) => entry.id === record.id));
+  });
+
+  const download = await getAttachmentForDownload(article.slug, record.id);
+  check("the download record carries the server-only storage key", () => {
+    assert.equal(download.file_key, `attachments/${stamp}/reference.pdf`);
+  });
+
+  await db.article.delete({ where: { id: article.id } });
+  const orphan = await db.articleAttachment.findUnique({ where: { id: record.id } });
+  check("deleting an article cascades its attachments", () => assert.equal(orphan, null));
+
+  /* ---- cleanup ---- */
+
+  await db.article.deleteMany({ where: { authorId: { in: userIds } } });
+  await db.bulletin.deleteMany({ where: { authorId: { in: userIds } } });
+  await db.user.deleteMany({ where: { id: { in: userIds } } });
+}
+
+console.log("attachments (pure)");
+
+check("magic bytes decide the attachment type; a renamed .exe is refused", () => {
+  const pdf = Buffer.from("%PDF-1.7\n%%EOF\n", "latin1");
+  assert.equal(detectAttachmentType(pdf), "application/pdf");
+
+  const exe = Buffer.concat([Buffer.from("MZ\x90\x00", "latin1"), Buffer.alloc(64)]);
+  assert.equal(detectAttachmentType(exe), null);
+  let status = 0;
+  try {
+    assertAttachmentType(exe, "totally-a.pdf");
+  } catch (error) {
+    status = error instanceof ApiError ? error.status : -1;
+  }
+  assert.equal(status, 422, "a renamed .exe must be refused with 422");
+
+  const docx = Buffer.concat([
+    Buffer.from("PK\x03\x04", "latin1"),
+    Buffer.from("word/document.xml [Content_Types].xml", "latin1"),
+  ]);
+  assert.equal(detectAttachmentType(docx), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  const xlsx = Buffer.concat([
+    Buffer.from("PK\x03\x04", "latin1"),
+    Buffer.from("xl/workbook.xml [Content_Types].xml", "latin1"),
+  ]);
+  assert.equal(detectAttachmentType(xlsx), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  assert.equal(ALLOWED_ATTACHMENT_TYPES.length, 3);
+});
+
+check("sanitizeAttachmentFileName keeps a storage-safe basename", () => {
+  assert.equal(sanitizeAttachmentFileName("../../etc/passwd"), "passwd");
+  assert.equal(sanitizeAttachmentFileName("Report (final).pdf"), "Report_final_.pdf");
+  assert.equal(sanitizeAttachmentFileName(""), "file");
+});
+
+console.log("attachments (async guards)");
+
+check("a missing PHI confirmation is refused with 422 (nothing stored)", () => {
+  const statusFor = (value: unknown) => {
+    try {
+      assertPhiConfirmed(value);
+      return 200;
+    } catch (error) {
+      return error instanceof ApiError ? error.status : -1;
+    }
+  };
+  assert.equal(statusFor(undefined), 422);
+  assert.equal(statusFor(false), 422);
+  assert.equal(statusFor("false"), 422);
+  assert.equal(statusFor(true), 200);
+  assert.equal(statusFor("true"), 200);
+});
+
+runDatabaseChecks()
+  .then(() => {
+    console.log(`\n${passed} checks passed.`);
+  })
+  .catch((error: unknown) => {
+    console.error("\nverify:frontend failed:", error);
+    process.exit(1);
+  });

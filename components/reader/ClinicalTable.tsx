@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, ChevronsUpDown, Search } from "lucide-react";
 import { InlineText } from "@/components/reader/Inline";
 import { plainTextOf } from "@/lib/markdown/inline";
+import type { TableCell } from "@/lib/markdown/parser";
 import { cx } from "@/lib/utils";
 
 /**
@@ -11,6 +12,11 @@ import { cx } from "@/lib/utils";
  *
  * Sticky header, click-to-sort columns, a filter box for long tables, and a
  * "Show all N rows" collapse for very long ones.
+ *
+ * Merged cells: a `{colspan=2}` / `{rowspan=N}` on a cell is emitted as the
+ * real HTML `colSpan` / `rowSpan` attribute, so grouped clinical headers render
+ * the way they were written. Missing (ragged) cells arrive already padded with
+ * empty cells from the parser.
  *
  * Sorting and filtering only. This component never computes anything from the
  * cell values — no dose math, no weight-based highlighting, no unit conversion
@@ -44,12 +50,30 @@ function compareCells(a: string, b: string): number {
   return collator.compare(a, b);
 }
 
-export function ClinicalTable({ head, rows }: { head: string[]; rows: string[][] }) {
+/** The `colSpan` / `rowSpan` attributes a merged cell renders, or `{}` when plain. */
+function spanAttrs(cell: TableCell): { colSpan?: number; rowSpan?: number } {
+  return {
+    ...(cell.colspan > 1 ? { colSpan: cell.colspan } : {}),
+    ...(cell.rowspan > 1 ? { rowSpan: cell.rowspan } : {}),
+  };
+}
+
+export function ClinicalTable({ head, rows }: { head: TableCell[]; rows: TableCell[][] }) {
   const [sort, setSort] = useState<SortState | null>(null);
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState(false);
 
-  const plainRows = useMemo(() => rows.map((row) => row.map((cell) => plainTextOf(cell))), [rows]);
+  // The number of visual columns, so the "no rows" message spans the table
+  // correctly even when the header uses colspan.
+  const columnCount = useMemo(
+    () => head.reduce((sum, cell) => sum + Math.max(1, cell.colspan), 0),
+    [head],
+  );
+
+  const plainRows = useMemo(
+    () => rows.map((row) => row.map((cell) => plainTextOf(cell.text))),
+    [rows],
+  );
 
   const order = useMemo(() => {
     const indexes = rows.map((_, index) => index);
@@ -139,6 +163,7 @@ export function ClinicalTable({ head, rows }: { head: string[]; rows: string[][]
                   <th
                     key={columnIndex}
                     scope="col"
+                    {...spanAttrs(cell)}
                     aria-sort={
                       active ? (active.direction === "asc" ? "ascending" : "descending") : undefined
                     }
@@ -149,7 +174,7 @@ export function ClinicalTable({ head, rows }: { head: string[]; rows: string[][]
                       onClick={() => cycleSort(columnIndex)}
                       className="-mx-2 flex h-10 items-center gap-1.5 rounded-md px-2 text-left uppercase tracking-[0.08em] transition-colors hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:pointer-events-none"
                     >
-                      <InlineText text={cell} />
+                      <InlineText text={cell.text} />
                       <span aria-hidden="true" className="text-zinc-400 print:hidden">
                         {active ? (
                           active.direction === "asc" ? (
@@ -186,19 +211,20 @@ export function ClinicalTable({ head, rows }: { head: string[]; rows: string[][]
                 {rows[rowIndex].map((cell, cellIndex) => (
                   <td
                     key={cellIndex}
+                    {...spanAttrs(cell)}
                     className={cx(
                       "px-4 py-3 align-top leading-6",
                       cellIndex === 0 ? "font-medium text-zinc-900" : "text-zinc-700",
                     )}
                   >
-                    <InlineText text={cell} />
+                    <InlineText text={cell.text} />
                   </td>
                 ))}
               </tr>
             ))}
             {matches && matches.size === 0 ? (
               <tr className="print:hidden">
-                <td colSpan={head.length} className="px-4 py-6 text-center text-[13px] text-zinc-500">
+                <td colSpan={columnCount} className="px-4 py-6 text-center text-[13px] text-zinc-500">
                   No rows match “{filter.trim()}”.
                 </td>
               </tr>

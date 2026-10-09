@@ -4,6 +4,13 @@ import { ApiError } from "@/lib/api";
 import { toBulletin } from "@/lib/data/mappers";
 import { getArticleById } from "@/lib/data/articles";
 import { roleAtLeast, type Role } from "@/lib/roles";
+import { DEFAULT_BULLETIN_FORMAT, type BulletinFormat } from "@/lib/bulletin/format";
+import {
+  BULLETIN_REACTION_EMOJIS,
+  isBulletinReactionEmoji,
+  summarizeReactions,
+  type ReactionSummaryEntry,
+} from "@/lib/bulletin/reactions";
 import {
   BULLETIN_EXPIRY_DEFAULTS,
   defaultExpiryFor,
@@ -11,7 +18,13 @@ import {
 } from "@/lib/bulletin/lifecycle";
 import type { Bulletin, Department, KnowledgeArticle } from "@/types/portal";
 
-export { BULLETIN_EXPIRY_DEFAULTS, defaultExpiryFor };
+export {
+  BULLETIN_EXPIRY_DEFAULTS,
+  defaultExpiryFor,
+  BULLETIN_REACTION_EMOJIS,
+  summarizeReactions,
+};
+export type { ReactionSummaryEntry };
 
 /**
  * Bulletin access — the drop-in replacement for the `BULLETINS` slice of
@@ -129,6 +142,11 @@ export interface CreateBulletinInput {
   body_markdown: string;
   departments: string[];
   priority: BulletinPriority;
+  /** Presentation tier; defaults to `notice`. */
+  format?: BulletinFormat;
+  /** Featured-only fields. */
+  kicker?: string | null;
+  deck?: string | null;
   /** `expires_at` as posted; `undefined` means "apply the default for priority". */
   expires_at?: Date | null;
   linked_article_id?: string | null;
@@ -178,6 +196,11 @@ export async function createBulletin(input: CreateBulletinInput): Promise<Bullet
       bodyMarkdown: input.body_markdown,
       departments: input.departments,
       priority: input.priority,
+      format: input.format ?? DEFAULT_BULLETIN_FORMAT,
+      // Featured-only fields are stored only when supplied; an empty string is
+      // normalised to null so the reader's falsy checks behave.
+      kicker: input.kicker?.trim() ? input.kicker.trim() : null,
+      deck: input.deck?.trim() ? input.deck.trim() : null,
       linkedArticleId: input.linked_article_id ?? null,
       authorId: input.author_id,
       publishedAt: now,
@@ -267,6 +290,9 @@ export interface UpdateBulletinInput {
   body_markdown?: string;
   departments?: string[];
   priority?: BulletinPriority;
+  format?: BulletinFormat;
+  kicker?: string | null;
+  deck?: string | null;
   expires_at?: Date | null;
   linked_article_id?: string | null;
 }
@@ -310,6 +336,9 @@ export async function updateBulletin(
       bodyMarkdown: true,
       departments: true,
       priority: true,
+      format: true,
+      kicker: true,
+      deck: true,
       expiresAt: true,
       linkedArticleId: true,
     },
@@ -322,6 +351,9 @@ export async function updateBulletin(
   const nextBody = patch.body_markdown ?? current.bodyMarkdown;
   const nextDepartments = patch.departments ?? current.departments;
   const nextPriority = patch.priority ?? current.priority;
+  const nextFormat = patch.format ?? current.format;
+  const nextKicker = patch.kicker === undefined ? current.kicker : (patch.kicker?.trim() ? patch.kicker.trim() : null);
+  const nextDeck = patch.deck === undefined ? current.deck : (patch.deck?.trim() ? patch.deck.trim() : null);
   const nextLinked =
     patch.linked_article_id === undefined ? current.linkedArticleId : patch.linked_article_id;
 
@@ -364,6 +396,9 @@ export async function updateBulletin(
         bodyMarkdown: nextBody,
         departments: nextDepartments,
         priority: nextPriority,
+        format: nextFormat,
+        kicker: nextKicker,
+        deck: nextDeck,
         linkedArticleId: nextLinked,
         expiresAt: nextExpires,
       },
@@ -381,4 +416,80 @@ export async function deleteBulletin(id: string, actor: { id: string; role: stri
   if (!current) throw new ApiError(404, `No bulletin with id \`${id}\` exists.`);
   assertBulletinMayBeChanged(actor, current.authorId, "delete");
   await db.bulletin.delete({ where: { id } });
+}
+
+/* ------------------------------------------------------------- reactions */
+
+/**
+ * Toggle one viewer's reaction to a bulletin (the bounded ❤️🎉👍 set).
+ *
+ * Idempotent by construction: the write path *attempts the insert*, and a
+ * `P2002` unique violation (which the `(bulletin, user, emoji)` constraint
+ * raises on a second identical reaction) is interpreted as "already reacted, so
+ * this click turns it off" and deletes the existing row. Rapid double-clicks
+ * therefore cannot create duplicate rows — the database, not the client, is
+ * what keeps it idempotent.
+ *
+ * 404 for an unknown bulletin; 422 for an emoji outside the allowlist.
+ */
+export interface ReactionToggleResult {
+  reacted: boolean;
+  summary: ReactionSummaryEntry[];
+}
+
+export async function toggleReaction(
+  bulletinId: string,
+  userId: string,
+  emoji: string,
+): Promise<ReactionToggleResult> {
+  if (!isBulletinReactionEmoji(emoji)) {
+    throw new ApiError(422, "`emoji` must be one of the three allowed reactions.", {
+      code: "emoji_not_allowed",
+      details: { field: "emoji", allowed: [...BULLETIN_REACTION_EMOJIS] },
+    });
+  }
+
+  const db = getDb();
+  const bulletin = await db.bulletin.findUnique({ where: { id: bulletinId }, select: { id: true } });
+  if (!bulletin) throw new ApiError(404, `No bulletin with id \`${bulletinId}\` exists.`);
+
+  let reacted: boolean;
+  try {
+    await db.bulletinReaction.create({ data: { bulletinId, userId, emoji } });
+    reacted = true;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      await db.bulletinReaction.deleteMany({ where: { bulletinId, userId, emoji } });
+      reacted = false;
+    } else {
+      throw error;
+    }
+  }
+
+  return { reacted, summary: await getReactionSummary(bulletinId, userId) };
+}
+
+/** Prisma's `P2002` unique-constraint violation, matched structurally so the
+ *  data layer need not import the client namespace as a value. */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}
+
+/**
+ * The reaction summary for a bulletin, in allowlist order, with the viewer's
+ * own reaction flagged. 404 for an unknown bulletin.
+ */
+export async function getReactionSummary(
+  bulletinId: string,
+  viewerId: string | null,
+): Promise<ReactionSummaryEntry[]> {
+  const db = getDb();
+  const bulletin = await db.bulletin.findUnique({ where: { id: bulletinId }, select: { id: true } });
+  if (!bulletin) throw new ApiError(404, `No bulletin with id \`${bulletinId}\` exists.`);
+
+  const rows = await db.bulletinReaction.findMany({
+    where: { bulletinId },
+    select: { emoji: true, userId: true },
+  });
+  return summarizeReactions(rows, viewerId);
 }

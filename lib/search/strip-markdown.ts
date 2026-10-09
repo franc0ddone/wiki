@@ -38,7 +38,8 @@ export function stripMarkdown(markdown: string): string {
 
     let line = raw;
     if (/^\s*:::\s*$/.test(line)) continue;
-    line = line.replace(/^\s*:::details\s*/, "");
+    // `:::details` / `:::steps` / `:::spotlight` are directives, not words.
+    line = line.replace(/^\s*:::(?:details|steps|spotlight)\s*/, "");
     if (/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line)) continue; // table divider
     if (/^\s*(?:-{3,}|\*{3,})\s*$/.test(line)) continue; // rule
 

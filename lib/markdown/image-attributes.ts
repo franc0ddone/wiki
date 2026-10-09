@@ -10,8 +10,11 @@
  * A caption is the standard Markdown image title (`"…"`). The suffix carries
  * pixel width (clamped 48–1200) and alignment (`left` | `center` | `right`).
  * An image with no title and no suffix is byte-for-byte what it was before, so
- * existing images are unaffected.
+ * existing images are unaffected. The `{…}` grammar itself is shared — see
+ * `lib/markdown/attribute-grammar.ts`.
  */
+
+import { parseAttributeTokens } from "@/lib/markdown/attribute-grammar";
 
 export type ImageAlign = "left" | "center" | "right";
 
@@ -42,19 +45,13 @@ export function clampWidth(value: number): number {
 export function parseImageAttributes(raw: string | null | undefined): ImageAttributes {
   let width: number | null = null;
   let align: ImageAlign | null = null;
-  if (!raw) return { width, align };
 
-  for (const part of raw.trim().split(/\s+/)) {
-    if (!part) continue;
-    const eq = part.indexOf("=");
-    if (eq === -1) continue;
-    const key = part.slice(0, eq);
-    const value = part.slice(eq + 1);
-    if (key === "width") {
-      const parsed = Number.parseInt(value, 10);
+  for (const token of parseAttributeTokens(raw)) {
+    if (token.key === "width" && token.value !== null) {
+      const parsed = Number.parseInt(token.value, 10);
       if (Number.isFinite(parsed)) width = clampWidth(parsed);
-    } else if (key === "align" && (ALIGNMENTS as readonly string[]).includes(value)) {
-      align = value as ImageAlign;
+    } else if (token.key === "align" && token.value !== null && (ALIGNMENTS as readonly string[]).includes(token.value)) {
+      align = token.value as ImageAlign;
     }
   }
 

@@ -4,20 +4,33 @@ import type { ComponentType } from "react";
 import { useEditorState } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Highlighter, Italic, Link2 } from "lucide-react";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Highlighter,
+  Italic,
+  Link2,
+  TableCellsMerge,
+  TableCellsSplit,
+} from "lucide-react";
 import { BUBBLE_FORMAT_ORDER, FORMAT_COMMANDS } from "@/components/editor/formatCommands";
 import type { FormatCommandId } from "@/components/editor/formatCommands";
-import { shouldShowBubbleMenu } from "@/lib/editor/bubble";
+import { bubbleMode, shouldShowBubbleMenu } from "@/lib/editor/bubble";
 import { cx } from "@/lib/utils";
 
 /**
- * Format-on-selection popup. Exactly bold, italic, link, highlight and
- * alignment — no extra items — and every button calls the same
- * `formatCommands.ts` function the toolbar uses, so the two cannot drift.
+ * Format-on-selection popup. Two modes, decided by the pure `bubbleMode`:
  *
- * Visibility is decided by the pure `shouldShowBubbleMenu`: a non-empty
- * TextSelection, not in a code block, and not while the link dialog is open
- * (`linkDialogOpen` is owned by the host, so it is passed in).
+ *  - the format menu — bold, italic, link, highlight, alignment — for a normal
+ *    text selection, using the same `formatCommands.ts` the toolbar uses;
+ *  - the table menu — Merge / Split — for a selection inside a table.
+ *
+ * There is no second menu instance: it is the one bubble, switching its items.
+ * Visibility is `shouldShowBubbleMenu` (not in a code block, and not while the
+ * link dialog is open).
  */
 
 const ICONS: Record<FormatCommandId, ComponentType<{ size?: number; strokeWidth?: number }>> = {
@@ -30,6 +43,11 @@ const ICONS: Record<FormatCommandId, ComponentType<{ size?: number; strokeWidth?
   alignJustify: AlignJustify,
   link: Link2,
 };
+
+const BUTTON_BASE =
+  "flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 disabled:cursor-not-allowed disabled:opacity-40";
+const BUTTON_IDLE = "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900";
+const BUTTON_ACTIVE = "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25";
 
 export function EditorBubbleMenu({
   editor,
@@ -49,6 +67,19 @@ export function EditorBubbleMenu({
     },
   });
 
+  const mode = useEditorState({
+    editor,
+    selector: ({ editor: current }) => bubbleMode(current.state, linkDialogOpen),
+  });
+
+  const tableActions = useEditorState({
+    editor,
+    selector: ({ editor: current }) => ({
+      canMerge: current.can().mergeCells(),
+      canSplit: current.can().splitCell(),
+    }),
+  });
+
   return (
     <BubbleMenu
       editor={editor}
@@ -57,29 +88,52 @@ export function EditorBubbleMenu({
       options={{ placement: "top", offset: 8 }}
       className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-1 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.28),0_2px_6px_rgba(24,24,27,0.08)]"
     >
-      {BUBBLE_FORMAT_ORDER.map((id) => {
-        const command = FORMAT_COMMANDS[id];
-        const Icon = ICONS[id];
-        const isActive = active[id] ?? false;
-        return (
+      {mode === "table" ? (
+        <>
           <button
-            key={id}
             type="button"
-            aria-label={command.label}
-            aria-pressed={isActive}
-            title={command.shortcut ? `${command.label} (${command.shortcut})` : command.label}
+            aria-label="Merge cells"
+            title="Merge cells"
+            disabled={!tableActions.canMerge}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => (id === "link" ? onLink() : command.run(editor))}
-            className={cx(
-              "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-              isActive ? "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
-            )}
+            onClick={() => editor.chain().focus().mergeCells().run()}
+            className={cx(BUTTON_BASE, BUTTON_IDLE)}
           >
-            <Icon size={16} strokeWidth={1.75} />
+            <TableCellsMerge size={16} strokeWidth={1.75} />
           </button>
-        );
-      })}
+          <button
+            type="button"
+            aria-label="Split cell"
+            title="Split cell"
+            disabled={!tableActions.canSplit}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => editor.chain().focus().splitCell().run()}
+            className={cx(BUTTON_BASE, BUTTON_IDLE)}
+          >
+            <TableCellsSplit size={16} strokeWidth={1.75} />
+          </button>
+        </>
+      ) : (
+        BUBBLE_FORMAT_ORDER.map((id) => {
+          const command = FORMAT_COMMANDS[id];
+          const Icon = ICONS[id];
+          const isActive = active[id] ?? false;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-label={command.label}
+              aria-pressed={isActive}
+              title={command.shortcut ? `${command.label} (${command.shortcut})` : command.label}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => (id === "link" ? onLink() : command.run(editor))}
+              className={cx(BUTTON_BASE, isActive ? BUTTON_ACTIVE : BUTTON_IDLE)}
+            >
+              <Icon size={16} strokeWidth={1.75} />
+            </button>
+          );
+        })
+      )}
     </BubbleMenu>
   );
 }

@@ -3,7 +3,7 @@
  * API's own `{ error, code }` reasons reach the UI verbatim.
  */
 import { ApiRequestError, request } from "@/lib/editor/api";
-import type { Bulletin, ClinicalDepartment } from "@/types/portal";
+import type { Bulletin, BulletinFormat, ClinicalDepartment } from "@/types/portal";
 import type { BulletinPriority } from "@/types/portal";
 
 export interface BulletinPayload {
@@ -11,6 +11,11 @@ export interface BulletinPayload {
   body_markdown: string;
   departments: ClinicalDepartment[];
   priority: BulletinPriority;
+  /** Presentation tier. Omitted means `notice`. */
+  format?: BulletinFormat;
+  /** Featured-only fields. */
+  kicker?: string | null;
+  deck?: string | null;
   /** ISO-8601, `null` for "never", or omitted to apply the priority default. */
   expires_at?: string | null;
   linked_article_id?: string | null;
@@ -59,6 +64,31 @@ export interface AckEntry {
 
 export function getBulletinAcks(id: string): Promise<AckEntry[]> {
   return request<AckEntry[]>(`/api/bulletins/${encodeURIComponent(id)}/ack`);
+}
+
+/* --------------------------------------------------------------- reactions */
+
+export interface ReactionSummaryEntry {
+  emoji: string;
+  count: number;
+  viewer_reacted: boolean;
+}
+
+export function getBulletinReactions(id: string): Promise<ReactionSummaryEntry[]> {
+  return request<ReactionSummaryEntry[]>(`/api/bulletins/${encodeURIComponent(id)}/reactions`);
+}
+
+export interface ReactionToggleResponse {
+  reacted: boolean;
+  summary: ReactionSummaryEntry[];
+}
+
+export function toggleBulletinReaction(id: string, emoji: string): Promise<ReactionToggleResponse> {
+  return request<ReactionToggleResponse>(`/api/bulletins/${encodeURIComponent(id)}/reactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emoji }),
+  });
 }
 
 export { ApiRequestError };

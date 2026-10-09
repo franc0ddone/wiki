@@ -67,6 +67,17 @@ enum RoleRequestStatus {
   declined
 }
 
+/// Presentation tier for a bulletin. One shared field — `notice` is the
+/// ordinary layout, `featured` is the celebratory hero built in prompt 5c, and
+/// `announcement` is defined here so the vocabulary is shared with prompt 6,
+/// which lands its distinct hero rendering. In 5c an `announcement` persists
+/// end-to-end but renders with the standard notice layout.
+enum BulletinFormat {
+  notice
+  announcement
+  featured
+}
+
 // --------------------------------------------------------------------- users
 
 model User {
@@ -94,6 +105,10 @@ model User {
   authoredBulletins Bulletin[]
   articleVersions  ArticleVersion[]
   bulletinAcks     BulletinAck[]
+  /// Bounded ❤️🎉👍 reactions this user has left on bulletins.
+  bulletinReactions BulletinReaction[]
+  /// Files this user attached to articles (`SetNull` when the account is removed).
+  uploadedAttachments ArticleAttachment[]
 
   /// Requests this user has raised (the "request author access" flow).
   roleRequests        RoleRequest[] @relation("RoleRequestRequester")
@@ -138,6 +153,7 @@ model Article {
   reviewer User?  @relation("ArticleReviewer", fields: [reviewerId], references: [id])
   versions ArticleVersion[]
   bulletins Bulletin[]
+  attachments ArticleAttachment[]
 
   @@index([status])
   @@index([updatedAt(sort: Desc)])
@@ -181,6 +197,14 @@ model Bulletin {
 
   priority BulletinPriority @default(normal)
 
+  /// Presentation tier. `notice` is the ordinary layout; `announcement` and
+  /// `featured` are celebratory posts (no ack button, reactions instead).
+  format BulletinFormat @default(notice)
+  /// Featured only: the small pill above the headline, e.g. "Pinned · Monthly".
+  kicker String?
+  /// Featured only: the warm one-liner under the headline (the standfirst).
+  deck   String?
+
   linkedArticleId String? @map("linked_article_id") @db.Uuid
 
   authorId String @map("author_id") @db.Uuid
@@ -197,6 +221,7 @@ model Bulletin {
   linkedArticle Article? @relation(fields: [linkedArticleId], references: [id], onDelete: SetNull)
   author        User     @relation(fields: [authorId], references: [id])
   acks          BulletinAck[]
+  reactions     BulletinReaction[]
 
   @@index([publishedAt(sort: Desc)])
   @@index([expiresAt])
@@ -219,6 +244,56 @@ model BulletinAck {
   @@unique([bulletinId, userId])
   @@index([bulletinId])
   @@map("bulletin_acks")
+}
+
+/// A bounded reaction on a bulletin: one row per (bulletin, user, emoji).
+///
+/// The emoji is validated against the fixed allowlist (`❤️` `🎉` `👍`) in
+/// `lib/bulletin/reactions.ts` before the row is written; the unique constraint
+/// is what makes a rapid double-toggle idempotent — the write path inserts and
+/// treats a P2002 as "already reacted, so delete it" (toggle off).
+model BulletinReaction {
+  id String @id @default(uuid()) @db.Uuid
+
+  bulletinId String @map("bulletin_id") @db.Uuid
+  userId     String @map("user_id") @db.Uuid
+  emoji      String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  bulletin Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bulletinId, userId, emoji])
+  @@index([bulletinId])
+  @@map("bulletin_reactions")
+}
+
+/// A file attached to an article (PDF / DOCX / XLSX).
+///
+/// Attachments belong to the article, not to a version, so they persist across
+/// republication and the reader lists them on the current version. The object
+/// key is server-derived (`attachments/<uuid>/<sanitized-fileName>`) and is
+/// never exposed to the client — the reader streams through the API instead.
+model ArticleAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  articleId String @map("article_id") @db.Uuid
+  fileName  String @map("file_name")
+  fileKey   String @map("file_key")
+  mimeType  String @map("mime_type")
+  sizeBytes Int    @map("size_bytes")
+
+  /// Nullable: removing the uploader's account must not delete the article's
+  /// attachments, so the FK is `SetNull` rather than `Cascade`.
+  uploadedById String? @map("uploaded_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  article    Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([articleId])
+  @@map("article_attachments")
 }
 
 // ----------------------------------------------------------- role requests

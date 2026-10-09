@@ -257,6 +257,13 @@ export type EnumBulletinPriorityFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel> | $Enums.BulletinPriority
 }
 
+export type EnumBulletinFormatFilter<$PrismaModel = never> = {
+  equals?: $Enums.BulletinFormat | Prisma.EnumBulletinFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel> | $Enums.BulletinFormat
+}
+
 export type EnumBulletinPriorityWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.BulletinPriority | Prisma.EnumBulletinPriorityFieldRefInput<$PrismaModel>
   in?: $Enums.BulletinPriority[] | Prisma.ListEnumBulletinPriorityFieldRefInput<$PrismaModel>
@@ -265,6 +272,16 @@ export type EnumBulletinPriorityWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel>
   _max?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel>
+}
+
+export type EnumBulletinFormatWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BulletinFormat | Prisma.EnumBulletinFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBulletinFormatWithAggregatesFilter<$PrismaModel> | $Enums.BulletinFormat
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel>
 }
 
 export type EnumRoleRequestStatusFilter<$PrismaModel = never> = {
@@ -621,6 +638,13 @@ export type NestedEnumBulletinPriorityFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel> | $Enums.BulletinPriority
 }
 
+export type NestedEnumBulletinFormatFilter<$PrismaModel = never> = {
+  equals?: $Enums.BulletinFormat | Prisma.EnumBulletinFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel> | $Enums.BulletinFormat
+}
+
 export type NestedEnumBulletinPriorityWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.BulletinPriority | Prisma.EnumBulletinPriorityFieldRefInput<$PrismaModel>
   in?: $Enums.BulletinPriority[] | Prisma.ListEnumBulletinPriorityFieldRefInput<$PrismaModel>
@@ -629,6 +653,16 @@ export type NestedEnumBulletinPriorityWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel>
   _max?: Prisma.NestedEnumBulletinPriorityFilter<$PrismaModel>
+}
+
+export type NestedEnumBulletinFormatWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BulletinFormat | Prisma.EnumBulletinFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BulletinFormat[] | Prisma.ListEnumBulletinFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBulletinFormatWithAggregatesFilter<$PrismaModel> | $Enums.BulletinFormat
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBulletinFormatFilter<$PrismaModel>
 }
 
 export type NestedEnumRoleRequestStatusFilter<$PrismaModel = never> = {

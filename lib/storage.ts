@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { ApiError } from "@/lib/api";
 
 /**
@@ -129,4 +129,76 @@ export async function putObject(
   }
 
   return { key, url: `${config.publicBaseUrl}/${key}` };
+}
+
+/* ------------------------------------------------------ article attachments */
+
+/**
+ * The storage key an article attachment lives at, per the batch spec:
+ * `attachments/<uuid>/<sanitized-fileName>`. Deterministic and readable, so a
+ * bucket listing tells you which article folder a file belongs to without a
+ * database lookup. The caller supplies the (already sanitised) file name.
+ */
+export function buildAttachmentKey(fileName: string): string {
+  const id = globalThis.crypto.randomUUID();
+  return `attachments/${id}/${fileName}`;
+}
+
+/**
+ * Store an object at an exact key (used by article attachments, whose keys are
+ * a documented `attachments/<uuid>/<name>` shape rather than the date-sharded
+ * image keys `putObject` builds). Bytes go to object storage and nowhere else.
+ */
+export async function putObjectAtKey(
+  key: string,
+  body: Buffer,
+  options: { contentType: string },
+): Promise<StoredObject> {
+  const config = readConfig();
+  const client = getClient(config);
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        Body: body,
+        ContentType: options.contentType,
+        CacheControl: "private, max-age=0, no-store",
+      }),
+    );
+  } catch (error) {
+    console.error("[uploads] S3 PutObject (attachment) failed:", error);
+    throw new ApiError(502, "The file could not be stored. Try again, or contact the practice administrator.", {
+      code: "storage_write_failed",
+    });
+  }
+
+  return { key, url: `${config.publicBaseUrl}/${key}` };
+}
+
+/**
+ * Read an object's bytes back for streaming through the API. Buffered (the
+ * attachment cap is 25 MB, so this is bounded), never handed to the client as a
+ * raw URL.
+ */
+export async function getObjectBuffer(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const config = readConfig();
+  const client = getClient(config);
+
+  try {
+    const response = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+    const body = response.Body;
+    if (!body) {
+      throw new ApiError(404, "The stored file is empty or missing.", { code: "storage_object_missing" });
+    }
+    const bytes = await body.transformToByteArray();
+    return { buffer: Buffer.from(bytes), contentType: response.ContentType ?? null };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    console.error("[uploads] S3 GetObject failed:", error);
+    throw new ApiError(404, "The stored file could not be read.", { code: "storage_read_failed" });
+  }
 }

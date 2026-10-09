@@ -47,6 +47,26 @@ export type Bulletin = Prisma.BulletinModel
  */
 export type BulletinAck = Prisma.BulletinAckModel
 /**
+ * Model BulletinReaction
+ * A bounded reaction on a bulletin: one row per (bulletin, user, emoji).
+ * 
+ * The emoji is validated against the fixed allowlist (`❤️` `🎉` `👍`) in
+ * `lib/bulletin/reactions.ts` before the row is written; the unique constraint
+ * is what makes a rapid double-toggle idempotent — the write path inserts and
+ * treats a P2002 as "already reacted, so delete it" (toggle off).
+ */
+export type BulletinReaction = Prisma.BulletinReactionModel
+/**
+ * Model ArticleAttachment
+ * A file attached to an article (PDF / DOCX / XLSX).
+ * 
+ * Attachments belong to the article, not to a version, so they persist across
+ * republication and the reader lists them on the current version. The object
+ * key is server-derived (`attachments/<uuid>/<sanitized-fileName>`) and is
+ * never exposed to the client — the reader streams through the API instead.
+ */
+export type ArticleAttachment = Prisma.ArticleAttachmentModel
+/**
  * Model RoleRequest
  * A staff member's self-service request for the `author` role.
  * 

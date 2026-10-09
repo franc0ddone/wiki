@@ -1,4 +1,4 @@
-import type { ArticleStatus, BulletinPriority, ShiftPreference } from "@/generated/prisma/enums";
+import type { ArticleStatus, BulletinFormat, BulletinPriority, ShiftPreference } from "@/generated/prisma/enums";
 import type {
   Bulletin,
   ClinicalDepartment,
@@ -69,6 +69,9 @@ export interface BulletinRowInput {
   bodyMarkdown: string;
   departments: string[];
   priority: BulletinPriority;
+  format: BulletinFormat;
+  kicker: string | null;
+  deck: string | null;
   linkedArticleId: string | null;
   publishedAt: Date;
   author: AuthorRow | null;
@@ -80,6 +83,11 @@ export function toBulletin(row: BulletinRowInput): Bulletin {
     title: row.title,
     departments: asDepartments(row.departments),
     priority: row.priority,
+    format: row.format,
+    // Featured-only fields are omitted entirely when empty so the reader's
+    // `bulletin.kicker` stays falsy exactly as it did for the old fixtures.
+    ...(row.kicker ? { kicker: row.kicker } : {}),
+    ...(row.deck ? { deck: row.deck } : {}),
     body_markdown: row.bodyMarkdown,
     created_at: row.publishedAt.toISOString(),
     author_name: formatAuthorName(row.author),

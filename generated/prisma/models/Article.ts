@@ -246,6 +246,7 @@ export type ArticleWhereInput = {
   reviewer?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   versions?: Prisma.ArticleVersionListRelationFilter
   bulletins?: Prisma.BulletinListRelationFilter
+  attachments?: Prisma.ArticleAttachmentListRelationFilter
 }
 
 export type ArticleOrderByWithRelationInput = {
@@ -266,6 +267,7 @@ export type ArticleOrderByWithRelationInput = {
   reviewer?: Prisma.UserOrderByWithRelationInput
   versions?: Prisma.ArticleVersionOrderByRelationAggregateInput
   bulletins?: Prisma.BulletinOrderByRelationAggregateInput
+  attachments?: Prisma.ArticleAttachmentOrderByRelationAggregateInput
 }
 
 export type ArticleWhereUniqueInput = Prisma.AtLeast<{
@@ -289,6 +291,7 @@ export type ArticleWhereUniqueInput = Prisma.AtLeast<{
   reviewer?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   versions?: Prisma.ArticleVersionListRelationFilter
   bulletins?: Prisma.BulletinListRelationFilter
+  attachments?: Prisma.ArticleAttachmentListRelationFilter
 }, "id" | "slug">
 
 export type ArticleOrderByWithAggregationInput = {
@@ -345,6 +348,7 @@ export type ArticleCreateInput = {
   reviewer?: Prisma.UserCreateNestedOneWithoutReviewedArticlesInput
   versions?: Prisma.ArticleVersionCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateInput = {
@@ -363,6 +367,7 @@ export type ArticleUncheckedCreateInput = {
   updatedAt: Date | string
   versions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUpdateInput = {
@@ -381,6 +386,7 @@ export type ArticleUpdateInput = {
   reviewer?: Prisma.UserUpdateOneWithoutReviewedArticlesNestedInput
   versions?: Prisma.ArticleVersionUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateInput = {
@@ -399,6 +405,7 @@ export type ArticleUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUncheckedUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleCreateManyInput = {
@@ -652,6 +659,20 @@ export type ArticleUpdateOneWithoutBulletinsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ArticleUpdateToOneWithWhereWithoutBulletinsInput, Prisma.ArticleUpdateWithoutBulletinsInput>, Prisma.ArticleUncheckedUpdateWithoutBulletinsInput>
 }
 
+export type ArticleCreateNestedOneWithoutAttachmentsInput = {
+  create?: Prisma.XOR<Prisma.ArticleCreateWithoutAttachmentsInput, Prisma.ArticleUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.ArticleCreateOrConnectWithoutAttachmentsInput
+  connect?: Prisma.ArticleWhereUniqueInput
+}
+
+export type ArticleUpdateOneRequiredWithoutAttachmentsNestedInput = {
+  create?: Prisma.XOR<Prisma.ArticleCreateWithoutAttachmentsInput, Prisma.ArticleUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.ArticleCreateOrConnectWithoutAttachmentsInput
+  upsert?: Prisma.ArticleUpsertWithoutAttachmentsInput
+  connect?: Prisma.ArticleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ArticleUpdateToOneWithWhereWithoutAttachmentsInput, Prisma.ArticleUpdateWithoutAttachmentsInput>, Prisma.ArticleUncheckedUpdateWithoutAttachmentsInput>
+}
+
 export type ArticleCreateWithoutAuthorInput = {
   id?: string
   slug: string
@@ -667,6 +688,7 @@ export type ArticleCreateWithoutAuthorInput = {
   reviewer?: Prisma.UserCreateNestedOneWithoutReviewedArticlesInput
   versions?: Prisma.ArticleVersionCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateWithoutAuthorInput = {
@@ -684,6 +706,7 @@ export type ArticleUncheckedCreateWithoutAuthorInput = {
   updatedAt: Date | string
   versions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleCreateOrConnectWithoutAuthorInput = {
@@ -711,6 +734,7 @@ export type ArticleCreateWithoutReviewerInput = {
   author: Prisma.UserCreateNestedOneWithoutAuthoredArticlesInput
   versions?: Prisma.ArticleVersionCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateWithoutReviewerInput = {
@@ -728,6 +752,7 @@ export type ArticleUncheckedCreateWithoutReviewerInput = {
   updatedAt: Date | string
   versions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutArticleInput
   bulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleCreateOrConnectWithoutReviewerInput = {
@@ -806,6 +831,7 @@ export type ArticleCreateWithoutVersionsInput = {
   author: Prisma.UserCreateNestedOneWithoutAuthoredArticlesInput
   reviewer?: Prisma.UserCreateNestedOneWithoutReviewedArticlesInput
   bulletins?: Prisma.BulletinCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateWithoutVersionsInput = {
@@ -823,6 +849,7 @@ export type ArticleUncheckedCreateWithoutVersionsInput = {
   createdAt?: Date | string
   updatedAt: Date | string
   bulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutLinkedArticleInput
+  attachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleCreateOrConnectWithoutVersionsInput = {
@@ -856,6 +883,7 @@ export type ArticleUpdateWithoutVersionsInput = {
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredArticlesNestedInput
   reviewer?: Prisma.UserUpdateOneWithoutReviewedArticlesNestedInput
   bulletins?: Prisma.BulletinUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateWithoutVersionsInput = {
@@ -873,6 +901,7 @@ export type ArticleUncheckedUpdateWithoutVersionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   bulletins?: Prisma.BulletinUncheckedUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleCreateWithoutBulletinsInput = {
@@ -890,6 +919,7 @@ export type ArticleCreateWithoutBulletinsInput = {
   author: Prisma.UserCreateNestedOneWithoutAuthoredArticlesInput
   reviewer?: Prisma.UserCreateNestedOneWithoutReviewedArticlesInput
   versions?: Prisma.ArticleVersionCreateNestedManyWithoutArticleInput
+  attachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateWithoutBulletinsInput = {
@@ -907,6 +937,7 @@ export type ArticleUncheckedCreateWithoutBulletinsInput = {
   createdAt?: Date | string
   updatedAt: Date | string
   versions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutArticleInput
+  attachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleCreateOrConnectWithoutBulletinsInput = {
@@ -940,6 +971,7 @@ export type ArticleUpdateWithoutBulletinsInput = {
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredArticlesNestedInput
   reviewer?: Prisma.UserUpdateOneWithoutReviewedArticlesNestedInput
   versions?: Prisma.ArticleVersionUpdateManyWithoutArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateWithoutBulletinsInput = {
@@ -957,6 +989,95 @@ export type ArticleUncheckedUpdateWithoutBulletinsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutArticleNestedInput
+}
+
+export type ArticleCreateWithoutAttachmentsInput = {
+  id?: string
+  slug: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.ArticleCreatedepartmentsInput | string[]
+  status?: $Enums.ArticleStatus
+  effectiveDate?: Date | string | null
+  sourceTitle?: string | null
+  importedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  author: Prisma.UserCreateNestedOneWithoutAuthoredArticlesInput
+  reviewer?: Prisma.UserCreateNestedOneWithoutReviewedArticlesInput
+  versions?: Prisma.ArticleVersionCreateNestedManyWithoutArticleInput
+  bulletins?: Prisma.BulletinCreateNestedManyWithoutLinkedArticleInput
+}
+
+export type ArticleUncheckedCreateWithoutAttachmentsInput = {
+  id?: string
+  slug: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.ArticleCreatedepartmentsInput | string[]
+  status?: $Enums.ArticleStatus
+  authorId: string
+  reviewerId?: string | null
+  effectiveDate?: Date | string | null
+  sourceTitle?: string | null
+  importedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  versions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutArticleInput
+  bulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutLinkedArticleInput
+}
+
+export type ArticleCreateOrConnectWithoutAttachmentsInput = {
+  where: Prisma.ArticleWhereUniqueInput
+  create: Prisma.XOR<Prisma.ArticleCreateWithoutAttachmentsInput, Prisma.ArticleUncheckedCreateWithoutAttachmentsInput>
+}
+
+export type ArticleUpsertWithoutAttachmentsInput = {
+  update: Prisma.XOR<Prisma.ArticleUpdateWithoutAttachmentsInput, Prisma.ArticleUncheckedUpdateWithoutAttachmentsInput>
+  create: Prisma.XOR<Prisma.ArticleCreateWithoutAttachmentsInput, Prisma.ArticleUncheckedCreateWithoutAttachmentsInput>
+  where?: Prisma.ArticleWhereInput
+}
+
+export type ArticleUpdateToOneWithWhereWithoutAttachmentsInput = {
+  where?: Prisma.ArticleWhereInput
+  data: Prisma.XOR<Prisma.ArticleUpdateWithoutAttachmentsInput, Prisma.ArticleUncheckedUpdateWithoutAttachmentsInput>
+}
+
+export type ArticleUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
+  status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  author?: Prisma.UserUpdateOneRequiredWithoutAuthoredArticlesNestedInput
+  reviewer?: Prisma.UserUpdateOneWithoutReviewedArticlesNestedInput
+  versions?: Prisma.ArticleVersionUpdateManyWithoutArticleNestedInput
+  bulletins?: Prisma.BulletinUpdateManyWithoutLinkedArticleNestedInput
+}
+
+export type ArticleUncheckedUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
+  status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  authorId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  versions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutArticleNestedInput
+  bulletins?: Prisma.BulletinUncheckedUpdateManyWithoutLinkedArticleNestedInput
 }
 
 export type ArticleCreateManyAuthorInput = {
@@ -1004,6 +1125,7 @@ export type ArticleUpdateWithoutAuthorInput = {
   reviewer?: Prisma.UserUpdateOneWithoutReviewedArticlesNestedInput
   versions?: Prisma.ArticleVersionUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateWithoutAuthorInput = {
@@ -1021,6 +1143,7 @@ export type ArticleUncheckedUpdateWithoutAuthorInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUncheckedUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
@@ -1053,6 +1176,7 @@ export type ArticleUpdateWithoutReviewerInput = {
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredArticlesNestedInput
   versions?: Prisma.ArticleVersionUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateWithoutReviewerInput = {
@@ -1070,6 +1194,7 @@ export type ArticleUncheckedUpdateWithoutReviewerInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutArticleNestedInput
   bulletins?: Prisma.BulletinUncheckedUpdateManyWithoutLinkedArticleNestedInput
+  attachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateManyWithoutReviewerInput = {
@@ -1095,11 +1220,13 @@ export type ArticleUncheckedUpdateManyWithoutReviewerInput = {
 export type ArticleCountOutputType = {
   versions: number
   bulletins: number
+  attachments: number
 }
 
 export type ArticleCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   versions?: boolean | ArticleCountOutputTypeCountVersionsArgs
   bulletins?: boolean | ArticleCountOutputTypeCountBulletinsArgs
+  attachments?: boolean | ArticleCountOutputTypeCountAttachmentsArgs
 }
 
 /**
@@ -1126,6 +1253,13 @@ export type ArticleCountOutputTypeCountBulletinsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.BulletinWhereInput
 }
 
+/**
+ * ArticleCountOutputType without action
+ */
+export type ArticleCountOutputTypeCountAttachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ArticleAttachmentWhereInput
+}
+
 
 export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1145,6 +1279,7 @@ export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   reviewer?: boolean | Prisma.Article$reviewerArgs<ExtArgs>
   versions?: boolean | Prisma.Article$versionsArgs<ExtArgs>
   bulletins?: boolean | Prisma.Article$bulletinsArgs<ExtArgs>
+  attachments?: boolean | Prisma.Article$attachmentsArgs<ExtArgs>
   _count?: boolean | Prisma.ArticleCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["article"]>
 
@@ -1206,6 +1341,7 @@ export type ArticleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   reviewer?: boolean | Prisma.Article$reviewerArgs<ExtArgs>
   versions?: boolean | Prisma.Article$versionsArgs<ExtArgs>
   bulletins?: boolean | Prisma.Article$bulletinsArgs<ExtArgs>
+  attachments?: boolean | Prisma.Article$attachmentsArgs<ExtArgs>
   _count?: boolean | Prisma.ArticleCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ArticleIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1224,6 +1360,7 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     reviewer: Prisma.$UserPayload<ExtArgs> | null
     versions: Prisma.$ArticleVersionPayload<ExtArgs>[]
     bulletins: Prisma.$BulletinPayload<ExtArgs>[]
+    attachments: Prisma.$ArticleAttachmentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1652,6 +1789,7 @@ export interface Prisma__ArticleClient<T, Null = never, ExtArgs extends runtime.
   reviewer<T extends Prisma.Article$reviewerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Article$reviewerArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   versions<T extends Prisma.Article$versionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Article$versionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArticleVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   bulletins<T extends Prisma.Article$bulletinsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Article$bulletinsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  attachments<T extends Prisma.Article$attachmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Article$attachmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArticleAttachmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2159,6 +2297,30 @@ export type Article$bulletinsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.BulletinScalarFieldEnum | Prisma.BulletinScalarFieldEnum[]
+}
+
+/**
+ * Article.attachments
+ */
+export type Article$attachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ArticleAttachment
+   */
+  select?: Prisma.ArticleAttachmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ArticleAttachment
+   */
+  omit?: Prisma.ArticleAttachmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ArticleAttachmentInclude<ExtArgs> | null
+  where?: Prisma.ArticleAttachmentWhereInput
+  orderBy?: Prisma.ArticleAttachmentOrderByWithRelationInput | Prisma.ArticleAttachmentOrderByWithRelationInput[]
+  cursor?: Prisma.ArticleAttachmentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ArticleAttachmentScalarFieldEnum | Prisma.ArticleAttachmentScalarFieldEnum[]
 }
 
 /**
