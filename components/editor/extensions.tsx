@@ -14,6 +14,7 @@ import { Table } from "@tiptap/extension-table";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
+import { DragHandle } from "@tiptap/extension-drag-handle";
 import { Markdown } from "tiptap-markdown";
 import {
   LINE_HEIGHTS,
@@ -30,6 +31,9 @@ import {
 } from "@/lib/markdown/image-attributes";
 import { FootnoteDefinitionView } from "@/components/editor/FootnoteView";
 import { ImageView } from "@/components/editor/ImageView";
+import { SlashCommands } from "@/components/editor/slash";
+import { FindHighlight } from "@/components/editor/findHighlight";
+import { createDragHandleElement } from "@/components/editor/dragHandle";
 
 /**
  * The editor's schema: Markdown in, Markdown out.
@@ -974,7 +978,16 @@ function isAllowedLinkUri(url: string): boolean {
   return value.startsWith("/") && !value.startsWith("//");
 }
 
-export function buildEditorExtensions() {
+export interface EditorExtensionOptions {
+  /** Opens the host's link dialog (the dialog state lives in the host). */
+  onLink: () => void;
+  /** Opens the host's hidden image file input → ImageDialog. */
+  onImage: () => void;
+}
+
+export function buildEditorExtensions(options: Partial<EditorExtensionOptions> = {}) {
+  const onLink = options.onLink ?? (() => {});
+  const onImage = options.onImage ?? (() => {});
   return [
     StarterKit.configure({
       // Paragraphs and headings are re-declared below: their stored form
@@ -1042,6 +1055,35 @@ export function buildEditorExtensions() {
       breaks: false,
       transformPastedText: true,
       transformCopiedText: false,
+    }),
+    // Editor chrome: the `/` command menu, the drag handle, and find-match
+    // decorations. The slash menu's host callbacks come from the host, because
+    // the link dialog and the image file input live there.
+    SlashCommands.configure({ onLink, onImage }),
+    FindHighlight,
+    DragHandle.configure({
+      render: createDragHandleElement,
+      // Nested handles are enabled so list items get one too; the default rules
+      // already exclude table structure (rows/cells) and deprioritise the list
+      // wrapper, and the rule below additionally excludes footnote definitions
+      // (which must stay at the document tail) and anything nested in a table
+      // cell.
+      nested: {
+        defaultRules: true,
+        rules: [
+          {
+            id: "excludeFootnotesAndTables",
+            evaluate: ({ node, $pos }) => {
+              if (node.type.name === "footnoteDefinition") return 1000;
+              for (let depth = $pos.depth; depth > 0; depth -= 1) {
+                const name = $pos.node(depth).type.name;
+                if (name === "table" || name === "tableRow" || name === "tableCell" || name === "tableHeader") return 1000;
+              }
+              return 0;
+            },
+          },
+        ],
+      },
     }),
   ];
 }

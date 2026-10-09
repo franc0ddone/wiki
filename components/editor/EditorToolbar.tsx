@@ -33,6 +33,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { CALLOUT_LABELS } from "@/components/editor/extensions";
+import { FORMAT_COMMANDS } from "@/components/editor/formatCommands";
 import { LINE_HEIGHTS, LINE_HEIGHT_LABELS, type LineHeight } from "@/lib/markdown/block-attributes";
 import { CALLOUT_VARIANTS, type CalloutVariant } from "@/lib/markdown/parser";
 import { cx } from "@/lib/utils";
@@ -283,10 +284,10 @@ export function EditorToolbar({
         onKeyDown={onKeyDown}
         className="flex flex-wrap items-center gap-0.5 px-2 py-1.5"
       >
-        <ToolButton label="Bold" shortcut="Ctrl+B" active={state.bold} onClick={() => chain().toggleBold().run()}>
+        <ToolButton label="Bold" shortcut="Ctrl+B" active={state.bold} onClick={() => FORMAT_COMMANDS.bold.run(editor)}>
           <Bold size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Italic" shortcut="Ctrl+I" active={state.italic} onClick={() => chain().toggleItalic().run()}>
+        <ToolButton label="Italic" shortcut="Ctrl+I" active={state.italic} onClick={() => FORMAT_COMMANDS.italic.run(editor)}>
           <Italic size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
         <ToolButton label="Subscript" shortcut="Ctrl+," active={state.subscript} onClick={() => chain().toggleSubscript().run()}>
@@ -295,7 +296,7 @@ export function EditorToolbar({
         <ToolButton label="Superscript" shortcut="Ctrl+." active={state.superscript} onClick={() => chain().toggleSuperscript().run()}>
           <Superscript size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Highlight" shortcut="Ctrl+Shift+H" active={state.highlight} onClick={() => chain().toggleHighlight().run()}>
+        <ToolButton label="Highlight" shortcut="Ctrl+Shift+H" active={state.highlight} onClick={() => FORMAT_COMMANDS.highlight.run(editor)}>
           <Highlighter size={16} strokeWidth={1.75} aria-hidden="true" />
         </ToolButton>
         <Divider />
@@ -307,16 +308,16 @@ export function EditorToolbar({
         </ToolButton>
         <Divider />
         <div role="group" aria-label="Paragraph formatting" className="flex items-center gap-0.5">
-          <ToolButton label="Align left" shortcut="Ctrl+Shift+L" active={state.alignLeft} onClick={() => chain().toggleTextAlign("left").run()}>
+          <ToolButton label="Align left" shortcut="Ctrl+Shift+L" active={state.alignLeft} onClick={() => FORMAT_COMMANDS.alignLeft.run(editor)}>
             <AlignLeft size={16} strokeWidth={1.75} aria-hidden="true" />
           </ToolButton>
-          <ToolButton label="Align center" shortcut="Ctrl+Shift+E" active={state.alignCenter} onClick={() => chain().toggleTextAlign("center").run()}>
+          <ToolButton label="Align center" shortcut="Ctrl+Shift+E" active={state.alignCenter} onClick={() => FORMAT_COMMANDS.alignCenter.run(editor)}>
             <AlignCenter size={16} strokeWidth={1.75} aria-hidden="true" />
           </ToolButton>
-          <ToolButton label="Align right" shortcut="Ctrl+Shift+R" active={state.alignRight} onClick={() => chain().toggleTextAlign("right").run()}>
+          <ToolButton label="Align right" shortcut="Ctrl+Shift+R" active={state.alignRight} onClick={() => FORMAT_COMMANDS.alignRight.run(editor)}>
             <AlignRight size={16} strokeWidth={1.75} aria-hidden="true" />
           </ToolButton>
-          <ToolButton label="Justify" shortcut="Ctrl+Shift+J" active={state.alignJustify} onClick={() => chain().toggleTextAlign("justify").run()}>
+          <ToolButton label="Justify" shortcut="Ctrl+Shift+J" active={state.alignJustify} onClick={() => FORMAT_COMMANDS.alignJustify.run(editor)}>
             <AlignJustify size={16} strokeWidth={1.75} aria-hidden="true" />
           </ToolButton>
           <label htmlFor="line-spacing" className="sr-only">

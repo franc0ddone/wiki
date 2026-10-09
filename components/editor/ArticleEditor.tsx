@@ -1,13 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, History, OctagonAlert } from "lucide-react";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
+import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
+import { DropImagePopover } from "@/components/editor/DropImagePopover";
+import { useImageDrop } from "@/components/editor/useImageDrop";
 import { buildEditorExtensions } from "@/components/editor/extensions";
 import { ImageDialog, type ImageDialogMode } from "@/components/editor/ImageDialog";
 import { LinkDialog } from "@/components/editor/LinkDialog";
@@ -133,6 +137,10 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [imageDialog, setImageDialog] = useState<ImageDialogMode | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  // Bumped by the slash menu's "image" item; the effect below opens the file
+  // picker, so the extension never closes over a ref.
+  const [imagePickerNonce, setImagePickerNonce] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const feedbackRef = useRef<HTMLDivElement | null>(null);
@@ -141,7 +149,14 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const isNew = slug === null;
 
   /* ----------------------------------------------------------- the editor */
-  const [extensions] = useState(() => buildEditorExtensions());
+  const [extensions] = useState(() =>
+    buildEditorExtensions({
+      // The slash menu's image and link items reach back into the host, which
+      // owns the file input and the dialog state.
+      onLink: () => setLinkDialogOpen(true),
+      onImage: () => setImagePickerNonce((value) => value + 1),
+    }),
+  );
   const editor = useEditor({
     extensions,
     content: initialMarkdown,
@@ -164,6 +179,24 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
     },
     onUpdate: ({ editor: updated }) => setMarkdown(readMarkdown(updated)),
   });
+
+  // Drag-and-drop image insertion: this host owns its own drop popover.
+  const drop = useImageDrop(editor);
+
+  // The slash menu's "image" item bumps the nonce; open the file picker here.
+  useEffect(() => {
+    if (imagePickerNonce > 0) fileInputRef.current?.click();
+  }, [imagePickerNonce]);
+
+  // Ctrl+H opens find/replace — only while the editor or the find bar has focus
+  // (the handler is a capture listener on the wrapper that holds both). Unlike
+  // the window-level Ctrl+S listener below, this one never fires from anywhere
+  // else on the page, and it preventDefaults Edge's History shortcut.
+  const onFindKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key.toLowerCase() !== "h" || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    event.preventDefault();
+    setFindOpen(true);
+  };
 
   /* ----------------------------------------------------------- validation */
   const debouncedMarkdown = useDebouncedValue(markdown, 300);
@@ -475,15 +508,34 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
 
           <section aria-label="Procedure body" className="rounded-xl border border-zinc-300/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)] ring-1 ring-black/[0.04]">
             {editor ? <EditorToolbar editor={editor} onLink={openLinkDialog} onImage={handleImage} /> : <div className="h-11 border-b border-zinc-200" />}
-            <div className="px-6 py-6 md:px-10 md:py-8">
-              {editor ? (
-                <EditorContent editor={editor} />
-              ) : (
+            {editor ? (
+              <div
+                onKeyDownCapture={onFindKeyDownCapture}
+                onDragOver={drop.onDragOver}
+                onDrop={drop.onDrop}
+              >
+                {findOpen ? <FindReplaceBar editor={editor} onClose={() => setFindOpen(false)} /> : null}
+                <div className="px-6 py-6 md:px-10 md:py-8">
+                  <EditorBubbleMenu editor={editor} linkDialogOpen={linkDialogOpen} onLink={openLinkDialog} />
+                  <EditorContent editor={editor} />
+                </div>
+                {drop.pending ? (
+                  <DropImagePopover
+                    editor={editor}
+                    file={drop.pending.file}
+                    pos={drop.pending.pos}
+                    anchor={drop.pending.anchor}
+                    onClose={drop.clear}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <div className="px-6 py-6 md:px-10 md:py-8">
                 <p className="text-[13px] text-zinc-500" role="status">
                   Loading editor…
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </section>
 
           <input

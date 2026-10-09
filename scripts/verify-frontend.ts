@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { EditorState } from "@tiptap/pm/state";
 import type { Transaction } from "@tiptap/pm/state";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { Schema } from "@tiptap/pm/model";
 import {
   closeDoubleQuote,
@@ -72,6 +73,19 @@ import {
   roleAfterApproval,
 } from "@/lib/role-requests";
 import { KNOWLEDGE_ARTICLES, BULLETINS, STAFF_DIRECTORY } from "@/lib/mock-data";
+import {
+  BUBBLE_FORMAT_ORDER,
+  FORMAT_COMMANDS,
+  TOOLBAR_FORMAT_ORDER,
+  bold as formatBold,
+  formatCommandsFor,
+  highlight as formatHighlight,
+  italic as formatItalic,
+} from "@/components/editor/formatCommands";
+import { SLASH_ITEMS, filterSlashItems } from "@/components/editor/slashItems";
+import { canInsertDroppedImage } from "@/lib/editor/image-validation";
+import { findMatches, replaceAllInDoc, stepMatchIndex } from "@/lib/editor/find";
+import { shouldShowBubbleMenu } from "@/lib/editor/bubble";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -637,6 +651,9 @@ check("the editor schema is wired once, and typography only rewrites what it sho
     "highlight",
     "inlineDelimiters",
     "typography",
+    "slashCommands",
+    "findHighlight",
+    "dragHandle",
   ]) {
     assert.ok(names.includes(required), `the editor schema is missing ${required}`);
   }
@@ -654,6 +671,137 @@ check("the editor schema is wired once, and typography only rewrites what it sho
   assert.equal(options.multiplication, false, "`2 x 3` must stay as typed");
   assert.equal(options.superscriptTwo, false, "`10^2` must stay as typed");
   assert.equal(options.rightArrow, false, "`->` must stay as typed");
+});
+
+console.log("editor chrome: format commands");
+check("the toolbar and the bubble menu resolve to the same format commands", () => {
+  // Both surfaces render from FORMAT_COMMANDS; `formatCommandsFor` hands back the
+  // very same objects, so a change to one is a change to both.
+  assert.equal(formatCommandsFor(TOOLBAR_FORMAT_ORDER)[0], FORMAT_COMMANDS.bold);
+  assert.equal(formatCommandsFor(BUBBLE_FORMAT_ORDER)[0], FORMAT_COMMANDS.bold);
+  assert.equal(FORMAT_COMMANDS.bold.run, formatBold);
+  assert.equal(FORMAT_COMMANDS.italic.run, formatItalic);
+  assert.equal(FORMAT_COMMANDS.highlight.run, formatHighlight);
+});
+check("the bubble menu shows exactly bold, italic, link, highlight and alignment", () => {
+  assert.deepEqual([...BUBBLE_FORMAT_ORDER], [
+    "bold",
+    "italic",
+    "link",
+    "highlight",
+    "alignLeft",
+    "alignCenter",
+    "alignRight",
+    "alignJustify",
+  ]);
+  // Every bubble item is a toolbar item too — one registry, two surfaces.
+  for (const id of BUBBLE_FORMAT_ORDER) assert.ok(TOOLBAR_FORMAT_ORDER.includes(id), `${id} is not in the toolbar`);
+});
+
+console.log("editor chrome: slash registry");
+check("the slash registry holds all 17 items with unique ids", () => {
+  assert.equal(SLASH_ITEMS.length, 17, `items: ${SLASH_ITEMS.map((item) => item.id).join(", ")}`);
+  assert.equal(new Set(SLASH_ITEMS.map((item) => item.id)).size, SLASH_ITEMS.length);
+  for (const item of SLASH_ITEMS) {
+    assert.equal(typeof item.label, "string");
+    assert.equal(typeof item.run, "function");
+    assert.ok(item.icon, `${item.id} has no icon`);
+  }
+  // H1 is deliberately absent (the article title is the page's <h1>).
+  assert.ok(!SLASH_ITEMS.some((item) => item.id === "heading-1"));
+  assert.deepEqual(
+    SLASH_ITEMS.filter((item) => item.id.startsWith("callout-")).map((item) => item.id),
+    ["callout-note", "callout-tip", "callout-dosing", "callout-protocol", "callout-warning", "callout-critical"],
+  );
+});
+check("filterSlashItems filters by label, id and keyword", () => {
+  assert.equal(filterSlashItems("").length, 17, "an empty query keeps everything");
+  assert.deepEqual(filterSlashItems("warning").map((item) => item.id), ["callout-warning"]);
+  assert.deepEqual(filterSlashItems("WARN").map((item) => item.id), ["callout-warning"], "matching is case-insensitive");
+  assert.equal(filterSlashItems("callout").length, 6, "all six callouts match the shared keyword");
+  assert.deepEqual(filterSlashItems("heading").map((item) => item.id), ["heading-2", "heading-3"]);
+  assert.deepEqual(filterSlashItems("mermaid").map((item) => item.id), ["mermaid"]);
+  assert.deepEqual(filterSlashItems("zzzznope"), []);
+});
+
+console.log("editor chrome: dropped images");
+check("canInsertDroppedImage refuses missing alt / unchecked PHI", () => {
+  assert.equal(canInsertDroppedImage({ alt: "ok alt", phiConfirmed: true }).ok, true);
+  const noAlt = canInsertDroppedImage({ alt: "", phiConfirmed: true });
+  assert.equal(noAlt.ok, false);
+  assert.ok(noAlt.altError, "missing alt text must be reported");
+  assert.equal(noAlt.phiError, null);
+  const noPhi = canInsertDroppedImage({ alt: "ok alt", phiConfirmed: false });
+  assert.equal(noPhi.ok, false);
+  assert.ok(noPhi.phiError, "unconfirmed PHI must be reported");
+  assert.equal(noPhi.altError, null);
+  assert.equal(canInsertDroppedImage({ alt: "ab", phiConfirmed: true }).ok, false, "alt under 3 characters is refused");
+  assert.equal(canInsertDroppedImage({ alt: "x".repeat(251), phiConfirmed: true }).ok, false, "alt over 250 characters is refused");
+});
+
+console.log("editor chrome: find & replace");
+const CHROME_SCHEMA = new Schema({
+  nodes: {
+    doc: { content: "block+" },
+    paragraph: { content: "inline*", group: "block" },
+    codeBlock: { content: "text*", group: "block", marks: "", code: true, defining: true },
+    image: { group: "block", atom: true },
+    text: { group: "inline" },
+  },
+  marks: {},
+});
+const paragraphOf = (text: string) => CHROME_SCHEMA.node("paragraph", null, text.length ? [CHROME_SCHEMA.text(text)] : []);
+const docOf = (...nodes: ReturnType<typeof paragraphOf>[]) => CHROME_SCHEMA.node("doc", null, nodes);
+
+check("findMatches returns every literal occurrence, case-insensitively by default", () => {
+  const doc = docOf(paragraphOf("The dog and the cat and the dog."));
+  assert.equal(findMatches(doc, "dog").length, 2);
+  assert.equal(findMatches(doc, "Dog").length, 2, "case-insensitive by default");
+  assert.equal(findMatches(doc, "Dog", true).length, 0, "match-case on: 'Dog' is not in the text");
+  assert.equal(findMatches(doc, "dog", true).length, 2);
+  assert.deepEqual(findMatches(doc, ""), [], "an empty query matches nothing");
+  assert.equal(findMatches(doc, "the").length, 3);
+});
+check("findMatches searches code blocks and every text node", () => {
+  const doc = docOf(paragraphOf("alpha"), CHROME_SCHEMA.node("codeBlock", null, [CHROME_SCHEMA.text("alpha")]));
+  assert.equal(findMatches(doc, "alpha").length, 2);
+});
+check("replaceAllInDoc replaces every match in one pass, literally", () => {
+  const doc = docOf(paragraphOf("a a a"));
+  const result = replaceAllInDoc(doc, "a", "b");
+  assert.equal(result.count, 3);
+  assert.equal(result.doc.textContent, "b b b");
+  // One call, one returned document → the caller applies it as one transaction.
+  // The replacement is literal: Markdown is never interpreted.
+  const literal = replaceAllInDoc(docOf(paragraphOf("x x")), "x", "**b**");
+  assert.equal(literal.doc.textContent, "**b** **b**");
+  assert.equal(replaceAllInDoc(doc, "", "b").count, 0, "an empty query changes nothing");
+  assert.equal(replaceAllInDoc(doc, "zzz", "b").count, 0);
+});
+check("stepMatchIndex wraps around at both ends", () => {
+  assert.equal(stepMatchIndex(0, 1, 3), 1);
+  assert.equal(stepMatchIndex(2, 1, 3), 0, "next from the last wraps to the first");
+  assert.equal(stepMatchIndex(0, -1, 3), 2, "previous from the first wraps to the last");
+  assert.equal(stepMatchIndex(0, 1, 0), 0, "no matches is a no-op");
+});
+
+console.log("editor chrome: bubble menu visibility");
+check("shouldShowBubbleMenu needs a non-empty TextSelection outside code", () => {
+  const paragraphDoc = docOf(paragraphOf("hello world"));
+  const collapsed = EditorState.create({ doc: paragraphDoc, schema: CHROME_SCHEMA, selection: TextSelection.create(paragraphDoc, 3) });
+  assert.equal(shouldShowBubbleMenu(collapsed, false), false, "a collapsed selection hides the menu");
+
+  const ranged = EditorState.create({ doc: paragraphDoc, schema: CHROME_SCHEMA, selection: TextSelection.create(paragraphDoc, 1, 5) });
+  assert.equal(shouldShowBubbleMenu(ranged, false), true, "a non-empty TextSelection shows the menu");
+  assert.equal(shouldShowBubbleMenu(ranged, true), false, "the open link dialog hides the menu");
+
+  const codeDoc = docOf(CHROME_SCHEMA.node("codeBlock", null, [CHROME_SCHEMA.text("let x = 1")]));
+  const codeSel = EditorState.create({ doc: codeDoc, schema: CHROME_SCHEMA, selection: TextSelection.create(codeDoc, 1, 4) });
+  assert.equal(shouldShowBubbleMenu(codeSel, false), false, "a selection inside a code block hides the menu");
+
+  const imageDoc = docOf(CHROME_SCHEMA.node("image"));
+  const nodeSel = EditorState.create({ doc: imageDoc, schema: CHROME_SCHEMA, selection: NodeSelection.create(imageDoc, 0) });
+  assert.equal(shouldShowBubbleMenu(nodeSel, false), false, "a NodeSelection (e.g. an image) hides the menu");
 });
 
 console.log(`\n${passed} checks passed.`);

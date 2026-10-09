@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
 import { Eye, OctagonAlert, PenLine, TriangleAlert } from "lucide-react";
 import { ArticleSearch } from "@/components/editor/ArticleSearch";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
+import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
+import { DropImagePopover } from "@/components/editor/DropImagePopover";
+import { useImageDrop } from "@/components/editor/useImageDrop";
 import { buildEditorExtensions } from "@/components/editor/extensions";
 import { ImageDialog, type ImageDialogMode } from "@/components/editor/ImageDialog";
 import { LinkDialog } from "@/components/editor/LinkDialog";
@@ -102,11 +107,18 @@ export default function BulletinComposer({
   const [serverError, setServerError] = useState<{ status: number; message: string } | null>(null);
   const [imageDialog, setImageDialog] = useState<ImageDialogMode | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [imagePickerNonce, setImagePickerNonce] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canPostRestricted = roleAtLeast(role, "clinical_lead");
 
-  const [extensions] = useState(() => buildEditorExtensions());
+  const [extensions] = useState(() =>
+    buildEditorExtensions({
+      onLink: () => setLinkDialogOpen(true),
+      onImage: () => setImagePickerNonce((value) => value + 1),
+    }),
+  );
   const editor = useEditor({
     extensions,
     content: initial?.body_markdown ?? "",
@@ -123,6 +135,21 @@ export default function BulletinComposer({
     onCreate: ({ editor: created }) => setMarkdown(readMarkdown(created)),
     onUpdate: ({ editor: updated }) => setMarkdown(readMarkdown(updated)),
   });
+
+  // Drag-and-drop image insertion — this host owns its own drop popover.
+  const drop = useImageDrop(editor);
+
+  // The slash menu's "image" item bumps the nonce; open the file picker here.
+  useEffect(() => {
+    if (imagePickerNonce > 0) fileInputRef.current?.click();
+  }, [imagePickerNonce]);
+
+  // Ctrl+H opens find/replace while the editor or the find bar has focus.
+  const onFindKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key.toLowerCase() !== "h" || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    event.preventDefault();
+    setFindOpen(true);
+  };
 
   const linkedId = useMemo(
     () => articles.find((article) => article.slug === linkedSlug)?.id ?? null,
@@ -303,7 +330,7 @@ export default function BulletinComposer({
 
           <div className="rounded-xl border border-zinc-300/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
             {tab === "write" ? (
-              <>
+              <div onKeyDownCapture={onFindKeyDownCapture} onDragOver={drop.onDragOver} onDrop={drop.onDrop}>
                 {editor ? (
                   <EditorToolbar
                     editor={editor}
@@ -323,16 +350,29 @@ export default function BulletinComposer({
                 ) : (
                   <div className="h-11 border-b border-zinc-200" />
                 )}
+                {editor && findOpen ? <FindReplaceBar editor={editor} onClose={() => setFindOpen(false)} /> : null}
                 <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
                   {editor ? (
-                    <EditorContent editor={editor} />
+                    <>
+                      <EditorBubbleMenu editor={editor} linkDialogOpen={linkDialogOpen} onLink={() => setLinkDialogOpen(true)} />
+                      <EditorContent editor={editor} />
+                    </>
                   ) : (
                     <p className="text-[13px] text-zinc-500" role="status">
                       Loading editor…
                     </p>
                   )}
                 </div>
-              </>
+                {editor && drop.pending ? (
+                  <DropImagePopover
+                    editor={editor}
+                    file={drop.pending.file}
+                    pos={drop.pending.pos}
+                    anchor={drop.pending.anchor}
+                    onClose={drop.clear}
+                  />
+                ) : null}
+              </div>
             ) : (
               <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
                 <MarkdownReader source={markdown.length > 0 ? markdown : "_Nothing to preview yet._"} showTableOfContents={false} />

@@ -623,3 +623,50 @@ input[type="search"]::-webkit-search-decoration {
 .dw-footnote-def-body > p {
   margin: 0;
 }
+
+/* --------------------------------------------------------- editor chrome */
+
+/* The gutter grip the drag handle extension positions beside the hovered
+   block. The extension owns its position (floating-ui writes left/top), so
+   only the appearance lives here. */
+.dw-drag-handle {
+  display: flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  cursor: grab;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  color: #a1a1aa;
+  opacity: 1;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dw-drag-handle:hover {
+  background: #f4f4f5;
+  color: #52525b;
+}
+
+.dw-drag-handle:active {
+  cursor: grabbing;
+}
+
+.dw-drag-handle[data-dragging="true"] {
+  opacity: 1;
+}
+
+/* Find & replace decorations — deliberately a different hue from the `mark`
+   highlight above, so a match never looks like stored formatting. */
+.dw-find-match {
+  border-radius: 2px;
+  background: rgba(56, 189, 248, 0.28);
+}
+
+.dw-find-active {
+  border-radius: 2px;
+  background: rgba(13, 148, 136, 0.42);
+  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.55);
+}
+

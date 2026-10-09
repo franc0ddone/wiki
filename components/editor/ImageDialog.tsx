@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ImagePlus, ShieldAlert } from "lucide-react";
 import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import { ApiRequestError, uploadImage } from "@/lib/editor/api";
+import { CAPTION_MAX, altTextProblem, captionProblem } from "@/lib/editor/image-validation";
 
 /**
  * Image insertion / editing: PHI confirmation → alt text (+ optional caption)
@@ -26,10 +27,6 @@ export interface ImageDialogResult {
   /** Empty string means "no caption"; the editor stores `null`. */
   title: string;
 }
-
-const ALT_MIN = 3;
-const ALT_MAX = 250;
-const CAPTION_MAX = 200;
 
 export function ImageDialog({
   mode,
@@ -60,14 +57,8 @@ export function ImageDialog({
 
   const trimmed = alt.trim();
   const trimmedCaption = caption.trim();
-  const altError =
-    trimmed.length < ALT_MIN
-      ? "Describe what the image shows, in a few words — it is read aloud to people who cannot see it."
-      : trimmed.length > ALT_MAX
-        ? `Alt text is ${trimmed.length} characters; keep it under ${ALT_MAX}.`
-        : null;
-  const captionError =
-    trimmedCaption.length > CAPTION_MAX ? `Keep the caption under ${CAPTION_MAX} characters.` : null;
+  const altError = altTextProblem(alt);
+  const captionError = captionProblem(caption);
 
   const submit = async () => {
     setTouched(true);
