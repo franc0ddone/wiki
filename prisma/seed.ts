@@ -61,7 +61,7 @@ const ROLE_BY_SYSTEM_ID: Record<string, Role> = {
   "EH-1188": "staff", // Trevor Lindqvist — ICU Technician II
 };
 
-const DEV_FALLBACK_PASSWORD = "dove-wiki-dev-password";
+const DEV_FALLBACK_PASSWORD = "dove-hub-dev-password";
 
 async function main() {
   const password = process.env.SEED_DEFAULT_PASSWORD?.trim() || DEV_FALLBACK_PASSWORD;

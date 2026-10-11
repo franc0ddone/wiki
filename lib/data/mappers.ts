@@ -72,8 +72,11 @@ export interface BulletinRowInput {
   format: BulletinFormat;
   kicker: string | null;
   deck: string | null;
+  heroImageUrl: string | null;
   linkedArticleId: string | null;
   publishedAt: Date;
+  /** Prisma column `expires_at`; `null` when the notice never ages out. */
+  expiresAt: Date | null;
   author: AuthorRow | null;
 }
 
@@ -88,9 +91,16 @@ export function toBulletin(row: BulletinRowInput): Bulletin {
     // `bulletin.kicker` stays falsy exactly as it did for the old fixtures.
     ...(row.kicker ? { kicker: row.kicker } : {}),
     ...(row.deck ? { deck: row.deck } : {}),
+    // The hero banner is omitted entirely when absent, the same way `kicker`
+    // and `deck` are — a bulletin with no hero keeps the exact shape the
+    // phase-1 fixtures had (callers read it back with `?? null`).
+    ...(row.heroImageUrl ? { hero_image_url: row.heroImageUrl } : {}),
     body_markdown: row.bodyMarkdown,
     created_at: row.publishedAt.toISOString(),
     author_name: formatAuthorName(row.author),
+    // The expiry travels as an ISO string, or `null` for a notice that never
+    // ages out. The board's active/expired partition reads exactly this.
+    expires_at: row.expiresAt ? row.expiresAt.toISOString() : null,
     // Optional in the portal type: omitted entirely when there is no link, so
     // `bulletin.linked_sop_id` stays falsy exactly as in the fixtures.
     ...(row.linkedArticleId ? { linked_sop_id: row.linkedArticleId } : {}),

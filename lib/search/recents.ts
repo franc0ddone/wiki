@@ -9,7 +9,7 @@
  * list appears right after hydration.
  */
 
-const STORAGE_KEY = "dovewiki.recent-searches";
+const STORAGE_KEY = "dovehub.recent-searches";
 export const MAX_RECENT_SEARCHES = 8;
 
 const EMPTY: readonly string[] = Object.freeze([]);

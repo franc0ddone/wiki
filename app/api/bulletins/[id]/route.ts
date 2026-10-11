@@ -11,6 +11,7 @@ import {
 import { requireRole } from "@/lib/auth";
 import { deleteBulletin, updateBulletin, type UpdateBulletinInput } from "@/lib/data/bulletins";
 import { DECK_MAX_LENGTH, KICKER_MAX_LENGTH, isBulletinFormat } from "@/lib/bulletin/format";
+import { normalizeHeroImageUrl } from "@/lib/bulletin/hero";
 import { roleAtLeast } from "@/lib/roles";
 
 /**
@@ -60,6 +61,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (body.deck !== undefined) {
       patch.deck = optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null;
+    }
+
+    // The hero banner is nullable; an empty string clears it, and a value that
+    // is neither an https URL nor a relative portal path is refused with 422.
+    if (body.heroImageUrl !== undefined) {
+      patch.hero_image_url = normalizeHeroImageUrl(optionalString(body, "heroImageUrl"));
     }
 
     if (body.priority !== undefined) {

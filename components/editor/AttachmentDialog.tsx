@@ -11,10 +11,8 @@ import { cx } from "@/lib/utils";
 /**
  * Attach a file to a procedure (PDF / DOCX / XLSX, ≤ 25 MB).
  *
- * The upload is gated on an unchecked-by-default PHI confirmation: the POST is
- * refused (422) until the box is ticked, and nothing reaches storage before
- * that. The 25 MB cap and the magic-byte type check are enforced server-side —
- * the client-side size hint just avoids a pointless round trip.
+ * The 25 MB cap and the magic-byte type check are enforced server-side — the
+ * client-side size hint just avoids a pointless round trip.
  */
 export function AttachmentDialog({
   slug,
@@ -26,20 +24,19 @@ export function AttachmentDialog({
   onUploaded: (fileName: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [phi, setPhi] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const inputId = useId();
 
   const tooLarge = file !== null && file.size > ATTACHMENT_MAX_BYTES;
-  const canSubmit = file !== null && phi && !tooLarge && !busy;
+  const canSubmit = file !== null && !tooLarge && !busy;
 
   const submit = async () => {
-    if (!file || !phi || busy) return;
+    if (!file || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const record = await uploadAttachment(slug, file, phi);
+      const record = await uploadAttachment(slug, file);
       onUploaded(record.file_name);
     } catch (caught) {
       setError(
@@ -88,19 +85,6 @@ export function AttachmentDialog({
             </p>
           ) : null}
         </div>
-
-        <label className="flex items-start gap-2.5 rounded-[10px] border border-zinc-300/60 bg-zinc-50/70 px-3.5 py-3">
-          <input
-            type="checkbox"
-            checked={phi}
-            disabled={busy}
-            onChange={(event) => setPhi(event.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-400 text-[#0F766E] focus:ring-teal-600/30"
-          />
-          <span className="text-[13px] leading-5 text-zinc-700">
-            I confirm this file contains no patient data (PHI).
-          </span>
-        </label>
 
         {error ? (
           <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-900">

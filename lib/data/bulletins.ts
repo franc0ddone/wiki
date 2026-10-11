@@ -147,6 +147,8 @@ export interface CreateBulletinInput {
   /** Featured-only fields. */
   kicker?: string | null;
   deck?: string | null;
+  /** Featured / announcement hero banner. `null` = none. */
+  hero_image_url?: string | null;
   /** `expires_at` as posted; `undefined` means "apply the default for priority". */
   expires_at?: Date | null;
   linked_article_id?: string | null;
@@ -201,6 +203,7 @@ export async function createBulletin(input: CreateBulletinInput): Promise<Bullet
       // normalised to null so the reader's falsy checks behave.
       kicker: input.kicker?.trim() ? input.kicker.trim() : null,
       deck: input.deck?.trim() ? input.deck.trim() : null,
+      heroImageUrl: input.hero_image_url?.trim() ? input.hero_image_url.trim() : null,
       linkedArticleId: input.linked_article_id ?? null,
       authorId: input.author_id,
       publishedAt: now,
@@ -293,6 +296,8 @@ export interface UpdateBulletinInput {
   format?: BulletinFormat;
   kicker?: string | null;
   deck?: string | null;
+  /** Featured / announcement hero banner. `null` = none. */
+  hero_image_url?: string | null;
   expires_at?: Date | null;
   linked_article_id?: string | null;
 }
@@ -339,6 +344,7 @@ export async function updateBulletin(
       format: true,
       kicker: true,
       deck: true,
+      heroImageUrl: true,
       expiresAt: true,
       linkedArticleId: true,
     },
@@ -354,6 +360,10 @@ export async function updateBulletin(
   const nextFormat = patch.format ?? current.format;
   const nextKicker = patch.kicker === undefined ? current.kicker : (patch.kicker?.trim() ? patch.kicker.trim() : null);
   const nextDeck = patch.deck === undefined ? current.deck : (patch.deck?.trim() ? patch.deck.trim() : null);
+  const nextHeroImage =
+    patch.hero_image_url === undefined
+      ? current.heroImageUrl
+      : (patch.hero_image_url?.trim() ? patch.hero_image_url.trim() : null);
   const nextLinked =
     patch.linked_article_id === undefined ? current.linkedArticleId : patch.linked_article_id;
 
@@ -399,6 +409,7 @@ export async function updateBulletin(
         format: nextFormat,
         kicker: nextKicker,
         deck: nextDeck,
+        heroImageUrl: nextHeroImage,
         linkedArticleId: nextLinked,
         expiresAt: nextExpires,
       },

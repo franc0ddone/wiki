@@ -226,6 +226,8 @@ export interface MasterDetailShellProps<T> {
   listSubtitle?: string;
   /** Optional controls beside the rail title (e.g. a "New" button). */
   listActions?: ReactNode;
+  /** Rendered below the list inside the same scroll container (e.g. an expired tray). */
+  listFooter?: ReactNode;
 
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -252,6 +254,7 @@ export function MasterDetailShell<T>({
   listTitle,
   listSubtitle,
   listActions,
+  listFooter,
   searchQuery,
   onSearchChange,
   searchPlaceholder,
@@ -350,6 +353,7 @@ export function MasterDetailShell<T>({
               })}
             </ul>
           )}
+          {listFooter}
         </div>
       </aside>
 

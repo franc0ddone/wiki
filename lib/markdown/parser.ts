@@ -1,5 +1,5 @@
 /**
- * Block-level markdown parser for the clinical subset Dove Wiki stores.
+ * Block-level markdown parser for the clinical subset Dove Hub stores.
  *
  * Pure and framework-free: `components/MarkdownReader.tsx` renders its output,
  * `lib/search/*` reads headings from it, and `lib/links.ts` derives heading ids

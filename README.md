@@ -1,4 +1,4 @@
-# Dove Wiki
+# Dove Hub
 
 Internal operations hub for Dove Lewis Emergency Animal Hospital — a bulletin
 board, a knowledge base of standard operating procedures, and a staff directory.

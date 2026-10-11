@@ -1,10 +1,7 @@
 /**
- * Alt-text / caption / PHI validation, shared by the image dialog and the
+ * Alt-text / caption validation, shared by the image dialog and the
  * drag-and-drop popover so the two never disagree about what an acceptable
  * image is. Pure and DOM-free.
- *
- * A hospital rule sits on top of the usual accessibility rule: nothing is
- * uploaded before the author confirms the file holds no patient information.
  */
 
 export const ALT_MIN = 3;
@@ -27,21 +24,17 @@ export function captionProblem(caption: string): string | null {
   return caption.trim().length > CAPTION_MAX ? `Keep the caption under ${CAPTION_MAX} characters.` : null;
 }
 
-export const PHI_REQUIRED_MESSAGE = "Confirm this file contains no patient data (PHI) before inserting it.";
-
 export interface DroppedImageDecision {
-  /** `true` only when alt text is acceptable AND PHI has been confirmed. */
+  /** `true` only when alt text is acceptable. */
   ok: boolean;
   altError: string | null;
-  phiError: string | null;
 }
 
 /**
- * The gate the drag-and-drop popover applies before uploading: PHI first, then
- * alt text — the same order (and the same messages) as the dialog.
+ * The gate the drag-and-drop popover applies before uploading: alt text — the
+ * same rule (and the same message) as the dialog.
  */
-export function canInsertDroppedImage({ alt, phiConfirmed }: { alt: string; phiConfirmed: boolean }): DroppedImageDecision {
+export function canInsertDroppedImage({ alt }: { alt: string }): DroppedImageDecision {
   const altError = altTextProblem(alt);
-  const phiError = phiConfirmed ? null : PHI_REQUIRED_MESSAGE;
-  return { ok: altError === null && phiError === null, altError, phiError };
+  return { ok: altError === null, altError };
 }

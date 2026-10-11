@@ -16,8 +16,8 @@ import { auth } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Sign in · Dove Wiki",
-  description: "Sign in to Dove Wiki — the operations hub for Dove Lewis Emergency Animal Hospital.",
+  title: "Sign in · Dove Hub",
+  description: "Sign in to Dove Hub — the operations hub for Dove Lewis Emergency Animal Hospital.",
 };
 
 export default async function LandingPage({

@@ -50,7 +50,7 @@ export default async function PortalPage({
 
   const [articles, bulletins, staff, params] = await Promise.all([
     getArticles(),
-    getBulletins(),
+    getBulletins({ includeExpired: true }),
     getStaff(),
     searchParams,
   ]);

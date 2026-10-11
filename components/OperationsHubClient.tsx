@@ -7,6 +7,8 @@ import Link from "next/link";
 import {
   BookOpen,
   CalendarDays,
+  ChevronRight,
+  Clock,
   History,
   Info,
   Megaphone,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
+import { ExpiryChip } from "@/components/bulletin/ExpiryChip";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
@@ -27,6 +30,7 @@ import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
 import { deleteBulletin, listBulletins } from "@/lib/bulletin/api";
+import { expiredChipLabel, partitionByExpiry } from "@/lib/bulletin/expiry";
 import { matchesDepartment } from "@/lib/data/filters";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
 import { roleAtLeast, type Role } from "@/lib/roles";
@@ -115,6 +119,20 @@ function rowTimestamp(iso: string): { date: string; time: string } {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return { date: iso, time: "" };
   return { date: ROW_DATE.format(parsed), time: ROW_TIME.format(parsed) };
+}
+
+/**
+ * A "now" that ticks once a minute, so a notice ages out of the board live.
+ * Seeded lazily on mount; the interval callback (async, not the effect body)
+ * does the updates, which keeps the render pure.
+ */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
 }
 
 /** First prose paragraph of a markdown body, stripped of inline markers. */
@@ -264,7 +282,8 @@ function RowTimestamp({ iso, withTime }: { iso: string; withTime: boolean }) {
   );
 }
 
-function BulletinRow({ bulletin, isSelected }: { bulletin: Bulletin; isSelected: boolean }) {
+function BulletinRow({ bulletin, isSelected, now }: { bulletin: Bulletin; isSelected: boolean; now: number }) {
+  const pinned = bulletin.priority === "pinned";
   return (
     <span className="block">
       <span className="flex items-center justify-between gap-3">
@@ -280,15 +299,86 @@ function BulletinRow({ bulletin, isSelected }: { bulletin: Bulletin; isSelected:
         )}
       >
         {bulletin.title}
+        {pinned ? (
+          <span role="img" aria-label="Pinned" className="ml-1.5 text-[12px]">
+            📌
+          </span>
+        ) : null}
       </span>
       <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
         {excerpt(bulletin.body_markdown)}
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-1">
-        {bulletin.priority !== "normal" ? <PriorityBadge priority={bulletin.priority} /> : null}
+        {bulletin.priority === "urgent" ? <PriorityBadge priority={bulletin.priority} /> : null}
+        <ExpiryChip expiresAt={bulletin.expires_at} priority={bulletin.priority} now={now} />
         <DepartmentTags departments={bulletin.departments} />
       </span>
     </span>
+  );
+}
+
+/** A row inside the collapsed Expired tray — greyed, read-only. */
+function ExpiredBulletinRow({ bulletin }: { bulletin: Bulletin }) {
+  return (
+    <span className="block opacity-60">
+      <span className="flex items-center justify-between gap-3">
+        <span className="truncate text-xs font-medium text-zinc-500">
+          {authorName(bulletin.author_name)}
+        </span>
+        <RowTimestamp iso={bulletin.created_at} withTime />
+      </span>
+      <span className="mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em] text-zinc-700">
+        {bulletin.title}
+      </span>
+      <span className="mt-2 flex flex-wrap items-center gap-1">
+        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-px text-xs font-semibold text-zinc-500">
+          <Clock size={12} strokeWidth={2} aria-hidden="true" />
+          {bulletin.expires_at ? expiredChipLabel(bulletin.expires_at) : "Expired"}
+        </span>
+        <DepartmentTags departments={bulletin.departments} />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The collapsed "Expired (M)" tray that sits below the active list. Expanding
+ * it renders the expired array it was handed — it performs no refetch. The two
+ * arrays both come from the single `?includeExpired=true` fetch, partitioned
+ * client-side.
+ */
+function ExpiredTray({ items }: { items: readonly Bulletin[] }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="px-1 pb-1 pt-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-1.5 rounded-[10px] border border-dashed border-zinc-300 px-3 py-2 text-[12.5px] font-medium text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+      >
+        <ChevronRight
+          size={13}
+          strokeWidth={2}
+          aria-hidden="true"
+          className={cx("transition-transform", open && "rotate-90")}
+        />
+        Expired ({items.length})
+      </button>
+      {open ? (
+        <ul role="list" className="mt-1.5 space-y-1.5">
+          {items.map((bulletin) => (
+            <li
+              key={bulletin.id}
+              className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
+            >
+              <ExpiredBulletinRow bulletin={bulletin} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
@@ -448,6 +538,7 @@ export function OperationsHubClient({
   authorRequest = null,
   roleRequests = [],
 }: OperationsHubClientProps) {
+  const now = useNow();
   const [activeView, setActiveView] = useState<PortalView>(() =>
     initialArticleSlug && articles.some((article) => article.slug === initialArticleSlug)
       ? "knowledge"
@@ -480,7 +571,7 @@ export function OperationsHubClient({
 
   const refreshBulletins = useCallback(async (preferId?: string) => {
     try {
-      const fresh = await listBulletins();
+      const fresh = await listBulletins({ includeExpired: true });
       setBulletinList(fresh);
       if (preferId) setSelectedBulletinId(preferId);
     } catch {
@@ -620,10 +711,16 @@ export function OperationsHubClient({
       ),
     [searchedBulletins, activeDepartment],
   );
+  // One fetch feeds both buckets; the split is client-side (active = no expiry
+  // or still in the future). `now` ticks each minute so a notice ages out live.
+  const { active: activeBulletins, expired: expiredBulletins } = useMemo(
+    () => partitionByExpiry(filteredBulletins, now),
+    [filteredBulletins, now],
+  );
   const bulletinCounts = useMemo(() => buildCounts(searchedBulletins), [searchedBulletins]);
   const selectedBulletin = useMemo(
-    () => filteredBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
-    [filteredBulletins, selectedBulletinId],
+    () => activeBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
+    [activeBulletins, selectedBulletinId],
   );
 
   /* Knowledge base */
@@ -690,12 +787,13 @@ export function OperationsHubClient({
       <main className="flex min-h-0 flex-1 flex-col print:block">
         {activeView === "bulletins" ? (
           <MasterDetailShell
-            items={filteredBulletins}
+            items={activeBulletins}
             getId={(bulletin) => bulletin.id}
             selectedId={selectedBulletin?.id ?? null}
             onSelect={setSelectedBulletinId}
             listTitle="Bulletin Board"
-            listSubtitle={`${filteredBulletins.length} of ${bulletinList.length}`}
+            listSubtitle={`${activeBulletins.length} active · ${expiredBulletins.length} expired`}
+            listFooter={<ExpiredTray items={expiredBulletins} />}
             listActions={
               isAuthor ? (
                 <button
@@ -709,7 +807,7 @@ export function OperationsHubClient({
               ) : null
             }
             renderListItem={(bulletin, isSelected) => (
-              <BulletinRow bulletin={bulletin} isSelected={isSelected} />
+              <BulletinRow bulletin={bulletin} isSelected={isSelected} now={now} />
             )}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -726,6 +824,7 @@ export function OperationsHubClient({
                   articles={articles}
                   viewerRole={viewerRole ?? "readonly"}
                   viewerId={viewerId ?? ""}
+                  now={now}
                   canEdit={canManageBulletin(selectedBulletin)}
                   onOpenArticle={openArticle}
                   onOpenArticleBySlug={openArticleBySlug}

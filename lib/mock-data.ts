@@ -254,6 +254,7 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
 export const BULLETINS: readonly Bulletin[] = [
   {
     id: "e8a2c5f1-3b74-4d09-a6c2-5f81b0d4e937",
+    expires_at: null,
     title: "Isolation bays at 3 of 4 capacity — intake diversion active through Friday",
     departments: ["ICU", "ER"],
     priority: "urgent",
@@ -278,6 +279,7 @@ export const BULLETINS: readonly Bulletin[] = [
   },
   {
     id: "d41f8b93-6a20-4c75-8e19-7b5d2c0f6a38",
+    expires_at: null,
     title: "Radiology suite 2 offline Tuesday 06:00–10:00 for generator service",
     departments: ["Radiology", "ER"],
     priority: "normal",
@@ -300,6 +302,7 @@ export const BULLETINS: readonly Bulletin[] = [
   },
   {
     id: "4c9e1b70-8d25-4f6b-9a30-2e7c6d1f8b45",
+    expires_at: null,
     title: "Updated deposit thresholds take effect Monday",
     departments: ["CSR", "Finance"],
     priority: "pinned",
@@ -327,6 +330,7 @@ export const BULLETINS: readonly Bulletin[] = [
   },
   {
     id: "7b3f0a26-9c58-4e14-b7d2-8a5f3c9e0d61",
+    expires_at: null,
     title: "Controlled substance log audit — September reconciliation closes Friday",
     departments: ["Finance", "ICU"],
     priority: "normal",

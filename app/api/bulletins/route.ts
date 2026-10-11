@@ -16,6 +16,7 @@ import {
   KICKER_MAX_LENGTH,
   isBulletinFormat,
 } from "@/lib/bulletin/format";
+import { normalizeHeroImageUrl } from "@/lib/bulletin/hero";
 import { roleAtLeast } from "@/lib/roles";
 import type { Department } from "@/types/portal";
 
@@ -98,6 +99,10 @@ export async function POST(request: NextRequest) {
       format,
       kicker: optionalString(body, "kicker", { maxLength: KICKER_MAX_LENGTH }) ?? null,
       deck: optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null,
+      // The hero banner is a featured/announcement surface; an absent value is
+      // `null`, and anything that is not an https URL or a relative portal path
+      // is refused with 422 `invalid_hero_image_url` before it is stored.
+      hero_image_url: normalizeHeroImageUrl(optionalString(body, "heroImageUrl")),
       // `undefined` means "apply the priority default"; an explicit null means
       // the poster deliberately asked for no expiry (refused for `urgent`).
       expires_at: expiresAt,

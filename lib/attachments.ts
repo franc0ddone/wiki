@@ -109,21 +109,6 @@ export function assertAttachmentType(buffer: Buffer, filename: string): {
 }
 
 /**
- * The PHI confirmation gate — the same pattern the image upload uses. An
- * attachment may only be stored once the uploader has affirmatively confirmed
- * that the file contains no patient data; anything but an explicit true (absent,
- * false, or a non-boolean) is refused with 422, before any byte is stored.
- */
-export function assertPhiConfirmed(value: unknown): void {
-  if (value !== true && value !== "true") {
-    throw new ApiError(422, "Confirm the file contains no patient data (PHI) before uploading.", {
-      code: "phi_confirmation_required",
-      details: { field: "phi_confirmed" },
-    });
-  }
-}
-
-/**
  * Drain an incoming request body into a Buffer, enforcing the size ceiling *on
  * the stream*: the read is abandoned the moment cumulative bytes exceed the cap,
  * so an oversize upload never gets fully buffered — it is refused with 413.

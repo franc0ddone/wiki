@@ -166,7 +166,7 @@ export function AuthLanding({ callbackUrl }: AuthLandingProps) {
           </span>
           <div className="min-w-0">
             <h1 className="text-[15px] font-bold uppercase leading-4 tracking-[0.06em] text-zinc-900">
-              Dove Wiki
+              Dove Hub
             </h1>
             <p className="text-[12.5px] text-zinc-500">Dove Lewis Emergency Animal Hospital</p>
           </div>

@@ -1,8 +1,7 @@
 /**
  * Client calls for article attachments. The bytes go up as the raw request body
- * (so the server can stream and cap them), with the file name and the PHI
- * confirmation in headers; downloads always go through the API, never a raw
- * storage URL.
+ * (so the server can stream and cap them), with the file name in a header;
+ * downloads always go through the API, never a raw storage URL.
  */
 import { request } from "@/lib/editor/api";
 
@@ -20,13 +19,12 @@ export function listAttachments(slug: string): Promise<AttachmentRecord[]> {
   return request<AttachmentRecord[]>(`/api/articles/${encodeURIComponent(slug)}/attachments`);
 }
 
-export function uploadAttachment(slug: string, file: File, phiConfirmed: boolean): Promise<AttachmentRecord> {
+export function uploadAttachment(slug: string, file: File): Promise<AttachmentRecord> {
   return request<AttachmentRecord>(`/api/articles/${encodeURIComponent(slug)}/attachments`, {
     method: "POST",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
       "x-attachment-filename": encodeURIComponent(file.name),
-      "x-phi-confirmed": phiConfirmed ? "true" : "false",
     },
     body: file,
   });

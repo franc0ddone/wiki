@@ -32,6 +32,7 @@ export type BulletinMinAggregateOutputType = {
   format: $Enums.BulletinFormat | null
   kicker: string | null
   deck: string | null
+  heroImageUrl: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
@@ -47,6 +48,7 @@ export type BulletinMaxAggregateOutputType = {
   format: $Enums.BulletinFormat | null
   kicker: string | null
   deck: string | null
+  heroImageUrl: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
@@ -63,6 +65,7 @@ export type BulletinCountAggregateOutputType = {
   format: number
   kicker: number
   deck: number
+  heroImageUrl: number
   linkedArticleId: number
   authorId: number
   publishedAt: number
@@ -80,6 +83,7 @@ export type BulletinMinAggregateInputType = {
   format?: true
   kicker?: true
   deck?: true
+  heroImageUrl?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -95,6 +99,7 @@ export type BulletinMaxAggregateInputType = {
   format?: true
   kicker?: true
   deck?: true
+  heroImageUrl?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -111,6 +116,7 @@ export type BulletinCountAggregateInputType = {
   format?: true
   kicker?: true
   deck?: true
+  heroImageUrl?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
@@ -200,6 +206,7 @@ export type BulletinGroupByOutputType = {
   format: $Enums.BulletinFormat
   kicker: string | null
   deck: string | null
+  heroImageUrl: string | null
   linkedArticleId: string | null
   authorId: string
   publishedAt: Date
@@ -237,6 +244,7 @@ export type BulletinWhereInput = {
   format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
   kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -257,6 +265,7 @@ export type BulletinOrderByWithRelationInput = {
   format?: Prisma.SortOrder
   kicker?: Prisma.SortOrderInput | Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
+  heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -280,6 +289,7 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
   kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -300,6 +310,7 @@ export type BulletinOrderByWithAggregationInput = {
   format?: Prisma.SortOrder
   kicker?: Prisma.SortOrderInput | Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
+  heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -322,6 +333,7 @@ export type BulletinScalarWhereWithAggregatesInput = {
   format?: Prisma.EnumBulletinFormatWithAggregatesFilter<"Bulletin"> | $Enums.BulletinFormat
   kicker?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   deck?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
+  heroImageUrl?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableWithAggregatesFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidWithAggregatesFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeWithAggregatesFilter<"Bulletin"> | Date | string
@@ -338,6 +350,7 @@ export type BulletinCreateInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -356,6 +369,7 @@ export type BulletinUncheckedCreateInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
@@ -374,6 +388,7 @@ export type BulletinUpdateInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -392,6 +407,7 @@ export type BulletinUncheckedUpdateInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -410,6 +426,7 @@ export type BulletinCreateManyInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
@@ -426,6 +443,7 @@ export type BulletinUpdateManyMutationInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -440,6 +458,7 @@ export type BulletinUncheckedUpdateManyInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -466,6 +485,7 @@ export type BulletinCountOrderByAggregateInput = {
   format?: Prisma.SortOrder
   kicker?: Prisma.SortOrder
   deck?: Prisma.SortOrder
+  heroImageUrl?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -481,6 +501,7 @@ export type BulletinMaxOrderByAggregateInput = {
   format?: Prisma.SortOrder
   kicker?: Prisma.SortOrder
   deck?: Prisma.SortOrder
+  heroImageUrl?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -496,6 +517,7 @@ export type BulletinMinOrderByAggregateInput = {
   format?: Prisma.SortOrder
   kicker?: Prisma.SortOrder
   deck?: Prisma.SortOrder
+  heroImageUrl?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -646,6 +668,7 @@ export type BulletinCreateWithoutAuthorInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -663,6 +686,7 @@ export type BulletinUncheckedCreateWithoutAuthorInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -709,6 +733,7 @@ export type BulletinScalarWhereInput = {
   format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
   kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
@@ -725,6 +750,7 @@ export type BulletinCreateWithoutLinkedArticleInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -742,6 +768,7 @@ export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -785,6 +812,7 @@ export type BulletinCreateWithoutAcksInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -802,6 +830,7 @@ export type BulletinUncheckedCreateWithoutAcksInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
@@ -835,6 +864,7 @@ export type BulletinUpdateWithoutAcksInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -852,6 +882,7 @@ export type BulletinUncheckedUpdateWithoutAcksInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -869,6 +900,7 @@ export type BulletinCreateWithoutReactionsInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -886,6 +918,7 @@ export type BulletinUncheckedCreateWithoutReactionsInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
@@ -919,6 +952,7 @@ export type BulletinUpdateWithoutReactionsInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -936,6 +970,7 @@ export type BulletinUncheckedUpdateWithoutReactionsInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -953,6 +988,7 @@ export type BulletinCreateManyAuthorInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -968,6 +1004,7 @@ export type BulletinUpdateWithoutAuthorInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -985,6 +1022,7 @@ export type BulletinUncheckedUpdateWithoutAuthorInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1002,6 +1040,7 @@ export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1017,6 +1056,7 @@ export type BulletinCreateManyLinkedArticleInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   deck?: string | null
+  heroImageUrl?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
@@ -1032,6 +1072,7 @@ export type BulletinUpdateWithoutLinkedArticleInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1049,6 +1090,7 @@ export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1066,6 +1108,7 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1121,6 +1164,7 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   format?: boolean
   kicker?: boolean
   deck?: boolean
+  heroImageUrl?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -1142,6 +1186,7 @@ export type BulletinSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   format?: boolean
   kicker?: boolean
   deck?: boolean
+  heroImageUrl?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -1160,6 +1205,7 @@ export type BulletinSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   format?: boolean
   kicker?: boolean
   deck?: boolean
+  heroImageUrl?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -1178,6 +1224,7 @@ export type BulletinSelectScalar = {
   format?: boolean
   kicker?: boolean
   deck?: boolean
+  heroImageUrl?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
@@ -1185,7 +1232,7 @@ export type BulletinSelectScalar = {
   createdAt?: boolean
 }
 
-export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "priority" | "format" | "kicker" | "deck" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt", ExtArgs["result"]["bulletin"]>
+export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "priority" | "format" | "kicker" | "deck" | "heroImageUrl" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt", ExtArgs["result"]["bulletin"]>
 export type BulletinInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1229,6 +1276,13 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
      * Featured only: the warm one-liner under the headline (the standfirst).
      */
     deck: string | null
+    /**
+     * Featured and announcement only: an optional hero banner image rendered
+     * full-bleed above the calling-card hero (the Employee-of-the-Month
+     * treatment). A `notice` is text-only and never renders a hero slot, whatever
+     * this column holds. Null = no hero.
+     */
+    heroImageUrl: string | null
     linkedArticleId: string | null
     authorId: string
     /**
@@ -1676,6 +1730,7 @@ export interface BulletinFieldRefs {
   readonly format: Prisma.FieldRef<"Bulletin", 'BulletinFormat'>
   readonly kicker: Prisma.FieldRef<"Bulletin", 'String'>
   readonly deck: Prisma.FieldRef<"Bulletin", 'String'>
+  readonly heroImageUrl: Prisma.FieldRef<"Bulletin", 'String'>
   readonly linkedArticleId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly authorId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly publishedAt: Prisma.FieldRef<"Bulletin", 'DateTime'>

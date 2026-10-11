@@ -23,10 +23,10 @@ import { PrismaClient } from "@/generated/prisma/client";
  * build require a reachable DATABASE_URL — it does not need one.
  */
 
-const globalForPrisma = globalThis as unknown as { __doveWikiPrisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { __doveHubPrisma?: PrismaClient };
 
 export function getDb(): PrismaClient {
-  if (globalForPrisma.__doveWikiPrisma) return globalForPrisma.__doveWikiPrisma;
+  if (globalForPrisma.__doveHubPrisma) return globalForPrisma.__doveHubPrisma;
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -39,7 +39,7 @@ export function getDb(): PrismaClient {
 
   // A dev-server hot reload re-evaluates modules; without the cache each reload
   // would open another pool and eventually exhaust Postgres connections.
-  globalForPrisma.__doveWikiPrisma = client;
+  globalForPrisma.__doveHubPrisma = client;
   return client;
 }
 

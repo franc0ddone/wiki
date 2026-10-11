@@ -5,7 +5,7 @@ import { getArticles } from "@/lib/data";
 import { getReviewerOptions, requireEditorViewer } from "@/lib/editor/server";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "New procedure · Dove Wiki" };
+export const metadata: Metadata = { title: "New procedure · Dove Hub" };
 
 /**
  * `/articles/new` — a blank draft. Full-page editor, outside the master/detail

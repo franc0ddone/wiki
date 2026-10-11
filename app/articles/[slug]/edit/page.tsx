@@ -6,7 +6,7 @@ import { getArticleBySlug, getArticles } from "@/lib/data";
 import { getArticleReviewerId, getReviewerOptions, requireEditorViewer } from "@/lib/editor/server";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Edit procedure · Dove Wiki" };
+export const metadata: Metadata = { title: "Edit procedure · Dove Hub" };
 
 /**
  * `/articles/<slug>/edit` — loads the current `body_markdown` and saves through

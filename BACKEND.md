@@ -1,7 +1,7 @@
-# Dove Wiki — backend
+# Dove Hub — backend
 
 Persistence, API, versioning, auth scaffolding, uploads, and import tooling for
-Dove Wiki. **This pass is backend-only:** `lib/mock-data.ts` still
+Dove Hub. **This pass is backend-only:** `lib/mock-data.ts` still
 works exactly as it did, and no component was changed other than the one
 permitted export in `components/MarkdownReader.tsx`.
 
@@ -364,7 +364,7 @@ draft for a clinical lead to review; nothing is published automatically.
   skipped and reported.
 - Prints a summary: imported / skipped / failed, with page titles and reasons.
   A fixture dump lives at `scripts/import-mediawiki/__fixtures__/sample-dump.xml`.
-- Imported drafts are owned by a `mediawiki-import@dove-wiki.local` service
+- Imported drafts are owned by a `mediawiki-import@dove-hub.local` service
   account (role `author`, no password), created on first run. `departments` is
   left empty — that is a clinical judgement, not something an import guesses.
 

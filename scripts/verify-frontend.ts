@@ -122,21 +122,34 @@ import {
 import {
   BULLETIN_FORMATS,
   DEFAULT_BULLETIN_FORMAT,
+  formatHasHero,
   formatUsesAck,
   isBulletinFormat,
 } from "@/lib/bulletin/format";
+import {
+  HERO_IMAGE_URL_MAX_LENGTH,
+  isValidHeroImageUrl,
+  normalizeHeroImageUrl,
+} from "@/lib/bulletin/hero";
+import {
+  expiredChipLabel,
+  isExpired,
+  isUrgentExpiringSoon,
+  partitionByExpiry,
+  relativeExpiryLabel,
+} from "@/lib/bulletin/expiry";
 import {
   createBulletin,
   getBulletinById,
   getReactionSummary,
   toggleReaction,
+  updateBulletin,
 } from "@/lib/data/bulletins";
 import { createArticle } from "@/lib/data/articles";
 import {
   ALLOWED_ATTACHMENT_TYPES,
   ATTACHMENT_MAX_BYTES,
   assertAttachmentType,
-  assertPhiConfirmed,
   detectAttachmentType,
   readAttachmentStream,
   sanitizeAttachmentFileName,
@@ -161,8 +174,12 @@ import {
 } from "@/lib/markdown/cell-attributes";
 import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
+import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
+import { AnnouncementHero } from "@/components/bulletin/AnnouncementHero";
+import { AcknowledgedPill, ExpiryChip, PinnedBadge } from "@/components/bulletin/ExpiryChip";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
 import { dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
+import type { Bulletin } from "@/types/portal";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -802,18 +819,13 @@ check("filterSlashItems filters by label, id and keyword", () => {
 });
 
 console.log("editor chrome: dropped images");
-check("canInsertDroppedImage refuses missing alt / unchecked PHI", () => {
-  assert.equal(canInsertDroppedImage({ alt: "ok alt", phiConfirmed: true }).ok, true);
-  const noAlt = canInsertDroppedImage({ alt: "", phiConfirmed: true });
+check("canInsertDroppedImage refuses missing or out-of-range alt text", () => {
+  assert.equal(canInsertDroppedImage({ alt: "ok alt" }).ok, true);
+  const noAlt = canInsertDroppedImage({ alt: "" });
   assert.equal(noAlt.ok, false);
   assert.ok(noAlt.altError, "missing alt text must be reported");
-  assert.equal(noAlt.phiError, null);
-  const noPhi = canInsertDroppedImage({ alt: "ok alt", phiConfirmed: false });
-  assert.equal(noPhi.ok, false);
-  assert.ok(noPhi.phiError, "unconfirmed PHI must be reported");
-  assert.equal(noPhi.altError, null);
-  assert.equal(canInsertDroppedImage({ alt: "ab", phiConfirmed: true }).ok, false, "alt under 3 characters is refused");
-  assert.equal(canInsertDroppedImage({ alt: "x".repeat(251), phiConfirmed: true }).ok, false, "alt over 250 characters is refused");
+  assert.equal(canInsertDroppedImage({ alt: "ab" }).ok, false, "alt under 3 characters is refused");
+  assert.equal(canInsertDroppedImage({ alt: "x".repeat(251) }).ok, false, "alt over 250 characters is refused");
 });
 
 console.log("editor chrome: find & replace");
@@ -954,6 +966,145 @@ check("the featured hero is a flat teal band with no brand-blue anywhere", () =>
   assert.match(html, /bg-\[#0f766e\]/);
   assert.match(html, /Employee of the Month/);
   assert.ok(!/#1E2A4A/i.test(html), "brand-blue leaked into the featured tree");
+});
+
+console.log("bulletin hero image");
+
+check("a hero URL is https or a relative portal path, and nothing else", () => {
+  assert.equal(isValidHeroImageUrl("https://cdn.example/hero.jpg"), true);
+  assert.equal(isValidHeroImageUrl("/portal/hero.jpg"), true);
+  assert.equal(isValidHeroImageUrl("http://localhost:9000/dove-hub/hero.jpg"), false, "plain http is refused");
+  assert.equal(isValidHeroImageUrl("//evil.example/hero.jpg"), false, "a protocol-relative URL is refused");
+  assert.equal(isValidHeroImageUrl("portal/hero.jpg"), false, "a bare relative path is refused");
+  assert.equal(isValidHeroImageUrl("javascript:alert(1)"), false);
+  assert.equal(isValidHeroImageUrl(""), false);
+  assert.equal(isValidHeroImageUrl("x".repeat(HERO_IMAGE_URL_MAX_LENGTH + 1)), false);
+});
+
+check("normalizeHeroImageUrl maps blank to null and refuses a bad URL with 422", () => {
+  assert.equal(normalizeHeroImageUrl(null), null);
+  assert.equal(normalizeHeroImageUrl(undefined), null);
+  assert.equal(normalizeHeroImageUrl("   "), null);
+  assert.equal(normalizeHeroImageUrl(" https://cdn.example/hero.jpg "), "https://cdn.example/hero.jpg");
+  let status = 0;
+  try {
+    normalizeHeroImageUrl("http://cdn.example/hero.jpg");
+  } catch (error) {
+    status = error instanceof ApiError ? error.status : -1;
+  }
+  assert.equal(status, 422);
+});
+
+check("only the featured and announcement tiers carry a hero", () => {
+  assert.equal(formatHasHero("featured"), true);
+  assert.equal(formatHasHero("announcement"), true);
+  assert.equal(formatHasHero("notice"), false);
+});
+
+check("the hero banner renders full-bleed (w-full h-[220px] object-cover)", () => {
+  const html = renderToStaticMarkup(createElement(BulletinHeroImage, { url: "https://cdn.example/hero.jpg" }));
+  assert.match(html, /w-full/);
+  assert.match(html, /h-\[220px\]/);
+  assert.match(html, /object-cover/);
+  assert.match(html, /https:\/\/cdn\.example\/hero\.jpg/);
+});
+
+console.log("bulletin expiry");
+
+check("relative expiry text follows the m / h / d thresholds", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  assert.equal(relativeExpiryLabel(new Date(now + 45 * 60_000).toISOString(), now), "in 45m");
+  assert.equal(relativeExpiryLabel(new Date(now + 3 * 3_600_000).toISOString(), now), "in 3h");
+  assert.equal(relativeExpiryLabel(new Date(now + 6 * 86_400_000).toISOString(), now), "in 6d");
+});
+
+check("a null expiry never ages out; a past one does", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  assert.equal(isExpired(null, now), false);
+  assert.equal(isExpired(new Date(now + 1).toISOString(), now), false);
+  assert.equal(isExpired(new Date(now - 1).toISOString(), now), true);
+});
+
+check("partitionByExpiry splits null-and-future (active) from past (expired)", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  const items = [
+    { id: "a", expires_at: null, priority: "normal" },
+    { id: "b", expires_at: new Date(now + 1000).toISOString(), priority: "urgent" },
+    { id: "c", expires_at: new Date(now - 1000).toISOString(), priority: "normal" },
+  ] as unknown as Bulletin[];
+  const { active, expired } = partitionByExpiry(items, now);
+  assert.deepEqual(active.map((b) => b.id), ["a", "b"]);
+  assert.deepEqual(expired.map((b) => b.id), ["c"]);
+});
+
+check("only an urgent notice inside 24 hours takes the red tint", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  assert.equal(isUrgentExpiringSoon(new Date(now + 3_600_000).toISOString(), "urgent", now), true);
+  assert.equal(isUrgentExpiringSoon(new Date(now + 30 * 3_600_000).toISOString(), "urgent", now), false);
+  assert.equal(isUrgentExpiringSoon(new Date(now + 3_600_000).toISOString(), "normal", now), false);
+  assert.equal(isUrgentExpiringSoon(null, "urgent", now), false);
+});
+
+check("the expired chip reads `Expired Sep 30` in the facility zone", () => {
+  assert.equal(expiredChipLabel("2026-09-30T10:00:00.000Z"), "Expired Sep 30");
+});
+
+check("the expiry chip carries the relative text and the quiet zinc pill", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  const html = renderToStaticMarkup(
+    createElement(ExpiryChip, {
+      expiresAt: new Date(now + 3 * 3_600_000).toISOString(),
+      priority: "normal",
+      now,
+    }),
+  );
+  assert.match(html, /in 3h/);
+  assert.match(html, /border-zinc-200 bg-zinc-50/);
+});
+
+check("an urgent chip inside 24 hours pulses red", () => {
+  const now = Date.parse("2026-09-28T12:00:00.000Z");
+  const html = renderToStaticMarkup(
+    createElement(ExpiryChip, {
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      priority: "urgent",
+      now,
+    }),
+  );
+  assert.match(html, /border-red-200 bg-red-50 text-red-700/);
+  assert.match(html, /animate-pulse/);
+});
+
+check("a notice with no expiry renders no chip", () => {
+  const html = renderToStaticMarkup(createElement(ExpiryChip, { expiresAt: null, priority: "normal", now: 0 }));
+  assert.equal(html, "");
+});
+
+check("the acknowledged and pinned pills take the dove-green treatment", () => {
+  const acked = renderToStaticMarkup(createElement(AcknowledgedPill));
+  assert.match(acked, /border-\[#5F6E00\] bg-\[#E6EBA5\] text-\[#5F6E00\]/);
+  assert.match(acked, /Acknowledged/);
+  const pinned = renderToStaticMarkup(createElement(PinnedBadge));
+  assert.match(pinned, /border-\[#5F6E00\] bg-\[#E6EBA5\] text-\[#5F6E00\]/);
+  assert.match(pinned, /Pinned/);
+});
+
+check("the announcement hero is a Dove Black calling card with a centred meta line", () => {
+  const html = renderToStaticMarkup(
+    createElement(AnnouncementHero, {
+      title: "Welcome to the team, Nadia",
+      authorName: "Priya Raghunathan",
+      departments: ["CSR" as const],
+      publishedAt: "2026-09-28T18:00:00.000Z",
+    }),
+  );
+  assert.ok(html.includes("bg-[#20241E]"), "the hero ground is Dove Black");
+  assert.ok(html.includes("border-[rgba(175,190,35,0.30)]"), "the hero frame is the faint #AFBE23 hairline");
+  assert.ok(html.includes("text-[#AFBE23]"), "the headline is #AFBE23");
+  assert.ok(html.includes("text-[#c9c9bd]/80"), "the departments/date line is muted #c9c9bd");
+  assert.ok(html.includes("Welcome to the team, Nadia"));
+  assert.match(html, /Priya Raghunathan/);
+  assert.match(html, /Sep 28, 2026/);
 });
 
 console.log("bulletin blocks");
@@ -1319,6 +1470,101 @@ async function runDatabaseChecks(): Promise<void> {
     assert.equal(featured?.deck, "Deck");
   });
 
+  /* ---- hero banner (DB) ---- */
+
+  const heroBulletin = await createBulletin({
+    title: "Hero bulletin",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "normal",
+    format: "featured",
+    hero_image_url: "https://cdn.example/hero.jpg",
+    author_id: author.id,
+  });
+  const refetchedHero = await getBulletinById(heroBulletin.id, { includeExpired: true });
+  check("a hero image URL persists and round-trips through the data layer", () => {
+    assert.equal(heroBulletin.hero_image_url, "https://cdn.example/hero.jpg");
+    assert.equal(refetchedHero?.hero_image_url, "https://cdn.example/hero.jpg");
+  });
+
+  const plainBulletin = await createBulletin({
+    title: "No hero bulletin",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "normal",
+    format: "announcement",
+    author_id: author.id,
+  });
+  check("a hero tier with no banner omits `hero_image_url` (falsy, never a key)", () => {
+    assert.ok(!plainBulletin.hero_image_url, "no banner must not surface a URL");
+  });
+
+  const clearedHero = await updateBulletin(
+    heroBulletin.id,
+    { hero_image_url: null },
+    { id: author.id, role: "author" },
+  );
+  check("clearing the hero image removes it again", () => {
+    assert.ok(!clearedHero.hero_image_url, "the cleared banner must not survive");
+  });
+
+  /* ---- expiry reaches the client (DB) ---- */
+
+  const futureMs = stamp + 3_600_000;
+  const expiring = await createBulletin({
+    title: "Expiry round-trip",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "normal",
+    expires_at: new Date(futureMs),
+    author_id: author.id,
+  });
+  check("`expires_at` reaches the client as an ISO string", () => {
+    assert.equal(typeof expiring.expires_at, "string");
+    assert.equal(expiring.expires_at, new Date(futureMs).toISOString());
+  });
+
+  const noExpiry = await createBulletin({
+    title: "No expiry",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "normal",
+    author_id: author.id,
+  });
+  check("a `normal` notice without an expiry stays null (never ages out)", () => {
+    assert.equal(noExpiry.expires_at, null);
+  });
+
+  const urgentDefault = await createBulletin({
+    title: "Urgent default",
+    body_markdown: "Body",
+    departments: ["ER"],
+    priority: "urgent",
+    author_id: author.id,
+  });
+  check("an `urgent` notice without an expiry gets the 72-hour default", () => {
+    assert.ok(urgentDefault.expires_at);
+    const ttl = new Date(urgentDefault.expires_at as string).getTime() - Date.now();
+    assert.ok(ttl > 71 * 3_600_000 && ttl < 73 * 3_600_000, `ttl was ${ttl}`);
+  });
+
+  let urgentNullStatus = 0;
+  try {
+    await createBulletin({
+      title: "Urgent no expiry",
+      body_markdown: "Body",
+      departments: ["ER"],
+      priority: "urgent",
+      expires_at: null,
+      author_id: author.id,
+    });
+  } catch (error) {
+    urgentNullStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("an explicit null expiry on an `urgent` notice is refused with 422", () => {
+    assert.equal(urgentNullStatus, 422);
+  });
+
   /* ---- reactions (DB) ---- */
 
   const bulletin = featured ?? bulletins[0];
@@ -1448,22 +1694,6 @@ check("sanitizeAttachmentFileName keeps a storage-safe basename", () => {
 });
 
 console.log("attachments (async guards)");
-
-check("a missing PHI confirmation is refused with 422 (nothing stored)", () => {
-  const statusFor = (value: unknown) => {
-    try {
-      assertPhiConfirmed(value);
-      return 200;
-    } catch (error) {
-      return error instanceof ApiError ? error.status : -1;
-    }
-  };
-  assert.equal(statusFor(undefined), 422);
-  assert.equal(statusFor(false), 422);
-  assert.equal(statusFor("false"), 422);
-  assert.equal(statusFor(true), 200);
-  assert.equal(statusFor("true"), 200);
-});
 
 runDatabaseChecks()
   .then(() => {

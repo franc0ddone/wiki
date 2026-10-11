@@ -2,19 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
-import { ImagePlus, ShieldAlert } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { ApiRequestError, uploadImage } from "@/lib/editor/api";
-import { ALT_MAX, PHI_REQUIRED_MESSAGE, canInsertDroppedImage } from "@/lib/editor/image-validation";
+import { ALT_MAX, canInsertDroppedImage } from "@/lib/editor/image-validation";
 import { cx } from "@/lib/utils";
 
 /**
  * The inline popover shown when an image is dropped into the editor.
  *
  * There is no dialog on drop: this small popover is anchored at the drop point
- * and reuses the image dialog's validation (`image-validation.ts` — PHI first,
- * then alt text, same 3–250 rule) and the existing upload pipeline
- * (`uploadImage`). Insert uploads at the drop position; Cancel discards the
- * file and inserts nothing. Esc, a click outside, or scrolling dismisses it.
+ * and reuses the image dialog's validation (`image-validation.ts` — the same
+ * 3–250 alt-text rule) and the existing upload pipeline (`uploadImage`). Insert
+ * uploads at the drop position; Cancel discards the file and inserts nothing.
+ * Esc, a click outside, or scrolling dismisses it.
  *
  * Caption / width / alignment are out of scope here — the dialog owns those.
  */
@@ -31,7 +31,6 @@ export interface DropImagePopoverProps {
 
 export function DropImagePopover({ editor, file, pos, anchor, onClose }: DropImagePopoverProps) {
   const [alt, setAlt] = useState("");
-  const [phiConfirmed, setPhiConfirmed] = useState(false);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +59,7 @@ export function DropImagePopover({ editor, file, pos, anchor, onClose }: DropIma
     };
   }, [busy, onClose]);
 
-  const decision = canInsertDroppedImage({ alt, phiConfirmed });
+  const decision = canInsertDroppedImage({ alt });
 
   const submit = async () => {
     setTouched(true);
@@ -100,24 +99,7 @@ export function DropImagePopover({ editor, file, pos, anchor, onClose }: DropIma
       {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
       <img src={previewUrl} alt="Preview of the dropped image" className="mb-3 max-h-36 w-full rounded-lg border border-zinc-200 bg-zinc-50 object-contain" />
 
-      <label className="mb-1.5 flex items-start gap-2 text-[12.5px] text-zinc-800">
-        <input
-          type="checkbox"
-          checked={phiConfirmed}
-          onChange={(event) => setPhiConfirmed(event.target.checked)}
-          aria-invalid={touched && decision.phiError ? true : undefined}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-teal-700 focus:ring-teal-600/30"
-        />
-        <span>I confirm this file contains no patient data (PHI)</span>
-      </label>
-      {touched && decision.phiError ? (
-        <p role="alert" className="mb-2 flex items-start gap-1.5 text-xs text-red-700">
-          <ShieldAlert size={13} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0" />
-          {PHI_REQUIRED_MESSAGE}
-        </p>
-      ) : null}
-
-      <label htmlFor="drop-image-alt" className="mb-1.5 mt-2 block text-[12.5px] font-medium text-zinc-800">
+      <label htmlFor="drop-image-alt" className="mb-1.5 block text-[12.5px] font-medium text-zinc-800">
         Alt text <span className="text-red-600">(required)</span>
       </label>
       <input

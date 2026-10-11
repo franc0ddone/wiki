@@ -16,13 +16,16 @@ export interface BulletinPayload {
   /** Featured-only fields. */
   kicker?: string | null;
   deck?: string | null;
+  /** Featured / announcement hero banner. `null` = none. */
+  heroImageUrl?: string | null;
   /** ISO-8601, `null` for "never", or omitted to apply the priority default. */
   expires_at?: string | null;
   linked_article_id?: string | null;
 }
 
-export function listBulletins(): Promise<Bulletin[]> {
-  return request<Bulletin[]>("/api/bulletins");
+export function listBulletins(options: { includeExpired?: boolean } = {}): Promise<Bulletin[]> {
+  const query = options.includeExpired ? "?includeExpired=true" : "";
+  return request<Bulletin[]>(`/api/bulletins${query}`);
 }
 
 export function createBulletin(payload: BulletinPayload): Promise<Bulletin> {

@@ -108,10 +108,23 @@ export interface Bulletin {
   kicker?: string | null;
   /** Featured only: the stand-up one-liner under the headline. */
   deck?: string | null;
+  /**
+   * Featured and announcement only: the optional hero banner image (an
+   * `https://` URL or a relative portal path). `null` (or absent) means no
+   * hero. A `notice` never renders one, whatever this holds.
+   */
+  hero_image_url?: string | null;
   body_markdown: string;
   /** ISO 8601 timestamp. */
   created_at: string;
   author_name: string;
+  /**
+   * When the notice leaves the board — ISO 8601, or `null` for a notice that
+   * never ages out (ordinary `normal` notices may be posted without one). The
+   * board partitions on this: active = null or in the future, expired =
+   * at or before now.
+   */
+  expires_at: string | null;
   /** Optional id of the `KnowledgeArticle` this bulletin references. */
   linked_sop_id?: string;
 }

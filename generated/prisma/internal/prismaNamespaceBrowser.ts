@@ -134,6 +134,7 @@ export const BulletinScalarFieldEnum = {
   format: 'format',
   kicker: 'kicker',
   deck: 'deck',
+  heroImageUrl: 'heroImageUrl',
   linkedArticleId: 'linkedArticleId',
   authorId: 'authorId',
   publishedAt: 'publishedAt',

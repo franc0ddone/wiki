@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { Eye, OctagonAlert, PenLine, TriangleAlert } from "lucide-react";
+import { Eye, ImagePlus, OctagonAlert, PenLine, TriangleAlert, X } from "lucide-react";
 import { ArticleSearch } from "@/components/editor/ArticleSearch";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
@@ -17,11 +17,13 @@ import { LinkDialog } from "@/components/editor/LinkDialog";
 import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { ApiRequestError, createBulletin, patchBulletin, type BulletinPayload } from "@/lib/bulletin/api";
+import { uploadImage } from "@/lib/editor/api";
 import {
   BULLETIN_FORMATS,
   BULLETIN_FORMAT_LABELS,
   DECK_MAX_LENGTH,
   KICKER_MAX_LENGTH,
+  formatHasHero,
 } from "@/lib/bulletin/format";
 import {
   BULLETIN_TITLE_MAX_LENGTH,
@@ -74,6 +76,26 @@ function readMarkdown(editor: Editor): string {
   return (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown().trim();
 }
 
+/**
+ * `YYYY-MM-DDTHH:mm` in the browser's own local time, for a
+ * `<input type="datetime-local">` value or `min`. `datetime-local` values parse
+ * as local time, so `new Date(value).toISOString()` is the matching conversion
+ * (see `expiresAtIso` below).
+ */
+function toLocalDateTimeInput(ms: number): string {
+  const date = new Date(ms);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** The body scaffolding the two template cards insert, keyed by kind. */
+function templateScaffolding(kind: "notice" | "announcement", title: string): string {
+  if (kind === "announcement") {
+    return `# ${title}\n\n> [!tip] In their own words: "..."`;
+  }
+  return `# ${title}\n\n> [!note]`;
+}
+
 function FeedbackError({ error }: { error: { status: number; message: string } }) {
   return (
     <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-900">
@@ -115,11 +137,23 @@ export default function BulletinComposer({
   const [busy, setBusy] = useState(false);
   const [issues, setIssues] = useState<BulletinIssue[]>([]);
   const [serverError, setServerError] = useState<{ status: number; message: string } | null>(null);
+  // The urgent "must expire" refusal is shown inline under the expiry input.
+  const [expiryError, setExpiryError] = useState<string | null>(null);
+  // `min` for the datetime-local input — captured once at mount (this component
+  // is client-only, imported with `ssr: false`).
+  const [minExpiry] = useState(() => toLocalDateTimeInput(Date.now()));
   const [imageDialog, setImageDialog] = useState<ImageDialogMode | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [imagePickerNonce, setImagePickerNonce] = useState(0);
+  // Hero banner (featured / announcement only). The stored value survives a
+  // switch to `notice` (the field hides, the state keeps it) and resurfaces when
+  // a hero tier is chosen again.
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(initial?.hero_image_url ?? null);
+  const [heroBusy, setHeroBusy] = useState(false);
+  const [heroError, setHeroError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const heroInputRef = useRef<HTMLInputElement | null>(null);
 
   const canPostRestricted = roleAtLeast(role, "clinical_lead");
 
@@ -187,10 +221,19 @@ export default function BulletinComposer({
 
   const issueFor = (field: BulletinIssue["field"]) => issues.filter((issue) => issue.field === field);
 
+  // `datetime-local` parses as local time, matching the composer's convention.
   const expiresAtIso = (): string | null | undefined => {
     if (expires.length === 0) return undefined; // keep current / apply priority default
-    const parsed = new Date(`${expires}T23:59:00`);
+    const parsed = new Date(expires);
     return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  };
+
+  /** Replace the whole body with a template's scaffolding (undoable via Ctrl+Z). */
+  const insertTemplate = (kind: "notice" | "announcement") => {
+    if (!editor) return;
+    editor.commands.setContent(templateScaffolding(kind, title), { emitUpdate: true });
+    editor.commands.focus();
+    setTab("write");
   };
 
   const submit = async () => {
@@ -201,6 +244,7 @@ export default function BulletinComposer({
       { canPostRestricted },
     );
     setIssues(result.errors);
+    setExpiryError(null);
     if (result.errors.length > 0) return;
 
     const payload: BulletinPayload = {
@@ -212,6 +256,9 @@ export default function BulletinComposer({
       // Featured fields are only sent when the featured tier is chosen; an
       // empty string is normalised to null by the API.
       ...(format === "featured" ? { kicker: kicker.trim() || null, deck: deck.trim() || null } : {}),
+      // The hero banner travels only for the tiers that render one; omitting it
+      // from a `notice` payload leaves any stored value untouched.
+      ...(formatHasHero(format) ? { heroImageUrl } : {}),
       linked_article_id: linkedId,
     };
     const expiresIso = expiresAtIso();
@@ -225,12 +272,41 @@ export default function BulletinComposer({
       if (mode === "edit") onSaved(saved);
       else onPosted(saved);
     } catch (caught) {
-      setServerError(
-        caught instanceof ApiRequestError
-          ? { status: caught.status, message: caught.message }
-          : { status: 0, message: "Something went wrong while posting. Nothing was lost; try again." },
-      );
+      // The tricky refusal — "an urgent notice must expire" — belongs beside the
+      // field it is about, not at the foot of the form.
+      if (caught instanceof ApiRequestError && caught.code === "urgent_requires_expiry") {
+        setExpiryError(caught.message);
+        setServerError(null);
+      } else {
+        setServerError(
+          caught instanceof ApiRequestError
+            ? { status: caught.status, message: caught.message }
+            : { status: 0, message: "Something went wrong while posting. Nothing was lost; try again." },
+        );
+      }
       setBusy(false);
+    }
+  };
+
+  /**
+   * Upload the hero banner through the shared image pipeline. A failure keeps
+   * the previous value and surfaces the error inline — the poster never loses a
+   * hero that was already set.
+   */
+  const uploadHeroImage = async (file: File) => {
+    setHeroBusy(true);
+    setHeroError(null);
+    try {
+      const uploaded = await uploadImage(file);
+      setHeroImageUrl(uploaded.url);
+    } catch (caught) {
+      setHeroError(
+        caught instanceof ApiRequestError
+          ? `Upload failed (${caught.status || "network"}): ${caught.message}`
+          : "Upload failed. Try again.",
+      );
+    } finally {
+      setHeroBusy(false);
     }
   };
 
@@ -309,6 +385,33 @@ export default function BulletinComposer({
             </p>
           ))}
         </fieldset>
+
+        {/* Template scaffolding — clicking a card replaces the whole body. */}
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Start from a template <span className="font-normal text-zinc-500">(replaces the body)</span>
+          </span>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={busy || !editor}
+              onClick={() => insertTemplate("notice")}
+              className="rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="block text-[13px] font-semibold text-zinc-800">Formal notice</span>
+              <span className="mt-0.5 block text-xs leading-5 text-zinc-500">A headline and a note block to fill in.</span>
+            </button>
+            <button
+              type="button"
+              disabled={busy || !editor}
+              onClick={() => insertTemplate("announcement")}
+              className="rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="block text-[13px] font-semibold text-zinc-800">Announcement</span>
+              <span className="mt-0.5 block text-xs leading-5 text-zinc-500">A headline and a warm pull-quote to fill in.</span>
+            </button>
+          </div>
+        </div>
 
         {/* Body: write / preview */}
         <div>
@@ -472,10 +575,11 @@ export default function BulletinComposer({
             </label>
             <input
               id="bulletin-expires"
-              type="date"
+              type="datetime-local"
+              min={minExpiry}
               value={expires}
               onChange={(event) => setExpires(event.target.value)}
-              className={cx(fieldClass, "mb-1")}
+              className={cx(fieldClass, "mb-1", expiryError && "border-red-300")}
               disabled={busy}
             />
             <p className="text-xs leading-5 text-zinc-500">
@@ -483,6 +587,11 @@ export default function BulletinComposer({
                 ? `Leave blank to keep the current expiry. Changing the priority applies: ${expiryLabel(priority)}.`
                 : `Leave blank for the default: ${expiryLabel(priority)}.`}
             </p>
+            {expiryError ? (
+              <p role="alert" className="mt-1 text-xs text-red-700">
+                {expiryError}
+              </p>
+            ) : null}
             {issueFor("expiry").map((issue) => (
               <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
                 {issue.message}
@@ -551,6 +660,82 @@ export default function BulletinComposer({
                   disabled={busy}
                 />
               </div>
+            </div>
+          ) : null}
+
+          {formatHasHero(format) ? (
+            <div className="mt-3">
+              <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+                Hero image <span className="font-normal text-zinc-500">(optional)</span>
+              </span>
+              {heroImageUrl ? (
+                <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded preview */}
+                  <img
+                    src={heroImageUrl}
+                    alt="Hero image preview"
+                    className="h-[120px] w-full rounded-lg border border-zinc-200/80 object-cover"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => heroInputRef.current?.click()}
+                      disabled={busy || heroBusy}
+                      className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ImagePlus size={13} strokeWidth={1.75} aria-hidden="true" />
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeroImageUrl(null);
+                        setHeroError(null);
+                      }}
+                      disabled={busy || heroBusy}
+                      className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <X size={13} strokeWidth={1.75} aria-hidden="true" />
+                      Remove
+                    </button>
+                    {heroBusy ? (
+                      <span role="status" className="text-xs text-zinc-500">
+                        Uploading…
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => heroInputRef.current?.click()}
+                  disabled={busy || heroBusy}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
+                  {heroBusy ? "Uploading…" : "Add hero image"}
+                </button>
+              )}
+              {heroError ? (
+                <p role="alert" className="mt-1.5 text-xs text-red-700">
+                  {heroError}
+                </p>
+              ) : null}
+              <p className="mt-1.5 text-xs leading-5 text-zinc-500">
+                A full-width banner above the card. Stored on the bulletin, never in the body.
+              </p>
+              <input
+                ref={heroInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                data-testid="bulletin-hero-file-input"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void uploadHeroImage(file);
+                }}
+              />
             </div>
           ) : null}
         </div>

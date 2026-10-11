@@ -2,7 +2,7 @@
  * The `{…}` attribute micro-syntax the stored Markdown extends itself with.
  *
  * Markdown has no notion of block alignment, image sizing, table cell spans, or
- * a link's presentation class, so Dove Wiki stores them as a bracketed suffix
+ * a link's presentation class, so Dove Hub stores them as a bracketed suffix
  * (or suffix-group) on the element they describe:
  *
  *   Paragraph.{align=center line-height=1.5}

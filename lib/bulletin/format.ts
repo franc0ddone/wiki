@@ -36,3 +36,12 @@ export function isBulletinFormat(value: unknown): value is BulletinFormat {
 export function formatUsesAck(format: BulletinFormat): boolean {
   return format === "notice";
 }
+
+/**
+ * The tiers that can carry a hero banner image — `featured` and `announcement`.
+ * A `notice` is text-only: the composer offers no hero field and the reader
+ * renders no hero slot, whatever the record holds.
+ */
+export function formatHasHero(format: BulletinFormat): boolean {
+  return format === "featured" || format === "announcement";
+}

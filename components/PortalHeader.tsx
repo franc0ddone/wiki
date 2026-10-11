@@ -60,7 +60,7 @@ export function PortalHeader({
   activeView,
   onViewChange,
   onOpenSearch,
-  title = "Dove Wiki",
+  title = "Dove Hub",
   facilityName = "Clinical operations · Dove Lewis Emergency Animal Hospital",
   rightSlot,
 }: PortalHeaderProps) {

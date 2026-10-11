@@ -17,8 +17,11 @@ import {
   Users,
 } from "lucide-react";
 import { MarkdownReader } from "@/components/MarkdownReader";
+import { AnnouncementHero } from "@/components/bulletin/AnnouncementHero";
+import { AcknowledgedPill, ExpiryChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
+import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import {
   acknowledgeBulletin,
@@ -29,7 +32,7 @@ import {
   type ReactionSummaryEntry,
 } from "@/lib/bulletin/api";
 import { BULLETIN_REACTION_EMOJIS } from "@/lib/bulletin/reactions";
-import { formatUsesAck } from "@/lib/bulletin/format";
+import { formatHasHero, formatUsesAck } from "@/lib/bulletin/format";
 import { roleAtLeast, type Role } from "@/lib/roles";
 import { cx, formatDateTime } from "@/lib/utils";
 import {
@@ -64,7 +67,7 @@ const PRIORITY_META: Record<BulletinPriority, { label: string; className: string
   },
   pinned: {
     label: "Pinned",
-    className: "border-teal-200 bg-teal-50 text-teal-800",
+    className: "border-[#5F6E00] bg-[#E6EBA5] text-[#5F6E00]",
     icon: <Pin size={12} strokeWidth={2} aria-hidden="true" />,
   },
   normal: {
@@ -120,6 +123,8 @@ export interface BulletinDetailProps {
   articles: readonly KnowledgeArticle[];
   viewerRole: Role;
   viewerId: string;
+  /** The tick-driven clock shared with the board, for the relative expiry chip. */
+  now: number;
   /** True when the viewer may edit/delete this notice (author of it, or a lead). */
   canEdit: boolean;
   onOpenArticle: (articleId: string) => void;
@@ -133,6 +138,7 @@ export function BulletinDetail({
   articles,
   viewerRole,
   viewerId,
+  now,
   canEdit,
   onOpenArticle,
   onOpenArticleBySlug,
@@ -148,7 +154,14 @@ export function BulletinDetail({
   const canReact = roleAtLeast(viewerRole, "staff");
   const format = bulletin.format ?? "notice";
   const featured = format === "featured";
+  const announcement = format === "announcement";
   const showAck = formatUsesAck(format);
+  // Featured and announcement may carry a hero banner; a notice never renders
+  // one, whatever the record holds.
+  const heroImage =
+    formatHasHero(format) && bulletin.hero_image_url
+      ? <BulletinHeroImage url={bulletin.hero_image_url} />
+      : null;
 
   const [acks, setAcks] = useState<AckEntry[] | null>(null);
   const [ackBusy, setAckBusy] = useState(false);
@@ -326,6 +339,11 @@ export function BulletinDetail({
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
         <PriorityBadge priority={bulletin.priority} />
+        {myAck ? (
+          <AcknowledgedPill />
+        ) : (
+          <ExpiryChip expiresAt={bulletin.expires_at} priority={bulletin.priority} now={now} />
+        )}
         <DepartmentTags departments={bulletin.departments} />
       </div>
       {canEdit ? (
@@ -372,8 +390,19 @@ export function BulletinDetail({
             {actionRow}
             {featured ? (
               <>
+                {heroImage}
                 <BulletinHero title={bulletin.title} kicker={bulletin.kicker} deck={bulletin.deck} />
                 <div className="mt-3">{metaRow}</div>
+              </>
+            ) : announcement ? (
+              <>
+                {heroImage}
+                <AnnouncementHero
+                  title={bulletin.title}
+                  authorName={bulletin.author_name}
+                  departments={bulletin.departments}
+                  publishedAt={bulletin.created_at}
+                />
               </>
             ) : (
               <>

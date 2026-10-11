@@ -1,4 +1,4 @@
-// Operations Hub ("Dove Wiki") data model.
+// Operations Hub ("Dove Hub") data model.
 //
 // Prisma ORM 7 · PostgreSQL. The client is generated as TypeScript into
 // `generated/prisma` (see prisma.config.ts for CLI configuration and
@@ -204,6 +204,12 @@ model Bulletin {
   kicker String?
   /// Featured only: the warm one-liner under the headline (the standfirst).
   deck   String?
+
+  /// Featured and announcement only: an optional hero banner image rendered
+  /// full-bleed above the calling-card hero (the Employee-of-the-Month
+  /// treatment). A `notice` is text-only and never renders a hero slot, whatever
+  /// this column holds. Null = no hero.
+  heroImageUrl String? @map("hero_image_url")
 
   linkedArticleId String? @map("linked_article_id") @db.Uuid
 

@@ -1,5 +1,5 @@
 /**
- * MediaWiki → Dove Wiki importer.
+ * MediaWiki → Dove Hub importer.
  *
  *   npm run import:mediawiki -- path/to/dump.xml [--dry-run] [--limit N]
  *
@@ -178,7 +178,7 @@ function asArray<T>(value: T | T[] | undefined): T[] {
 
 /* ------------------------------------------------------------------- main */
 
-const IMPORT_AUTHOR_EMAIL = "mediawiki-import@dove-wiki.local";
+const IMPORT_AUTHOR_EMAIL = "mediawiki-import@dove-hub.local";
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
