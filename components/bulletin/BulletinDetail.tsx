@@ -1,25 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import {
   ArrowUpRight,
-  CalendarDays,
   Check,
   FileText,
-  Info,
   Megaphone,
-  PenLine,
   Pencil,
-  Pin,
   Trash2,
-  TriangleAlert,
   Users,
 } from "lucide-react";
 import { MarkdownReader } from "@/components/MarkdownReader";
-import { AnnouncementHero } from "@/components/bulletin/AnnouncementHero";
-import { AcknowledgedPill, ExpiryChip } from "@/components/bulletin/ExpiryChip";
-import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
+import { AcknowledgedPill, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
@@ -32,60 +24,25 @@ import {
   type ReactionSummaryEntry,
 } from "@/lib/bulletin/api";
 import { BULLETIN_REACTION_EMOJIS } from "@/lib/bulletin/reactions";
-import { formatHasHero, formatUsesAck } from "@/lib/bulletin/format";
 import { roleAtLeast, type Role } from "@/lib/roles";
 import { cx, formatDateTime } from "@/lib/utils";
 import {
   DEPARTMENT_LABELS,
   type Bulletin,
-  type BulletinPriority,
   type ClinicalDepartment,
   type KnowledgeArticle,
 } from "@/types/portal";
 
 /**
- * Bulletin reader.
+ * Bulletin reader — exactly one layout for every bulletin (prompt 6c follow-up).
  *
- * Two presentation tiers share this component:
- *
- *  - the **notice** layout (also used for `announcement` until prompt 6) — the
- *    badges, the headline with its petroleum-teal rule, the body, the ack row
- *    and the linked-SOP card;
- *  - the **featured** layout — a flat `#0f766e` hero band with a kicker pill,
- *    the headline and deck in white, then the same body / linked-SOP card.
- *
- * Both carry the bounded ❤️🎉👍 reaction row (celebratory posts get reactions,
- * not formal acks — the ack button is hidden for `announcement` and `featured`,
- * though existing ack records are never deleted). Articles get no reactions.
+ * The dark calling card (`BulletinHero`) is the universal header: it renders
+ * for pinned, urgent, and plain posts alike, with the title, the optional deck,
+ * and the author/departments/date meta line. An optional hero banner sits above
+ * it. `pinned` / `urgent` change nothing here except the red urgent chip. The
+ * body, the bounded ❤️🎉👍 reaction row, the ack row, and the linked-SOP card
+ * are the same for all of them.
  */
-
-const PRIORITY_META: Record<BulletinPriority, { label: string; className: string; icon: ReactNode }> = {
-  urgent: {
-    label: "Urgent",
-    className: "border-red-200 bg-red-50 text-red-700",
-    icon: <TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-  pinned: {
-    label: "Pinned",
-    className: "border-[#5F6E00] bg-[#E6EBA5] text-[#5F6E00]",
-    icon: <Pin size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-  normal: {
-    label: "Notice",
-    className: "border-zinc-200 bg-zinc-50 text-zinc-600",
-    icon: <Info size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-};
-
-function PriorityBadge({ priority }: { priority: BulletinPriority }) {
-  const meta = PRIORITY_META[priority];
-  return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full border px-2 py-px text-xs font-semibold", meta.className)}>
-      {meta.icon}
-      {meta.label}
-    </span>
-  );
-}
 
 function DepartmentTags({ departments }: { departments: readonly ClinicalDepartment[] }) {
   return (
@@ -101,22 +58,6 @@ function DepartmentTags({ departments }: { departments: readonly ClinicalDepartm
     </span>
   );
 }
-
-function MetaItem({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
-  return (
-    <span className="flex items-center gap-2 text-[13px] text-zinc-500">
-      <span className="text-zinc-400">{icon}</span>
-      <span className="sr-only">{label}</span>
-      <span className="text-zinc-500">{children}</span>
-    </span>
-  );
-}
-
-/**
- * The headline treatment lives in `components/bulletin/BulletinHeadline.tsx`
- * (owner's "Option C"): 34px, 700, letter-spacing -0.02em, line-height 1.1,
- * with a 64px × 3px petroleum-teal rule 14px below.
- */
 
 export interface BulletinDetailProps {
   bulletin: Bulletin;
@@ -152,16 +93,10 @@ export function BulletinDetail({
   const canAck = roleAtLeast(viewerRole, "staff");
   const showRoster = roleAtLeast(viewerRole, "clinical_lead");
   const canReact = roleAtLeast(viewerRole, "staff");
-  const format = bulletin.format ?? "notice";
-  const featured = format === "featured";
-  const announcement = format === "announcement";
-  const showAck = formatUsesAck(format);
-  // Featured and announcement may carry a hero banner; a notice never renders
-  // one, whatever the record holds.
-  const heroImage =
-    formatHasHero(format) && bulletin.hero_image_url
-      ? <BulletinHeroImage url={bulletin.hero_image_url} />
-      : null;
+  // An optional hero banner renders above whatever headline treatment follows.
+  const heroImage = bulletin.hero_image_url ? (
+    <BulletinHeroImage url={bulletin.hero_image_url} alt={bulletin.hero_image_alt ?? ""} />
+  ) : null;
 
   const [acks, setAcks] = useState<AckEntry[] | null>(null);
   const [ackBusy, setAckBusy] = useState(false);
@@ -338,11 +273,11 @@ export function BulletinDetail({
   const actionRow = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <PriorityBadge priority={bulletin.priority} />
+        {bulletin.urgent ? <UrgentChip /> : null}
         {myAck ? (
           <AcknowledgedPill />
         ) : (
-          <ExpiryChip expiresAt={bulletin.expires_at} priority={bulletin.priority} now={now} />
+          <ExpiryChip expiresAt={bulletin.expires_at} now={now} />
         )}
         <DepartmentTags departments={bulletin.departments} />
       </div>
@@ -369,17 +304,6 @@ export function BulletinDetail({
     </div>
   );
 
-  const metaRow = (
-    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-      <MetaItem icon={<PenLine size={14} strokeWidth={1.75} aria-hidden="true" />} label="Posted by">
-        {bulletin.author_name}
-      </MetaItem>
-      <MetaItem icon={<CalendarDays size={14} strokeWidth={1.75} aria-hidden="true" />} label="Posted">
-        {formatDateTime(bulletin.created_at)}
-      </MetaItem>
-    </div>
-  );
-
   return (
     <div className="mx-auto w-full max-w-[72rem] px-4 py-6 sm:px-6 md:px-8 md:py-10">
       <MarkdownReader
@@ -388,89 +312,70 @@ export function BulletinDetail({
         header={
           <>
             {actionRow}
-            {featured ? (
-              <>
-                {heroImage}
-                <BulletinHero title={bulletin.title} kicker={bulletin.kicker} deck={bulletin.deck} />
-                <div className="mt-3">{metaRow}</div>
-              </>
-            ) : announcement ? (
-              <>
-                {heroImage}
-                <AnnouncementHero
-                  title={bulletin.title}
-                  authorName={bulletin.author_name}
-                  departments={bulletin.departments}
-                  publishedAt={bulletin.created_at}
-                />
-              </>
-            ) : (
-              <>
-                <div className="mt-4">
-                  <BulletinHeadline title={bulletin.title} />
-                </div>
-                {metaRow}
-              </>
-            )}
+            {heroImage}
+            <BulletinHero
+              title={bulletin.title}
+              deck={bulletin.deck}
+              authorName={bulletin.author_name}
+              departments={bulletin.departments}
+              publishedAt={bulletin.created_at}
+            />
           </>
         }
         footer={
           <div className="space-y-6">
             {reactionsRow}
 
-            {/* Acknowledge — only for the formal `notice` tier. */}
-            {showAck ? (
-              <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-[13px] text-zinc-600">
-                    <Users size={15} strokeWidth={1.75} aria-hidden="true" className="text-zinc-400" />
-                    <span>
-                      {acks === null
-                        ? "Loading acknowledgements…"
-                        : acks.length === 0
-                          ? "No one has acknowledged this yet."
-                          : `${acks.length} ${acks.length === 1 ? "person has" : "people have"} acknowledged this.`}
-                    </span>
-                  </div>
-                  {canAck ? (
-                    myAck ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800">
-                        <Check size={14} strokeWidth={2} aria-hidden="true" />
-                        Acknowledged {formatDateTime(myAck.acked_at)}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void handleAck()}
-                        disabled={ackBusy}
-                        className={cx(primaryButton, "h-8 px-3 text-[13px]")}
-                      >
-                        <Check size={14} strokeWidth={2} aria-hidden="true" />
-                        {ackBusy ? "Recording…" : "Acknowledge"}
-                      </button>
-                    )
-                  ) : null}
+            <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[13px] text-zinc-600">
+                  <Users size={15} strokeWidth={1.75} aria-hidden="true" className="text-zinc-400" />
+                  <span>
+                    {acks === null
+                      ? "Loading acknowledgements…"
+                      : acks.length === 0
+                        ? "No one has acknowledged this yet."
+                        : `${acks.length} ${acks.length === 1 ? "person has" : "people have"} acknowledged this.`}
+                  </span>
                 </div>
-                {ackError ? (
-                  <p role="alert" className="mt-2 text-xs text-red-700">
-                    {ackError}
-                  </p>
-                ) : null}
-
-                {showRoster && acks && acks.length > 0 ? (
-                  <ul className="mt-3 space-y-1 border-t border-zinc-200 pt-3">
-                    {acks.map((entry) => (
-                      <li key={entry.user_id} className="flex items-center justify-between gap-3 text-[13px] text-zinc-700">
-                        <span className="truncate font-medium text-zinc-800">{entry.name}</span>
-                        <time dateTime={entry.acked_at} className="shrink-0 tabular-nums text-xs text-zinc-500">
-                          {formatDateTime(entry.acked_at)}
-                        </time>
-                      </li>
-                    ))}
-                  </ul>
+                {canAck ? (
+                  myAck ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800">
+                      <Check size={14} strokeWidth={2} aria-hidden="true" />
+                      Acknowledged {formatDateTime(myAck.acked_at)}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleAck()}
+                      disabled={ackBusy}
+                      className={cx(primaryButton, "h-8 px-3 text-[13px]")}
+                    >
+                      <Check size={14} strokeWidth={2} aria-hidden="true" />
+                      {ackBusy ? "Recording…" : "Acknowledge"}
+                    </button>
+                  )
                 ) : null}
               </div>
-            ) : null}
+              {ackError ? (
+                <p role="alert" className="mt-2 text-xs text-red-700">
+                  {ackError}
+                </p>
+              ) : null}
+
+              {showRoster && acks && acks.length > 0 ? (
+                <ul className="mt-3 space-y-1 border-t border-zinc-200 pt-3">
+                  {acks.map((entry) => (
+                    <li key={entry.user_id} className="flex items-center justify-between gap-3 text-[13px] text-zinc-700">
+                      <span className="truncate font-medium text-zinc-800">{entry.name}</span>
+                      <time dateTime={entry.acked_at} className="shrink-0 tabular-nums text-xs text-zinc-500">
+                        {formatDateTime(entry.acked_at)}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
 
             {linkedCard}
           </div>

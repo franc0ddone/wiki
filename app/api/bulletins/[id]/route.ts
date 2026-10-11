@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
-import type { BulletinPriority } from "@/generated/prisma/enums";
 import {
   ApiError,
   errorResponse,
+  optionalBoolean,
   optionalDate,
   optionalString,
   optionalStringArray,
@@ -10,9 +10,8 @@ import {
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { deleteBulletin, updateBulletin, type UpdateBulletinInput } from "@/lib/data/bulletins";
-import { DECK_MAX_LENGTH, KICKER_MAX_LENGTH, isBulletinFormat } from "@/lib/bulletin/format";
-import { normalizeHeroImageUrl } from "@/lib/bulletin/hero";
-import { roleAtLeast } from "@/lib/roles";
+import { DECK_MAX_LENGTH } from "@/lib/bulletin/lifecycle";
+import { normalizeHeroImageAlt, normalizeHeroImageUrl } from "@/lib/bulletin/hero";
 
 /**
  * `PATCH  /api/bulletins/[id]` — edit. Requires `author`+ **and** (the original
@@ -24,8 +23,6 @@ import { roleAtLeast } from "@/lib/roles";
  * Field validation mirrors `POST /api/bulletins`. Editing an `urgent` notice
  * with changed content clears its acknowledgements (`updateBulletin`).
  */
-
-const PRIORITIES: readonly BulletinPriority[] = ["urgent", "pinned", "normal"];
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,50 +37,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.departments !== undefined) patch.departments = optionalStringArray(body, "departments");
     if (body.expires_at !== undefined) patch.expires_at = optionalDate(body, "expires_at");
 
-    if (body.linked_article_id !== undefined) {
-      const linked = optionalString(body, "linked_article_id");
-      patch.linked_article_id = linked && linked.length > 0 ? linked : null;
-    }
-
-    if (body.format !== undefined) {
-      const format = optionalString(body, "format");
-      if (!format || !isBulletinFormat(format)) {
-        throw new ApiError(422, "`format` must be one of `notice`, `announcement`, `featured`.", {
-          details: { field: "format" },
-        });
-      }
-      patch.format = format;
-    }
-
-    if (body.kicker !== undefined) {
-      patch.kicker = optionalString(body, "kicker", { maxLength: KICKER_MAX_LENGTH }) ?? null;
-    }
+    if (body.pinned !== undefined) patch.pinned = optionalBoolean(body, "pinned") ?? false;
+    if (body.urgent !== undefined) patch.urgent = optionalBoolean(body, "urgent") ?? false;
 
     if (body.deck !== undefined) {
       patch.deck = optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null;
     }
 
-    // The hero banner is nullable; an empty string clears it, and a value that
-    // is neither an https URL nor a relative portal path is refused with 422.
-    if (body.heroImageUrl !== undefined) {
-      patch.hero_image_url = normalizeHeroImageUrl(optionalString(body, "heroImageUrl"));
-    }
-
-    if (body.priority !== undefined) {
-      const priority = optionalString(body, "priority");
-      if (!priority || !(PRIORITIES as readonly string[]).includes(priority)) {
-        throw new ApiError(422, "`priority` must be one of `urgent`, `pinned`, `normal`.", {
-          details: { field: "priority" },
+    // The hero banner and its required alt text travel together. A URL that is
+    // set without alt text is refused with 422 `missing_hero_alt`.
+    if (body.heroImageUrl !== undefined || body.heroImageAlt !== undefined) {
+      const heroUrl = body.heroImageUrl !== undefined ? normalizeHeroImageUrl(optionalString(body, "heroImageUrl")) : undefined;
+      const heroAlt = body.heroImageAlt !== undefined ? normalizeHeroImageAlt(optionalString(body, "heroImageAlt")) : undefined;
+      if (heroUrl !== undefined) patch.hero_image_url = heroUrl;
+      if (heroAlt !== undefined) patch.hero_image_alt = heroAlt;
+      if (heroUrl && !heroAlt) {
+        throw new ApiError(422, "A hero image needs alt text: provide `heroImageAlt` alongside `heroImageUrl`.", {
+          code: "missing_hero_alt",
+          details: { field: "heroImageAlt" },
         });
       }
-      if ((priority === "urgent" || priority === "pinned") && !roleAtLeast(actor.role, "clinical_lead")) {
-        throw new ApiError(
-          403,
-          `Posting an ${priority} bulletin requires the clinical lead role or higher.`,
-          { code: "forbidden", details: { requiredRole: "clinical_lead", actualRole: actor.role } },
-        );
-      }
-      patch.priority = priority as BulletinPriority;
+    }
+
+    if (body.linked_article_id !== undefined) {
+      const linked = optionalString(body, "linked_article_id");
+      patch.linked_article_id = linked && linked.length > 0 ? linked : null;
     }
 
     if (Object.keys(patch).length === 0) {

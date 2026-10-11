@@ -28,32 +28,38 @@ export type BulletinMinAggregateOutputType = {
   id: string | null
   title: string | null
   bodyMarkdown: string | null
-  priority: $Enums.BulletinPriority | null
-  format: $Enums.BulletinFormat | null
-  kicker: string | null
+  pinned: boolean | null
+  urgent: boolean | null
   deck: string | null
   heroImageUrl: string | null
+  heroImageAlt: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
   expiresAt: Date | null
   createdAt: Date | null
+  priority: $Enums.BulletinPriority | null
+  format: $Enums.BulletinFormat | null
+  kicker: string | null
 }
 
 export type BulletinMaxAggregateOutputType = {
   id: string | null
   title: string | null
   bodyMarkdown: string | null
-  priority: $Enums.BulletinPriority | null
-  format: $Enums.BulletinFormat | null
-  kicker: string | null
+  pinned: boolean | null
+  urgent: boolean | null
   deck: string | null
   heroImageUrl: string | null
+  heroImageAlt: string | null
   linkedArticleId: string | null
   authorId: string | null
   publishedAt: Date | null
   expiresAt: Date | null
   createdAt: Date | null
+  priority: $Enums.BulletinPriority | null
+  format: $Enums.BulletinFormat | null
+  kicker: string | null
 }
 
 export type BulletinCountAggregateOutputType = {
@@ -61,16 +67,19 @@ export type BulletinCountAggregateOutputType = {
   title: number
   bodyMarkdown: number
   departments: number
-  priority: number
-  format: number
-  kicker: number
+  pinned: number
+  urgent: number
   deck: number
   heroImageUrl: number
+  heroImageAlt: number
   linkedArticleId: number
   authorId: number
   publishedAt: number
   expiresAt: number
   createdAt: number
+  priority: number
+  format: number
+  kicker: number
   _all: number
 }
 
@@ -79,32 +88,38 @@ export type BulletinMinAggregateInputType = {
   id?: true
   title?: true
   bodyMarkdown?: true
-  priority?: true
-  format?: true
-  kicker?: true
+  pinned?: true
+  urgent?: true
   deck?: true
   heroImageUrl?: true
+  heroImageAlt?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
+  priority?: true
+  format?: true
+  kicker?: true
 }
 
 export type BulletinMaxAggregateInputType = {
   id?: true
   title?: true
   bodyMarkdown?: true
-  priority?: true
-  format?: true
-  kicker?: true
+  pinned?: true
+  urgent?: true
   deck?: true
   heroImageUrl?: true
+  heroImageAlt?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
+  priority?: true
+  format?: true
+  kicker?: true
 }
 
 export type BulletinCountAggregateInputType = {
@@ -112,16 +127,19 @@ export type BulletinCountAggregateInputType = {
   title?: true
   bodyMarkdown?: true
   departments?: true
-  priority?: true
-  format?: true
-  kicker?: true
+  pinned?: true
+  urgent?: true
   deck?: true
   heroImageUrl?: true
+  heroImageAlt?: true
   linkedArticleId?: true
   authorId?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
+  priority?: true
+  format?: true
+  kicker?: true
   _all?: true
 }
 
@@ -202,16 +220,19 @@ export type BulletinGroupByOutputType = {
   title: string
   bodyMarkdown: string
   departments: string[]
-  priority: $Enums.BulletinPriority
-  format: $Enums.BulletinFormat
-  kicker: string | null
+  pinned: boolean
+  urgent: boolean
   deck: string | null
   heroImageUrl: string | null
+  heroImageAlt: string | null
   linkedArticleId: string | null
   authorId: string
   publishedAt: Date
   expiresAt: Date | null
   createdAt: Date
+  priority: $Enums.BulletinPriority
+  format: $Enums.BulletinFormat
+  kicker: string | null
   _count: BulletinCountAggregateOutputType | null
   _min: BulletinMinAggregateOutputType | null
   _max: BulletinMaxAggregateOutputType | null
@@ -240,16 +261,19 @@ export type BulletinWhereInput = {
   title?: Prisma.StringFilter<"Bulletin"> | string
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
-  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
-  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
+  urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
   expiresAt?: Prisma.DateTimeNullableFilter<"Bulletin"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
+  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticle?: Prisma.XOR<Prisma.ArticleNullableScalarRelationFilter, Prisma.ArticleWhereInput> | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
@@ -261,16 +285,19 @@ export type BulletinOrderByWithRelationInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
-  priority?: Prisma.SortOrder
-  format?: Prisma.SortOrder
-  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
+  pinned?: Prisma.SortOrder
+  urgent?: Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  heroImageAlt?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticle?: Prisma.ArticleOrderByWithRelationInput
   author?: Prisma.UserOrderByWithRelationInput
   acks?: Prisma.BulletinAckOrderByRelationAggregateInput
@@ -285,16 +312,19 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   title?: Prisma.StringFilter<"Bulletin"> | string
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
-  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
-  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
+  urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
   expiresAt?: Prisma.DateTimeNullableFilter<"Bulletin"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
+  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticle?: Prisma.XOR<Prisma.ArticleNullableScalarRelationFilter, Prisma.ArticleWhereInput> | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
@@ -306,16 +336,19 @@ export type BulletinOrderByWithAggregationInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
-  priority?: Prisma.SortOrder
-  format?: Prisma.SortOrder
-  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
+  pinned?: Prisma.SortOrder
+  urgent?: Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  heroImageAlt?: Prisma.SortOrderInput | Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrderInput | Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.BulletinCountOrderByAggregateInput
   _max?: Prisma.BulletinMaxOrderByAggregateInput
   _min?: Prisma.BulletinMinOrderByAggregateInput
@@ -329,16 +362,19 @@ export type BulletinScalarWhereWithAggregatesInput = {
   title?: Prisma.StringWithAggregatesFilter<"Bulletin"> | string
   bodyMarkdown?: Prisma.StringWithAggregatesFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
-  priority?: Prisma.EnumBulletinPriorityWithAggregatesFilter<"Bulletin"> | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatWithAggregatesFilter<"Bulletin"> | $Enums.BulletinFormat
-  kicker?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
+  pinned?: Prisma.BoolWithAggregatesFilter<"Bulletin"> | boolean
+  urgent?: Prisma.BoolWithAggregatesFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
+  heroImageAlt?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableWithAggregatesFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidWithAggregatesFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeWithAggregatesFilter<"Bulletin"> | Date | string
   expiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Bulletin"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Bulletin"> | Date | string
+  priority?: Prisma.EnumBulletinPriorityWithAggregatesFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatWithAggregatesFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
 }
 
 export type BulletinCreateInput = {
@@ -346,14 +382,17 @@ export type BulletinCreateInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
@@ -365,16 +404,19 @@ export type BulletinUncheckedCreateInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
@@ -384,14 +426,17 @@ export type BulletinUpdateInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
@@ -403,16 +448,19 @@ export type BulletinUncheckedUpdateInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
@@ -422,16 +470,19 @@ export type BulletinCreateManyInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
 }
 
 export type BulletinUpdateManyMutationInput = {
@@ -439,14 +490,17 @@ export type BulletinUpdateManyMutationInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type BulletinUncheckedUpdateManyInput = {
@@ -454,16 +508,19 @@ export type BulletinUncheckedUpdateManyInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type BulletinListRelationFilter = {
@@ -481,48 +538,57 @@ export type BulletinCountOrderByAggregateInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
-  priority?: Prisma.SortOrder
-  format?: Prisma.SortOrder
-  kicker?: Prisma.SortOrder
+  pinned?: Prisma.SortOrder
+  urgent?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
+  heroImageAlt?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
 }
 
 export type BulletinMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
-  priority?: Prisma.SortOrder
-  format?: Prisma.SortOrder
-  kicker?: Prisma.SortOrder
+  pinned?: Prisma.SortOrder
+  urgent?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
+  heroImageAlt?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
 }
 
 export type BulletinMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
-  priority?: Prisma.SortOrder
-  format?: Prisma.SortOrder
-  kicker?: Prisma.SortOrder
+  pinned?: Prisma.SortOrder
+  urgent?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
+  heroImageAlt?: Prisma.SortOrder
   linkedArticleId?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  priority?: Prisma.SortOrder
+  format?: Prisma.SortOrder
+  kicker?: Prisma.SortOrder
 }
 
 export type BulletinScalarRelationFilter = {
@@ -623,6 +689,10 @@ export type BulletinUpdatedepartmentsInput = {
   push?: string | string[]
 }
 
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
 export type EnumBulletinPriorityFieldUpdateOperationsInput = {
   set?: $Enums.BulletinPriority
 }
@@ -664,14 +734,17 @@ export type BulletinCreateWithoutAuthorInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
@@ -682,15 +755,18 @@ export type BulletinUncheckedCreateWithoutAuthorInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
@@ -729,16 +805,19 @@ export type BulletinScalarWhereInput = {
   title?: Prisma.StringFilter<"Bulletin"> | string
   bodyMarkdown?: Prisma.StringFilter<"Bulletin"> | string
   departments?: Prisma.StringNullableListFilter<"Bulletin">
-  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
-  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
+  urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
+  heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   linkedArticleId?: Prisma.UuidNullableFilter<"Bulletin"> | string | null
   authorId?: Prisma.UuidFilter<"Bulletin"> | string
   publishedAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
   expiresAt?: Prisma.DateTimeNullableFilter<"Bulletin"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Bulletin"> | Date | string
+  priority?: Prisma.EnumBulletinPriorityFilter<"Bulletin"> | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFilter<"Bulletin"> | $Enums.BulletinFormat
+  kicker?: Prisma.StringNullableFilter<"Bulletin"> | string | null
 }
 
 export type BulletinCreateWithoutLinkedArticleInput = {
@@ -746,14 +825,17 @@ export type BulletinCreateWithoutLinkedArticleInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
@@ -764,15 +846,18 @@ export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
@@ -808,14 +893,17 @@ export type BulletinCreateWithoutAcksInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
@@ -826,16 +914,19 @@ export type BulletinUncheckedCreateWithoutAcksInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
 }
 
@@ -860,14 +951,17 @@ export type BulletinUpdateWithoutAcksInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
@@ -878,16 +972,19 @@ export type BulletinUncheckedUpdateWithoutAcksInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
@@ -896,14 +993,17 @@ export type BulletinCreateWithoutReactionsInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
@@ -914,16 +1014,19 @@ export type BulletinUncheckedCreateWithoutReactionsInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
 }
 
@@ -948,14 +1051,17 @@ export type BulletinUpdateWithoutReactionsInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
@@ -966,16 +1072,19 @@ export type BulletinUncheckedUpdateWithoutReactionsInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
@@ -984,15 +1093,18 @@ export type BulletinCreateManyAuthorInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   linkedArticleId?: string | null
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
 }
 
 export type BulletinUpdateWithoutAuthorInput = {
@@ -1000,14 +1112,17 @@ export type BulletinUpdateWithoutAuthorInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
@@ -1018,15 +1133,18 @@ export type BulletinUncheckedUpdateWithoutAuthorInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
@@ -1036,15 +1154,18 @@ export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type BulletinCreateManyLinkedArticleInput = {
@@ -1052,15 +1173,18 @@ export type BulletinCreateManyLinkedArticleInput = {
   title: string
   bodyMarkdown: string
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
-  priority?: $Enums.BulletinPriority
-  format?: $Enums.BulletinFormat
-  kicker?: string | null
+  pinned?: boolean
+  urgent?: boolean
   deck?: string | null
   heroImageUrl?: string | null
+  heroImageAlt?: string | null
   authorId: string
   publishedAt: Date | string
   expiresAt?: Date | string | null
   createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
 }
 
 export type BulletinUpdateWithoutLinkedArticleInput = {
@@ -1068,14 +1192,17 @@ export type BulletinUpdateWithoutLinkedArticleInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
@@ -1086,15 +1213,18 @@ export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
@@ -1104,15 +1234,18 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
-  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
-  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
-  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -1160,16 +1293,19 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   title?: boolean
   bodyMarkdown?: boolean
   departments?: boolean
-  priority?: boolean
-  format?: boolean
-  kicker?: boolean
+  pinned?: boolean
+  urgent?: boolean
   deck?: boolean
   heroImageUrl?: boolean
+  heroImageAlt?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
+  priority?: boolean
+  format?: boolean
+  kicker?: boolean
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   acks?: boolean | Prisma.Bulletin$acksArgs<ExtArgs>
@@ -1182,16 +1318,19 @@ export type BulletinSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   title?: boolean
   bodyMarkdown?: boolean
   departments?: boolean
-  priority?: boolean
-  format?: boolean
-  kicker?: boolean
+  pinned?: boolean
+  urgent?: boolean
   deck?: boolean
   heroImageUrl?: boolean
+  heroImageAlt?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
+  priority?: boolean
+  format?: boolean
+  kicker?: boolean
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bulletin"]>
@@ -1201,16 +1340,19 @@ export type BulletinSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   title?: boolean
   bodyMarkdown?: boolean
   departments?: boolean
-  priority?: boolean
-  format?: boolean
-  kicker?: boolean
+  pinned?: boolean
+  urgent?: boolean
   deck?: boolean
   heroImageUrl?: boolean
+  heroImageAlt?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
+  priority?: boolean
+  format?: boolean
+  kicker?: boolean
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bulletin"]>
@@ -1220,19 +1362,22 @@ export type BulletinSelectScalar = {
   title?: boolean
   bodyMarkdown?: boolean
   departments?: boolean
-  priority?: boolean
-  format?: boolean
-  kicker?: boolean
+  pinned?: boolean
+  urgent?: boolean
   deck?: boolean
   heroImageUrl?: boolean
+  heroImageAlt?: boolean
   linkedArticleId?: boolean
   authorId?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
+  priority?: boolean
+  format?: boolean
+  kicker?: boolean
 }
 
-export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "priority" | "format" | "kicker" | "deck" | "heroImageUrl" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt", ExtArgs["result"]["bulletin"]>
+export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "pinned" | "urgent" | "deck" | "heroImageUrl" | "heroImageAlt" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt" | "priority" | "format" | "kicker", ExtArgs["result"]["bulletin"]>
 export type BulletinInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1262,27 +1407,30 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     title: string
     bodyMarkdown: string
     departments: string[]
-    priority: $Enums.BulletinPriority
     /**
-     * Presentation tier. `notice` is the ordinary layout; `announcement` and
-     * `featured` are celebratory posts (no ack button, reactions instead).
+     * Pinned: floats to the top of every board and renders as the dark
+     * calling-card hero (detail) / dark mini-card (board rail).
      */
-    format: $Enums.BulletinFormat
+    pinned: boolean
     /**
-     * Featured only: the small pill above the headline, e.g. "Pinned · Monthly".
+     * Urgent: an opt-in red visual flag. Not a tier — just a chip.
      */
-    kicker: string | null
+    urgent: boolean
     /**
-     * Featured only: the warm one-liner under the headline (the standfirst).
+     * The muted subtitle line under the headline (plain text). Optional, whole
+     * life of the post.
      */
     deck: string | null
     /**
-     * Featured and announcement only: an optional hero banner image rendered
-     * full-bleed above the calling-card hero (the Employee-of-the-Month
-     * treatment). A `notice` is text-only and never renders a hero slot, whatever
-     * this column holds. Null = no hero.
+     * An optional hero banner image rendered above the headline, whatever the
+     * post. `https://` URL or a relative portal path; null = no hero.
      */
     heroImageUrl: string | null
+    /**
+     * Required whenever `heroImageUrl` is set (max 280 chars), rendered as the
+     * `<img alt>`.
+     */
+    heroImageAlt: string | null
     linkedArticleId: string | null
     authorId: string
     /**
@@ -1290,11 +1438,23 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
      */
     publishedAt: Date
     /**
-     * Pinned and urgent notices age out; nothing accumulates forever. The API
-     * applies a default window per priority when the client omits one.
+     * Opt-in expiry. On board fetch, rows with `expiresAt <= now()` are silently
+     * deleted. Null = the post lives until it is manually deleted.
      */
     expiresAt: Date | null
     createdAt: Date
+    /**
+     * Unused. Superseded by `pinned` / `urgent`.
+     */
+    priority: $Enums.BulletinPriority
+    /**
+     * Unused. The presentation tier was deleted.
+     */
+    format: $Enums.BulletinFormat
+    /**
+     * Unused. The eyebrow pill was deleted (departments are the tags).
+     */
+    kicker: string | null
   }, ExtArgs["result"]["bulletin"]>
   composites: {}
 }
@@ -1726,16 +1886,19 @@ export interface BulletinFieldRefs {
   readonly title: Prisma.FieldRef<"Bulletin", 'String'>
   readonly bodyMarkdown: Prisma.FieldRef<"Bulletin", 'String'>
   readonly departments: Prisma.FieldRef<"Bulletin", 'String[]'>
-  readonly priority: Prisma.FieldRef<"Bulletin", 'BulletinPriority'>
-  readonly format: Prisma.FieldRef<"Bulletin", 'BulletinFormat'>
-  readonly kicker: Prisma.FieldRef<"Bulletin", 'String'>
+  readonly pinned: Prisma.FieldRef<"Bulletin", 'Boolean'>
+  readonly urgent: Prisma.FieldRef<"Bulletin", 'Boolean'>
   readonly deck: Prisma.FieldRef<"Bulletin", 'String'>
   readonly heroImageUrl: Prisma.FieldRef<"Bulletin", 'String'>
+  readonly heroImageAlt: Prisma.FieldRef<"Bulletin", 'String'>
   readonly linkedArticleId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly authorId: Prisma.FieldRef<"Bulletin", 'String'>
   readonly publishedAt: Prisma.FieldRef<"Bulletin", 'DateTime'>
   readonly expiresAt: Prisma.FieldRef<"Bulletin", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Bulletin", 'DateTime'>
+  readonly priority: Prisma.FieldRef<"Bulletin", 'BulletinPriority'>
+  readonly format: Prisma.FieldRef<"Bulletin", 'BulletinFormat'>
+  readonly kicker: Prisma.FieldRef<"Bulletin", 'String'>
 }
     
 

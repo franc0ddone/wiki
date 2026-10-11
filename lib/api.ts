@@ -171,3 +171,13 @@ export function optionalDate(body: Record<string, unknown>, field: string): Date
   }
   return parsed;
 }
+
+/** Parse an optional boolean flag, rejecting anything that is not a boolean. */
+export function optionalBoolean(body: Record<string, unknown>, field: string): boolean | undefined {
+  const value = body[field];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "boolean") {
+    throw new ApiError(422, `\`${field}\` must be a boolean.`, { details: { field } });
+  }
+  return value;
+}

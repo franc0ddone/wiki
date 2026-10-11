@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
-import type { BulletinPriority } from "@/generated/prisma/enums";
 import {
   ApiError,
   errorResponse,
+  optionalBoolean,
   optionalDate,
   optionalString,
   readJsonBody,
@@ -11,44 +11,29 @@ import {
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { createBulletin, getBulletins, type BulletinFilters } from "@/lib/data/bulletins";
-import {
-  DECK_MAX_LENGTH,
-  KICKER_MAX_LENGTH,
-  isBulletinFormat,
-} from "@/lib/bulletin/format";
-import { normalizeHeroImageUrl } from "@/lib/bulletin/hero";
-import { roleAtLeast } from "@/lib/roles";
+import { DECK_MAX_LENGTH } from "@/lib/bulletin/lifecycle";
+import { normalizeHeroImageAlt, normalizeHeroImageUrl } from "@/lib/bulletin/hero";
 import type { Department } from "@/types/portal";
 
 /**
- * `GET  /api/bulletins` — list. Expired notices are excluded unless
- *                        `?includeExpired=true`.
- * `POST /api/bulletins` — post. Requires `author`+; an `urgent` or `pinned`
- *                        notice requires `clinical_lead`+.
+ * `GET  /api/bulletins` — the board. Expired posts are silently deleted by the
+ *                        data layer before the rest are returned.
+ * `POST /api/bulletins` — post. Requires `author`+.
+ *
+ * Prompt 6c: no priority/format tiers. A bulletin carries `pinned` / `urgent`
+ * booleans, an optional deck, an optional hero image (with required alt text),
+ * and an opt-in expiry.
  */
-
-const PRIORITIES: readonly BulletinPriority[] = ["urgent", "pinned", "normal"];
-
-function isPriority(value: string): value is BulletinPriority {
-  return (PRIORITIES as readonly string[]).includes(value);
-}
 
 export async function GET(request: NextRequest) {
   try {
     await requireRole("readonly");
 
     const params = request.nextUrl.searchParams;
-    const priorities = params
-      .getAll("priority")
-      .flatMap((value) => value.split(","))
-      .map((value) => value.trim())
-      .filter(isPriority);
 
     const filters: BulletinFilters = {
-      ...(priorities.length > 0 ? { priority: priorities } : {}),
       department: (params.get("department") ?? "All") as Department,
       ...(params.get("q") ? { q: params.get("q") as string } : {}),
-      includeExpired: params.get("includeExpired") === "true",
     };
 
     return Response.json(await getBulletins(filters));
@@ -62,50 +47,29 @@ export async function POST(request: NextRequest) {
     const actor = await requireRole("author");
     const body = await readJsonBody(request);
 
-    const priority = optionalString(body, "priority") ?? "normal";
-    if (!isPriority(priority)) {
-      throw new ApiError(422, "`priority` must be one of `urgent`, `pinned`, `normal`.", {
-        details: { field: "priority" },
+    // The hero banner is optional; when a URL is set, alt text is required.
+    const heroImageUrl = normalizeHeroImageUrl(optionalString(body, "heroImageUrl"));
+    const heroImageAlt = normalizeHeroImageAlt(optionalString(body, "heroImageAlt"));
+    if (heroImageUrl && !heroImageAlt) {
+      throw new ApiError(422, "A hero image needs alt text: provide `heroImageAlt` alongside `heroImageUrl`.", {
+        code: "missing_hero_alt",
+        details: { field: "heroImageAlt" },
       });
     }
 
-    // An urgent or pinned notice is a clinical-lead call: it floats to the top
-    // of every board in the hospital. `normal` notices are a staff-level write.
-    if ((priority === "urgent" || priority === "pinned") && !roleAtLeast(actor.role, "clinical_lead")) {
-      throw new ApiError(
-        403,
-        `Posting an ${priority} bulletin requires the clinical lead role or higher.`,
-        { code: "forbidden", details: { requiredRole: "clinical_lead", actualRole: actor.role } },
-      );
-    }
-
-    const expiresAt = optionalDate(body, "expires_at");
     const linkedArticleId = optionalString(body, "linked_article_id");
-
-    // The presentation tier is one shared field; anything outside the enum is a
-    // 422. Omitted means `notice`.
-    const format = optionalString(body, "format") ?? "notice";
-    if (!isBulletinFormat(format)) {
-      throw new ApiError(422, "`format` must be one of `notice`, `announcement`, `featured`.", {
-        details: { field: "format" },
-      });
-    }
 
     const bulletin = await createBulletin({
       title: requireString(body, "title", { maxLength: 300 }),
       body_markdown: requireString(body, "body_markdown", { minLength: 1 }),
       departments: requireStringArray(body, "departments"),
-      priority,
-      format,
-      kicker: optionalString(body, "kicker", { maxLength: KICKER_MAX_LENGTH }) ?? null,
+      pinned: optionalBoolean(body, "pinned") ?? false,
+      urgent: optionalBoolean(body, "urgent") ?? false,
       deck: optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null,
-      // The hero banner is a featured/announcement surface; an absent value is
-      // `null`, and anything that is not an https URL or a relative portal path
-      // is refused with 422 `invalid_hero_image_url` before it is stored.
-      hero_image_url: normalizeHeroImageUrl(optionalString(body, "heroImageUrl")),
-      // `undefined` means "apply the priority default"; an explicit null means
-      // the poster deliberately asked for no expiry (refused for `urgent`).
-      expires_at: expiresAt,
+      hero_image_url: heroImageUrl,
+      hero_image_alt: heroImageAlt,
+      // Optional: `null`/omitted means the post lives until it is deleted.
+      expires_at: optionalDate(body, "expires_at"),
       linked_article_id: linkedArticleId && linkedArticleId.length > 0 ? linkedArticleId : null,
       author_id: actor.id,
     });

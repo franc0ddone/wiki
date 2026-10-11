@@ -162,29 +162,25 @@ async function main() {
     );
   });
 
-  await test("bulletins: expired notices are excluded by default and included on request", async () => {
+  await test("an expired bulletin is silently deleted when the board is fetched", async () => {
     const marker = `${PREFIX}-expired`;
     const bulletin = await createBulletin({
       title: `${marker} notice`,
       body_markdown: "Verification fixture.",
       departments: ["ER"],
-      priority: "normal",
       // Deliberately already in the past.
       expires_at: new Date(Date.now() - 60_000),
       author_id: author.id,
     });
 
-    const withoutExpired = await getBulletins();
+    const board = await getBulletins();
     assert(
-      !withoutExpired.some((row) => row.id === bulletin.id),
-      "an expired bulletin appeared in the default listing",
+      !board.some((row) => row.id === bulletin.id),
+      "an expired bulletin appeared on the board",
     );
 
-    const withExpired = await getBulletins({ includeExpired: true });
-    assert(
-      withExpired.some((row) => row.id === bulletin.id),
-      "includeExpired=true did not return the expired bulletin",
-    );
+    const gone = await db.bulletin.findUnique({ where: { id: bulletin.id }, select: { id: true } });
+    assertEqual(gone, null, "the expired bulletin survived the sweep");
   });
 
   /* ------------------------------------------------- publishing + versions */
@@ -330,54 +326,51 @@ async function main() {
 
   /* ---------------------------------------------------------------- expiry */
 
-  await test("an urgent bulletin always ends up with an expiry", async () => {
+  await test("a bulletin may be posted urgent or pinned, and neither forces an expiry", async () => {
     const bulletin = await createBulletin({
       title: `${PREFIX} urgent`,
       body_markdown: "Urgent fixture.",
       departments: ["ICU"],
-      priority: "urgent",
+      urgent: true,
       author_id: lead.id,
     });
 
     const row = await db.bulletin.findUniqueOrThrow({
       where: { id: bulletin.id },
-      select: { expiresAt: true },
+      select: { urgent: true, pinned: true, expiresAt: true },
     });
-    assert(row.expiresAt, "an urgent bulletin was stored without an expiry");
-    const hours = (row.expiresAt.getTime() - Date.now()) / 3_600_000;
-    assert(
-      Math.abs(hours - 72) < 0.1,
-      `the urgent default should be 72 hours, got ${hours.toFixed(2)}`,
-    );
+    assertEqual(row.urgent, true, "the urgent flag was not stored");
+    assertEqual(row.pinned, false, "the pinned flag was not left false");
+    assertEqual(row.expiresAt, null, "an urgent bulletin without an explicit expiry must not expire");
 
-    await assertApiError(
-      () =>
-        createBulletin({
-          title: `${PREFIX} urgent no expiry`,
-          body_markdown: "Urgent fixture.",
-          departments: ["ICU"],
-          priority: "urgent",
-          expires_at: null,
-          author_id: lead.id,
-        }),
-      "urgent_requires_expiry",
-      "urgent with expires_at: null",
-    );
+    const pinned = await createBulletin({
+      title: `${PREFIX} pinned`,
+      body_markdown: "Pinned fixture.",
+      departments: ["ICU"],
+      pinned: true,
+      author_id: lead.id,
+    });
+    const pinnedRow = await db.bulletin.findUniqueOrThrow({
+      where: { id: pinned.id },
+      select: { pinned: true, urgent: true, expiresAt: true },
+    });
+    assertEqual(pinnedRow.pinned, true, "the pinned flag was not stored");
+    assertEqual(pinnedRow.urgent, false, "the urgent flag was not left false");
+    assertEqual(pinnedRow.expiresAt, null, "a pinned bulletin must not expire by default");
   });
 
-  await test("a normal bulletin may be posted without an expiry", async () => {
+  await test("a bulletin may be posted without an expiry", async () => {
     const bulletin = await createBulletin({
       title: `${PREFIX} normal`,
       body_markdown: "Normal fixture.",
       departments: ["CSR"],
-      priority: "normal",
       author_id: author.id,
     });
     const row = await db.bulletin.findUniqueOrThrow({
       where: { id: bulletin.id },
       select: { expiresAt: true },
     });
-    assertEqual(row.expiresAt, null, "normal bulletin expiresAt");
+    assertEqual(row.expiresAt, null, "a bulletin without an explicit expiry must not expire");
   });
 
   await test("acknowledging a bulletin is idempotent", async () => {
@@ -385,7 +378,6 @@ async function main() {
       title: `${PREFIX} ack`,
       body_markdown: "Ack fixture.",
       departments: ["ER"],
-      priority: "normal",
       author_id: lead.id,
     });
 

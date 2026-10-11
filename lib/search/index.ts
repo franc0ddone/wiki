@@ -205,7 +205,11 @@ export function buildSearchIndex(
         departments: bulletin.departments,
         headings: headingsOf(bulletin.body_markdown),
         body: stripMarkdown(bulletin.body_markdown),
-        tags: [...deptTags(bulletin.departments), bulletin.priority],
+        tags: [
+          ...deptTags(bulletin.departments),
+          ...(bulletin.urgent ? ["urgent"] : []),
+          ...(bulletin.pinned ? ["pinned"] : []),
+        ],
         meta: [bulletin.author_name],
       })),
     ),

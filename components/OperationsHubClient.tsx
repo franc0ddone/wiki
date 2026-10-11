@@ -7,20 +7,16 @@ import Link from "next/link";
 import {
   BookOpen,
   CalendarDays,
-  ChevronRight,
-  Clock,
   History,
-  Info,
   Megaphone,
   PenLine,
   Pencil,
-  Pin,
   Plus,
   TriangleAlert,
 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
-import { ExpiryChip } from "@/components/bulletin/ExpiryChip";
+import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
@@ -30,7 +26,6 @@ import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
 import { deleteBulletin, listBulletins } from "@/lib/bulletin/api";
-import { expiredChipLabel, partitionByExpiry } from "@/lib/bulletin/expiry";
 import { matchesDepartment } from "@/lib/data/filters";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
 import { roleAtLeast, type Role } from "@/lib/roles";
@@ -42,7 +37,6 @@ import {
   CLINICAL_DEPARTMENTS,
   DEPARTMENT_LABELS,
   type Bulletin,
-  type BulletinPriority,
   type ClinicalDepartment,
   type Department,
   type DepartmentCounts,
@@ -161,42 +155,6 @@ function authorName(author: string): string {
 
 /* ------------------------------------------------------------------- badges */
 
-const PRIORITY_META: Record<
-  BulletinPriority,
-  { label: string; className: string; icon: ReactNode }
-> = {
-  urgent: {
-    label: "Urgent",
-    className: "border-red-200 bg-red-50 text-red-700",
-    icon: <TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-  pinned: {
-    label: "Pinned",
-    className: "border-teal-200 bg-teal-50 text-teal-800",
-    icon: <Pin size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-  normal: {
-    label: "Notice",
-    className: "border-zinc-200 bg-zinc-50 text-zinc-600",
-    icon: <Info size={12} strokeWidth={2} aria-hidden="true" />,
-  },
-};
-
-function PriorityBadge({ priority }: { priority: BulletinPriority }) {
-  const meta = PRIORITY_META[priority];
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-px text-xs font-semibold",
-        meta.className,
-      )}
-    >
-      {meta.icon}
-      {meta.label}
-    </span>
-  );
-}
-
 function StatusBadge({ status }: { status: KnowledgeArticle["status"] }) {
   if (status === "published") {
     return (
@@ -282,8 +240,12 @@ function RowTimestamp({ iso, withTime }: { iso: string; withTime: boolean }) {
   );
 }
 
+/**
+ * A board row. Every row is the same simple white row (prompt 6c follow-up):
+ * author · date, title, excerpt, department tags, and the urgent / expiry chips
+ * where applicable. A pinned post carries no marker here — it only sorts first.
+ */
 function BulletinRow({ bulletin, isSelected, now }: { bulletin: Bulletin; isSelected: boolean; now: number }) {
-  const pinned = bulletin.priority === "pinned";
   return (
     <span className="block">
       <span className="flex items-center justify-between gap-3">
@@ -299,86 +261,16 @@ function BulletinRow({ bulletin, isSelected, now }: { bulletin: Bulletin; isSele
         )}
       >
         {bulletin.title}
-        {pinned ? (
-          <span role="img" aria-label="Pinned" className="ml-1.5 text-[12px]">
-            📌
-          </span>
-        ) : null}
       </span>
       <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
         {excerpt(bulletin.body_markdown)}
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-1">
-        {bulletin.priority === "urgent" ? <PriorityBadge priority={bulletin.priority} /> : null}
-        <ExpiryChip expiresAt={bulletin.expires_at} priority={bulletin.priority} now={now} />
+        {bulletin.urgent ? <UrgentChip /> : null}
+        <ExpiryChip expiresAt={bulletin.expires_at} now={now} />
         <DepartmentTags departments={bulletin.departments} />
       </span>
     </span>
-  );
-}
-
-/** A row inside the collapsed Expired tray — greyed, read-only. */
-function ExpiredBulletinRow({ bulletin }: { bulletin: Bulletin }) {
-  return (
-    <span className="block opacity-60">
-      <span className="flex items-center justify-between gap-3">
-        <span className="truncate text-xs font-medium text-zinc-500">
-          {authorName(bulletin.author_name)}
-        </span>
-        <RowTimestamp iso={bulletin.created_at} withTime />
-      </span>
-      <span className="mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em] text-zinc-700">
-        {bulletin.title}
-      </span>
-      <span className="mt-2 flex flex-wrap items-center gap-1">
-        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-px text-xs font-semibold text-zinc-500">
-          <Clock size={12} strokeWidth={2} aria-hidden="true" />
-          {bulletin.expires_at ? expiredChipLabel(bulletin.expires_at) : "Expired"}
-        </span>
-        <DepartmentTags departments={bulletin.departments} />
-      </span>
-    </span>
-  );
-}
-
-/**
- * The collapsed "Expired (M)" tray that sits below the active list. Expanding
- * it renders the expired array it was handed — it performs no refetch. The two
- * arrays both come from the single `?includeExpired=true` fetch, partitioned
- * client-side.
- */
-function ExpiredTray({ items }: { items: readonly Bulletin[] }) {
-  const [open, setOpen] = useState(false);
-  if (items.length === 0) return null;
-  return (
-    <div className="px-1 pb-1 pt-3">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-1.5 rounded-[10px] border border-dashed border-zinc-300 px-3 py-2 text-[12.5px] font-medium text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-      >
-        <ChevronRight
-          size={13}
-          strokeWidth={2}
-          aria-hidden="true"
-          className={cx("transition-transform", open && "rotate-90")}
-        />
-        Expired ({items.length})
-      </button>
-      {open ? (
-        <ul role="list" className="mt-1.5 space-y-1.5">
-          {items.map((bulletin) => (
-            <li
-              key={bulletin.id}
-              className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
-            >
-              <ExpiredBulletinRow bulletin={bulletin} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }
 
@@ -571,7 +463,7 @@ export function OperationsHubClient({
 
   const refreshBulletins = useCallback(async (preferId?: string) => {
     try {
-      const fresh = await listBulletins({ includeExpired: true });
+      const fresh = await listBulletins();
       setBulletinList(fresh);
       if (preferId) setSelectedBulletinId(preferId);
     } catch {
@@ -711,16 +603,15 @@ export function OperationsHubClient({
       ),
     [searchedBulletins, activeDepartment],
   );
-  // One fetch feeds both buckets; the split is client-side (active = no expiry
-  // or still in the future). `now` ticks each minute so a notice ages out live.
-  const { active: activeBulletins, expired: expiredBulletins } = useMemo(
-    () => partitionByExpiry(filteredBulletins, now),
-    [filteredBulletins, now],
-  );
   const bulletinCounts = useMemo(() => buildCounts(searchedBulletins), [searchedBulletins]);
+  // Pinned posts float to the top; order within each group is preserved.
+  const boardBulletins = useMemo(
+    () => [...filteredBulletins].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+    [filteredBulletins],
+  );
   const selectedBulletin = useMemo(
-    () => activeBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
-    [activeBulletins, selectedBulletinId],
+    () => boardBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
+    [boardBulletins, selectedBulletinId],
   );
 
   /* Knowledge base */
@@ -787,13 +678,11 @@ export function OperationsHubClient({
       <main className="flex min-h-0 flex-1 flex-col print:block">
         {activeView === "bulletins" ? (
           <MasterDetailShell
-            items={activeBulletins}
+            items={boardBulletins}
             getId={(bulletin) => bulletin.id}
             selectedId={selectedBulletin?.id ?? null}
             onSelect={setSelectedBulletinId}
             listTitle="Bulletin Board"
-            listSubtitle={`${activeBulletins.length} active · ${expiredBulletins.length} expired`}
-            listFooter={<ExpiredTray items={expiredBulletins} />}
             listActions={
               isAuthor ? (
                 <button

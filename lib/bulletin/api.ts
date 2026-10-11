@@ -3,29 +3,28 @@
  * API's own `{ error, code }` reasons reach the UI verbatim.
  */
 import { ApiRequestError, request } from "@/lib/editor/api";
-import type { Bulletin, BulletinFormat, ClinicalDepartment } from "@/types/portal";
-import type { BulletinPriority } from "@/types/portal";
+import type { Bulletin, ClinicalDepartment } from "@/types/portal";
 
 export interface BulletinPayload {
   title: string;
   body_markdown: string;
   departments: ClinicalDepartment[];
-  priority: BulletinPriority;
-  /** Presentation tier. Omitted means `notice`. */
-  format?: BulletinFormat;
-  /** Featured-only fields. */
-  kicker?: string | null;
+  /** Opt-in flags. */
+  pinned?: boolean;
+  urgent?: boolean;
+  /** The optional muted subtitle under the headline. */
   deck?: string | null;
-  /** Featured / announcement hero banner. `null` = none. */
+  /** The optional hero banner. `null` = none. */
   heroImageUrl?: string | null;
-  /** ISO-8601, `null` for "never", or omitted to apply the priority default. */
+  /** Required whenever `heroImageUrl` is set. */
+  heroImageAlt?: string | null;
+  /** ISO-8601, or `null` for "lives until deleted". */
   expires_at?: string | null;
   linked_article_id?: string | null;
 }
 
-export function listBulletins(options: { includeExpired?: boolean } = {}): Promise<Bulletin[]> {
-  const query = options.includeExpired ? "?includeExpired=true" : "";
-  return request<Bulletin[]>(`/api/bulletins${query}`);
+export function listBulletins(): Promise<Bulletin[]> {
+  return request<Bulletin[]>("/api/bulletins");
 }
 
 export function createBulletin(payload: BulletinPayload): Promise<Bulletin> {

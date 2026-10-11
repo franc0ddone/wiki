@@ -69,11 +69,7 @@ import {
   serializeFootnoteReference,
 } from "@/lib/markdown/footnotes";
 import {
-  BULLETIN_EXPIRY_DEFAULTS,
-  canPostPriority,
-  defaultExpiryFor,
-  expiryLabel,
-  priorityRequiresClinicalLead,
+  DECK_MAX_LENGTH,
   shouldClearAcksForUrgentEdit,
   validateBulletinDraft,
 } from "@/lib/bulletin/lifecycle";
@@ -120,27 +116,17 @@ import {
   summarizeReactions,
 } from "@/lib/bulletin/reactions";
 import {
-  BULLETIN_FORMATS,
-  DEFAULT_BULLETIN_FORMAT,
-  formatHasHero,
-  formatUsesAck,
-  isBulletinFormat,
-} from "@/lib/bulletin/format";
-import {
+  HERO_ALT_MAX_LENGTH,
   HERO_IMAGE_URL_MAX_LENGTH,
   isValidHeroImageUrl,
+  normalizeHeroImageAlt,
   normalizeHeroImageUrl,
 } from "@/lib/bulletin/hero";
-import {
-  expiredChipLabel,
-  isExpired,
-  isUrgentExpiringSoon,
-  partitionByExpiry,
-  relativeExpiryLabel,
-} from "@/lib/bulletin/expiry";
+import { relativeExpiryLabel } from "@/lib/bulletin/expiry";
 import {
   createBulletin,
   getBulletinById,
+  getBulletins,
   getReactionSummary,
   toggleReaction,
   updateBulletin,
@@ -173,13 +159,11 @@ import {
   splitCellSpan,
 } from "@/lib/markdown/cell-attributes";
 import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
-import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
-import { AnnouncementHero } from "@/components/bulletin/AnnouncementHero";
-import { AcknowledgedPill, ExpiryChip, PinnedBadge } from "@/components/bulletin/ExpiryChip";
+import { BulletinHero } from "@/components/bulletin/BulletinHero";
+import { AcknowledgedPill, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
 import { dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
-import type { Bulletin } from "@/types/portal";
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -417,35 +401,15 @@ check("status guard recognises exactly the three lifecycle values", () => {
 });
 
 console.log("bulletin lifecycle");
-check("expiry defaults: urgent 72h, pinned 30d, normal none", () => {
-  const from = new Date("2026-01-01T00:00:00.000Z");
-  assert.equal(defaultExpiryFor("urgent", from)?.toISOString(), "2026-01-04T00:00:00.000Z");
-  assert.equal(defaultExpiryFor("pinned", from)?.toISOString(), "2026-01-31T00:00:00.000Z");
-  assert.equal(defaultExpiryFor("normal", from), null);
-  assert.equal(BULLETIN_EXPIRY_DEFAULTS.urgent, 72 * 60 * 60 * 1000);
-});
-check("expiry labels describe the effective window", () => {
-  assert.equal(expiryLabel("urgent"), "72 hours from now");
-  assert.equal(expiryLabel("pinned"), "30 days from now");
-  assert.equal(expiryLabel("normal"), "No expiry");
-});
-check("priority gate: normal is author+, urgent/pinned are clinical_lead+", () => {
-  assert.equal(canPostPriority("author", "normal"), true);
-  assert.equal(canPostPriority("author", "urgent"), false);
-  assert.equal(canPostPriority("clinical_lead", "urgent"), true);
-  assert.equal(canPostPriority(null, "normal"), false);
-  assert.equal(priorityRequiresClinicalLead("pinned"), true);
-  assert.equal(priorityRequiresClinicalLead("normal"), false);
-});
 check("editing an urgent notice with changed content clears acks", () => {
-  const urgent = { priority: "urgent" as const, title: "A", body_markdown: "B" };
-  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "urgent", title: "A", body_markdown: "B" }), false);
-  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "urgent", title: "A", body_markdown: "C" }), true);
-  assert.equal(shouldClearAcksForUrgentEdit(urgent, { priority: "normal", title: "A", body_markdown: "C" }), false);
+  const urgent = { urgent: true, title: "A", body_markdown: "B" };
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { urgent: true, title: "A", body_markdown: "B" }), false);
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { urgent: true, title: "A", body_markdown: "C" }), true);
+  assert.equal(shouldClearAcksForUrgentEdit(urgent, { urgent: false, title: "A", body_markdown: "C" }), false);
   assert.equal(
     shouldClearAcksForUrgentEdit(
-      { priority: "normal", title: "A", body_markdown: "B" },
-      { priority: "normal", title: "Z", body_markdown: "Y" },
+      { urgent: false, title: "A", body_markdown: "B" },
+      { urgent: false, title: "Z", body_markdown: "Y" },
     ),
     false,
   );
@@ -455,19 +419,26 @@ check("composer validation blocks the fields the API would refuse", () => {
     title: "T",
     body_markdown: "B",
     departments: ["ER"] as string[],
-    priority: "normal" as "normal" | "urgent" | "pinned",
-    expires_at: undefined as string | null | undefined,
+    deck: null as string | null,
+    expires_at: null as string | null,
+    hero_image_url: null as string | null,
+    hero_image_alt: null as string | null,
   };
-  const codes = (patch: Partial<typeof base>, canPostRestricted = false) =>
-    validateBulletinDraft({ ...base, ...patch }, { canPostRestricted }).errors.map((issue) => issue.code);
+  const codes = (patch: Partial<typeof base>) =>
+    validateBulletinDraft({ ...base, ...patch }).errors.map((issue) => issue.code);
   assert.deepEqual(codes({}), []);
   assert.deepEqual(codes({ title: "   " }), ["title_empty"]);
   assert.deepEqual(codes({ title: "x".repeat(301) }), ["title_too_long"]);
   assert.deepEqual(codes({ body_markdown: "" }), ["body_empty"]);
   assert.deepEqual(codes({ departments: [] }), ["no_departments"]);
-  assert.deepEqual(codes({ priority: "urgent" }), ["priority_forbidden"]);
-  assert.deepEqual(codes({ priority: "urgent" }, true), []);
-  assert.deepEqual(codes({ priority: "urgent", expires_at: null }, true), ["urgent_requires_expiry"]);
+  assert.deepEqual(codes({ deck: "x".repeat(DECK_MAX_LENGTH + 1) }), ["deck_too_long"]);
+  assert.deepEqual(codes({ expires_at: "not-a-date" }), ["expiry_invalid"]);
+  // A hero image without alt text is the API's `missing_hero_alt`, surfaced inline.
+  assert.deepEqual(codes({ hero_image_url: "https://cdn.example/hero.jpg" }), ["missing_hero_alt"]);
+  assert.deepEqual(
+    codes({ hero_image_url: "https://cdn.example/hero.jpg", hero_image_alt: "A cat" }),
+    [],
+  );
 });
 
 console.log("images");
@@ -941,33 +912,6 @@ check("the headline rule renders 64px × 3px in #0f766e with the exact type", ()
   assert.match(html, /bg-\[#0f766e\]/);
 });
 
-console.log("bulletin format");
-
-check("the format vocabulary is one shared enum, default `notice`", () => {
-  assert.deepEqual([...BULLETIN_FORMATS], ["notice", "announcement", "featured"]);
-  assert.equal(DEFAULT_BULLETIN_FORMAT, "notice");
-  assert.equal(isBulletinFormat("notice"), true);
-  assert.equal(isBulletinFormat("announcement"), true);
-  assert.equal(isBulletinFormat("featured"), true);
-  assert.equal(isBulletinFormat("hero"), false);
-  assert.equal(isBulletinFormat(null), false);
-});
-
-check("celebratory tiers drop the acks; only `notice` keeps them", () => {
-  assert.equal(formatUsesAck("notice"), true);
-  assert.equal(formatUsesAck("announcement"), false);
-  assert.equal(formatUsesAck("featured"), false);
-});
-
-check("the featured hero is a flat teal band with no brand-blue anywhere", () => {
-  const html = renderToStaticMarkup(
-    createElement(BulletinHero, { title: "Employee of the Month", kicker: "Pinned · Monthly", deck: "Thank you for the long nights." }),
-  );
-  assert.match(html, /bg-\[#0f766e\]/);
-  assert.match(html, /Employee of the Month/);
-  assert.ok(!/#1E2A4A/i.test(html), "brand-blue leaked into the featured tree");
-});
-
 console.log("bulletin hero image");
 
 check("a hero URL is https or a relative portal path, and nothing else", () => {
@@ -995,18 +939,28 @@ check("normalizeHeroImageUrl maps blank to null and refuses a bad URL with 422",
   assert.equal(status, 422);
 });
 
-check("only the featured and announcement tiers carry a hero", () => {
-  assert.equal(formatHasHero("featured"), true);
-  assert.equal(formatHasHero("announcement"), true);
-  assert.equal(formatHasHero("notice"), false);
+check("normalizeHeroImageAlt maps blank to null and caps the length", () => {
+  assert.equal(normalizeHeroImageAlt(null), null);
+  assert.equal(normalizeHeroImageAlt("   "), null);
+  assert.equal(normalizeHeroImageAlt(" A cat on a mat "), "A cat on a mat");
+  let status = 0;
+  try {
+    normalizeHeroImageAlt("x".repeat(HERO_ALT_MAX_LENGTH + 1));
+  } catch (error) {
+    status = error instanceof ApiError ? error.status : -1;
+  }
+  assert.equal(status, 422);
 });
 
-check("the hero banner renders full-bleed (w-full h-[220px] object-cover)", () => {
-  const html = renderToStaticMarkup(createElement(BulletinHeroImage, { url: "https://cdn.example/hero.jpg" }));
+check("the hero banner renders full-bleed with its alt text", () => {
+  const html = renderToStaticMarkup(
+    createElement(BulletinHeroImage, { url: "https://cdn.example/hero.jpg", alt: "A cat on a mat" }),
+  );
   assert.match(html, /w-full/);
   assert.match(html, /h-\[220px\]/);
   assert.match(html, /object-cover/);
   assert.match(html, /https:\/\/cdn\.example\/hero\.jpg/);
+  assert.match(html, /alt="A cat on a mat"/);
 });
 
 console.log("bulletin expiry");
@@ -1018,43 +972,11 @@ check("relative expiry text follows the m / h / d thresholds", () => {
   assert.equal(relativeExpiryLabel(new Date(now + 6 * 86_400_000).toISOString(), now), "in 6d");
 });
 
-check("a null expiry never ages out; a past one does", () => {
-  const now = Date.parse("2026-09-28T12:00:00.000Z");
-  assert.equal(isExpired(null, now), false);
-  assert.equal(isExpired(new Date(now + 1).toISOString(), now), false);
-  assert.equal(isExpired(new Date(now - 1).toISOString(), now), true);
-});
-
-check("partitionByExpiry splits null-and-future (active) from past (expired)", () => {
-  const now = Date.parse("2026-09-28T12:00:00.000Z");
-  const items = [
-    { id: "a", expires_at: null, priority: "normal" },
-    { id: "b", expires_at: new Date(now + 1000).toISOString(), priority: "urgent" },
-    { id: "c", expires_at: new Date(now - 1000).toISOString(), priority: "normal" },
-  ] as unknown as Bulletin[];
-  const { active, expired } = partitionByExpiry(items, now);
-  assert.deepEqual(active.map((b) => b.id), ["a", "b"]);
-  assert.deepEqual(expired.map((b) => b.id), ["c"]);
-});
-
-check("only an urgent notice inside 24 hours takes the red tint", () => {
-  const now = Date.parse("2026-09-28T12:00:00.000Z");
-  assert.equal(isUrgentExpiringSoon(new Date(now + 3_600_000).toISOString(), "urgent", now), true);
-  assert.equal(isUrgentExpiringSoon(new Date(now + 30 * 3_600_000).toISOString(), "urgent", now), false);
-  assert.equal(isUrgentExpiringSoon(new Date(now + 3_600_000).toISOString(), "normal", now), false);
-  assert.equal(isUrgentExpiringSoon(null, "urgent", now), false);
-});
-
-check("the expired chip reads `Expired Sep 30` in the facility zone", () => {
-  assert.equal(expiredChipLabel("2026-09-30T10:00:00.000Z"), "Expired Sep 30");
-});
-
 check("the expiry chip carries the relative text and the quiet zinc pill", () => {
   const now = Date.parse("2026-09-28T12:00:00.000Z");
   const html = renderToStaticMarkup(
     createElement(ExpiryChip, {
       expiresAt: new Date(now + 3 * 3_600_000).toISOString(),
-      priority: "normal",
       now,
     }),
   );
@@ -1062,36 +984,23 @@ check("the expiry chip carries the relative text and the quiet zinc pill", () =>
   assert.match(html, /border-zinc-200 bg-zinc-50/);
 });
 
-check("an urgent chip inside 24 hours pulses red", () => {
-  const now = Date.parse("2026-09-28T12:00:00.000Z");
-  const html = renderToStaticMarkup(
-    createElement(ExpiryChip, {
-      expiresAt: new Date(now + 3_600_000).toISOString(),
-      priority: "urgent",
-      now,
-    }),
-  );
-  assert.match(html, /border-red-200 bg-red-50 text-red-700/);
-  assert.match(html, /animate-pulse/);
-});
-
-check("a notice with no expiry renders no chip", () => {
-  const html = renderToStaticMarkup(createElement(ExpiryChip, { expiresAt: null, priority: "normal", now: 0 }));
+check("a post with no expiry renders no chip", () => {
+  const html = renderToStaticMarkup(createElement(ExpiryChip, { expiresAt: null, now: 0 }));
   assert.equal(html, "");
 });
 
-check("the acknowledged and pinned pills take the dove-green treatment", () => {
+check("the urgent flag is the red chip; the acknowledged pill is dove green", () => {
+  const urgent = renderToStaticMarkup(createElement(UrgentChip));
+  assert.match(urgent, /border-red-200 bg-red-50 text-red-700/);
+  assert.match(urgent, /Urgent/);
   const acked = renderToStaticMarkup(createElement(AcknowledgedPill));
   assert.match(acked, /border-\[#5F6E00\] bg-\[#E6EBA5\] text-\[#5F6E00\]/);
   assert.match(acked, /Acknowledged/);
-  const pinned = renderToStaticMarkup(createElement(PinnedBadge));
-  assert.match(pinned, /border-\[#5F6E00\] bg-\[#E6EBA5\] text-\[#5F6E00\]/);
-  assert.match(pinned, /Pinned/);
 });
 
-check("the announcement hero is a Dove Black calling card with a centred meta line", () => {
+check("the bulletin hero is a Dove Black calling card with a centred meta line", () => {
   const html = renderToStaticMarkup(
-    createElement(AnnouncementHero, {
+    createElement(BulletinHero, {
       title: "Welcome to the team, Nadia",
       authorName: "Priya Raghunathan",
       departments: ["CSR" as const],
@@ -1105,6 +1014,34 @@ check("the announcement hero is a Dove Black calling card with a centred meta li
   assert.ok(html.includes("Welcome to the team, Nadia"));
   assert.match(html, /Priya Raghunathan/);
   assert.match(html, /Sep 28, 2026/);
+});
+
+check("the hero renders the deck as a #c9c9bd line, and nothing when absent", () => {
+  const withDeck = renderToStaticMarkup(
+    createElement(BulletinHero, {
+      title: "Deposit thresholds",
+      deck: "The new bands take effect Monday.",
+      authorName: "Priya Raghunathan",
+      departments: ["CSR" as const],
+      publishedAt: "2026-09-28T18:00:00.000Z",
+    }),
+  );
+  assert.match(
+    withDeck,
+    /<p class="[^"]*text-\[#c9c9bd\][^"]*">The new bands take effect Monday\.<\/p>/,
+    "the deck must render as a muted #c9c9bd subtitle line",
+  );
+  assert.equal((withDeck.match(/<p/g) ?? []).length, 1, "the deck is the hero's only paragraph line");
+
+  const withoutDeck = renderToStaticMarkup(
+    createElement(BulletinHero, {
+      title: "Deposit thresholds",
+      authorName: "Priya Raghunathan",
+      departments: ["CSR" as const],
+      publishedAt: "2026-09-28T18:00:00.000Z",
+    }),
+  );
+  assert.equal((withoutDeck.match(/<p/g) ?? []).length, 0, "no deck must render no line and no empty space");
 });
 
 console.log("bulletin blocks");
@@ -1424,50 +1361,35 @@ async function runDatabaseChecks(): Promise<void> {
   });
   userIds.push(other.id);
 
-  /* ---- bulletin format round-trip (DB) ---- */
+  /* ---- pinned / urgent flags round-trip (DB) ---- */
 
-  const bulletins = [];
-  for (const fmt of BULLETIN_FORMATS) {
-    bulletins.push(
-      await createBulletin({
-        title: `Format ${fmt}`,
-        body_markdown: "Body",
-        departments: ["ER"],
-        priority: "normal",
-        format: fmt,
-        kicker: fmt === "featured" ? "Kicker" : null,
-        deck: fmt === "featured" ? "Deck" : null,
-        author_id: author.id,
-      }),
-    );
-  }
-
-  for (const fmt of BULLETIN_FORMATS) {
-    const fetched = await getBulletinById(bulletins.find((b) => b.format === fmt)?.id ?? "", {
-      includeExpired: true,
-    });
-    check(`format \`${fmt}\` persists and round-trips through the data layer`, () => {
-      assert.equal(fetched?.format, fmt);
-    });
-  }
-
-  const defaulted = await createBulletin({
-    title: "Defaulted format",
+  const flagged = await createBulletin({
+    title: "Pinned and urgent",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "normal",
+    pinned: true,
+    urgent: true,
+    deck: "A standfirst",
     author_id: author.id,
   });
-  check("an omitted format defaults to `notice`", () => assert.equal(defaulted.format, DEFAULT_BULLETIN_FORMAT));
-
-  check("an invalid format value is not a valid BulletinFormat (the route 422s it)", () => {
-    assert.equal(isBulletinFormat("spotlight"), false);
+  const refetchedFlagged = await getBulletinById(flagged.id);
+  check("`pinned` / `urgent` / `deck` persist and round-trip through the data layer", () => {
+    assert.equal(flagged.pinned, true);
+    assert.equal(flagged.urgent, true);
+    assert.equal(flagged.deck, "A standfirst");
+    assert.equal(refetchedFlagged?.pinned, true);
+    assert.equal(refetchedFlagged?.urgent, true);
   });
 
-  const featured = bulletins.find((b) => b.format === "featured");
-  check("the featured kicker/deck persist and round-trip", () => {
-    assert.equal(featured?.kicker, "Kicker");
-    assert.equal(featured?.deck, "Deck");
+  const unflagged = await createBulletin({
+    title: "Neither flag",
+    body_markdown: "Body",
+    departments: ["ER"],
+    author_id: author.id,
+  });
+  check("the flags default to false", () => {
+    assert.equal(unflagged.pinned, false);
+    assert.equal(unflagged.urgent, false);
   });
 
   /* ---- hero banner (DB) ---- */
@@ -1476,26 +1398,25 @@ async function runDatabaseChecks(): Promise<void> {
     title: "Hero bulletin",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "normal",
-    format: "featured",
     hero_image_url: "https://cdn.example/hero.jpg",
+    hero_image_alt: "A cat on a mat",
     author_id: author.id,
   });
-  const refetchedHero = await getBulletinById(heroBulletin.id, { includeExpired: true });
-  check("a hero image URL persists and round-trips through the data layer", () => {
+  const refetchedHero = await getBulletinById(heroBulletin.id);
+  check("a hero image URL and its alt text persist and round-trip", () => {
     assert.equal(heroBulletin.hero_image_url, "https://cdn.example/hero.jpg");
+    assert.equal(heroBulletin.hero_image_alt, "A cat on a mat");
     assert.equal(refetchedHero?.hero_image_url, "https://cdn.example/hero.jpg");
+    assert.equal(refetchedHero?.hero_image_alt, "A cat on a mat");
   });
 
   const plainBulletin = await createBulletin({
     title: "No hero bulletin",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "normal",
-    format: "announcement",
     author_id: author.id,
   });
-  check("a hero tier with no banner omits `hero_image_url` (falsy, never a key)", () => {
+  check("a bulletin with no banner omits `hero_image_url` (falsy, never a key)", () => {
     assert.ok(!plainBulletin.hero_image_url, "no banner must not surface a URL");
   });
 
@@ -1515,7 +1436,6 @@ async function runDatabaseChecks(): Promise<void> {
     title: "Expiry round-trip",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "normal",
     expires_at: new Date(futureMs),
     author_id: author.id,
   });
@@ -1528,46 +1448,32 @@ async function runDatabaseChecks(): Promise<void> {
     title: "No expiry",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "normal",
     author_id: author.id,
   });
-  check("a `normal` notice without an expiry stays null (never ages out)", () => {
+  check("a bulletin without an expiry stays null (lives until deleted)", () => {
     assert.equal(noExpiry.expires_at, null);
   });
 
-  const urgentDefault = await createBulletin({
-    title: "Urgent default",
+  // Silent delete: fetching the board removes rows whose expiry has passed.
+  const pastExpiry = await createBulletin({
+    title: "Already expired",
     body_markdown: "Body",
     departments: ["ER"],
-    priority: "urgent",
+    expires_at: new Date(Date.now() - 60_000),
     author_id: author.id,
   });
-  check("an `urgent` notice without an expiry gets the 72-hour default", () => {
-    assert.ok(urgentDefault.expires_at);
-    const ttl = new Date(urgentDefault.expires_at as string).getTime() - Date.now();
-    assert.ok(ttl > 71 * 3_600_000 && ttl < 73 * 3_600_000, `ttl was ${ttl}`);
+  const board = await getBulletins();
+  check("an expired post is silently deleted by the board fetch", () => {
+    assert.ok(!board.some((row) => row.id === pastExpiry.id), "the expired post was returned");
   });
-
-  let urgentNullStatus = 0;
-  try {
-    await createBulletin({
-      title: "Urgent no expiry",
-      body_markdown: "Body",
-      departments: ["ER"],
-      priority: "urgent",
-      expires_at: null,
-      author_id: author.id,
-    });
-  } catch (error) {
-    urgentNullStatus = error instanceof ApiError ? error.status : -1;
-  }
-  check("an explicit null expiry on an `urgent` notice is refused with 422", () => {
-    assert.equal(urgentNullStatus, 422);
+  const swept = await db.bulletin.findUnique({ where: { id: pastExpiry.id }, select: { id: true } });
+  check("the expired post is gone from the database, not just hidden", () => {
+    assert.equal(swept, null, "the expired post survived the sweep");
   });
 
   /* ---- reactions (DB) ---- */
 
-  const bulletin = featured ?? bulletins[0];
+  const bulletin = flagged;
   const emoji = BULLETIN_REACTION_EMOJIS[0];
 
   const on = await toggleReaction(bulletin.id, other.id, emoji);

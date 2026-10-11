@@ -43,8 +43,6 @@ export {
   updateBulletin,
   deleteBulletin,
   acknowledgeBulletin,
-  defaultExpiryFor,
-  BULLETIN_EXPIRY_DEFAULTS,
   type BulletinFilters,
   type CreateBulletinInput,
   type UpdateBulletinInput,

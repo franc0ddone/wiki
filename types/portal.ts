@@ -87,42 +87,42 @@ export interface KnowledgeArticle {
   author_name: string;
 }
 
-export type BulletinPriority = "normal" | "urgent" | "pinned";
-
 /**
- * Presentation tier for a bulletin. Mirrors the Prisma `BulletinFormat` enum —
- * keep the two in step. `notice` is the ordinary layout; `announcement` and
- * `featured` are celebratory posts (no ack button, reactions instead).
+ * A time-sensitive announcement posted to the bulletin board.
+ *
+ * Prompt 6c: one simple model. A bulletin is a title, an optional deck, a body,
+ * and an optional hero image, plus two opt-in flags (`pinned`, `urgent`) and an
+ * opt-in expiry. The old `priority` / `format` / `kicker` fields are gone from
+ * the portal contract — the columns survive in the database, unread.
  */
-export type BulletinFormat = "notice" | "announcement" | "featured";
-
-/** A time-sensitive announcement posted to the bulletin board. */
 export interface Bulletin {
   id: string;
   title: string;
   departments: ClinicalDepartment[];
-  priority: BulletinPriority;
-  /** Presentation tier. */
-  format: BulletinFormat;
-  /** Featured only: the small pill above the headline. */
-  kicker?: string | null;
-  /** Featured only: the stand-up one-liner under the headline. */
+  /** Floats to the top of the board; renders as the dark calling card. */
+  pinned: boolean;
+  /** Opt-in red chip treatment. Not a tier — just a visual flag. */
+  urgent: boolean;
+  /** The muted subtitle line under the headline (plain text, max 200 chars). */
   deck?: string | null;
   /**
-   * Featured and announcement only: the optional hero banner image (an
-   * `https://` URL or a relative portal path). `null` (or absent) means no
-   * hero. A `notice` never renders one, whatever this holds.
+   * The optional hero banner image (an `https://` URL or a relative portal
+   * path). `null` (or absent) means no hero.
    */
   hero_image_url?: string | null;
+  /**
+   * The hero image's alt text — required whenever `hero_image_url` is set
+   * (max 280 chars). Rendered as the `<img alt>`.
+   */
+  hero_image_alt?: string | null;
   body_markdown: string;
   /** ISO 8601 timestamp. */
   created_at: string;
   author_name: string;
   /**
-   * When the notice leaves the board — ISO 8601, or `null` for a notice that
-   * never ages out (ordinary `normal` notices may be posted without one). The
-   * board partitions on this: active = null or in the future, expired =
-   * at or before now.
+   * When the post is silently deleted on the next board fetch — ISO 8601, or
+   * `null` for a post that lives until it is manually deleted. Expiry is
+   * purely opt-in.
    */
   expires_at: string | null;
   /** Optional id of the `KnowledgeArticle` this bulletin references. */

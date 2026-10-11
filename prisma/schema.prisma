@@ -39,6 +39,9 @@ enum ArticleStatus {
   published
 }
 
+/// **Unused since prompt 6c.** Superseded by the `pinned` / `urgent` booleans on
+/// `Bulletin`; the column and this enum survive only so the existing data is not
+/// migrated away. No application code reads or writes `priority`.
 enum BulletinPriority {
   urgent
   pinned
@@ -67,11 +70,9 @@ enum RoleRequestStatus {
   declined
 }
 
-/// Presentation tier for a bulletin. One shared field — `notice` is the
-/// ordinary layout, `featured` is the celebratory hero built in prompt 5c, and
-/// `announcement` is defined here so the vocabulary is shared with prompt 6,
-/// which lands its distinct hero rendering. In 5c an `announcement` persists
-/// end-to-end but renders with the standard notice layout.
+/// **Unused since prompt 6c.** The three-tier bulletin format was deleted; the
+/// column and this enum survive only so the existing data is not migrated away.
+/// No application code reads or writes `format`.
 enum BulletinFormat {
   notice
   announcement
@@ -195,21 +196,22 @@ model Bulletin {
   bodyMarkdown String @map("body_markdown")
   departments  String[]
 
-  priority BulletinPriority @default(normal)
+  /// Pinned: floats to the top of every board and renders as the dark
+  /// calling-card hero (detail) / dark mini-card (board rail).
+  pinned Boolean @default(false)
+  /// Urgent: an opt-in red visual flag. Not a tier — just a chip.
+  urgent Boolean @default(false)
 
-  /// Presentation tier. `notice` is the ordinary layout; `announcement` and
-  /// `featured` are celebratory posts (no ack button, reactions instead).
-  format BulletinFormat @default(notice)
-  /// Featured only: the small pill above the headline, e.g. "Pinned · Monthly".
-  kicker String?
-  /// Featured only: the warm one-liner under the headline (the standfirst).
-  deck   String?
+  /// The muted subtitle line under the headline (plain text). Optional, whole
+  /// life of the post.
+  deck String?
 
-  /// Featured and announcement only: an optional hero banner image rendered
-  /// full-bleed above the calling-card hero (the Employee-of-the-Month
-  /// treatment). A `notice` is text-only and never renders a hero slot, whatever
-  /// this column holds. Null = no hero.
+  /// An optional hero banner image rendered above the headline, whatever the
+  /// post. `https://` URL or a relative portal path; null = no hero.
   heroImageUrl String? @map("hero_image_url")
+  /// Required whenever `heroImageUrl` is set (max 280 chars), rendered as the
+  /// `<img alt>`.
+  heroImageAlt String? @map("hero_image_alt")
 
   linkedArticleId String? @map("linked_article_id") @db.Uuid
 
@@ -218,11 +220,20 @@ model Bulletin {
   /// When the notice went up. Exposed to the frontend as `created_at`.
   publishedAt DateTime @map("published_at")
 
-  /// Pinned and urgent notices age out; nothing accumulates forever. The API
-  /// applies a default window per priority when the client omits one.
+  /// Opt-in expiry. On board fetch, rows with `expiresAt <= now()` are silently
+  /// deleted. Null = the post lives until it is manually deleted.
   expiresAt DateTime? @map("expires_at")
 
   createdAt DateTime @default(now()) @map("created_at")
+
+  // --- Legacy columns (prompt 6c). Left in place, never read or written by the
+  //     application; the data is preserved rather than migrated away. ---
+  /// Unused. Superseded by `pinned` / `urgent`.
+  priority BulletinPriority @default(normal)
+  /// Unused. The presentation tier was deleted.
+  format BulletinFormat @default(notice)
+  /// Unused. The eyebrow pill was deleted (departments are the tags).
+  kicker String?
 
   linkedArticle Article? @relation(fields: [linkedArticleId], references: [id], onDelete: SetNull)
   author        User     @relation(fields: [authorId], references: [id])
@@ -231,7 +242,6 @@ model Bulletin {
 
   @@index([publishedAt(sort: Desc)])
   @@index([expiresAt])
-  @@index([priority])
   @@map("bulletins")
 }
 

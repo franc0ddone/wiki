@@ -1,4 +1,4 @@
-import type { ArticleStatus, BulletinFormat, BulletinPriority, ShiftPreference } from "@/generated/prisma/enums";
+import type { ArticleStatus, ShiftPreference } from "@/generated/prisma/enums";
 import type {
   Bulletin,
   ClinicalDepartment,
@@ -68,14 +68,14 @@ export interface BulletinRowInput {
   title: string;
   bodyMarkdown: string;
   departments: string[];
-  priority: BulletinPriority;
-  format: BulletinFormat;
-  kicker: string | null;
+  pinned: boolean;
+  urgent: boolean;
   deck: string | null;
   heroImageUrl: string | null;
+  heroImageAlt: string | null;
   linkedArticleId: string | null;
   publishedAt: Date;
-  /** Prisma column `expires_at`; `null` when the notice never ages out. */
+  /** Prisma column `expires_at`; `null` when the post never ages out. */
   expiresAt: Date | null;
   author: AuthorRow | null;
 }
@@ -85,21 +85,21 @@ export function toBulletin(row: BulletinRowInput): Bulletin {
     id: row.id,
     title: row.title,
     departments: asDepartments(row.departments),
-    priority: row.priority,
-    format: row.format,
-    // Featured-only fields are omitted entirely when empty so the reader's
-    // `bulletin.kicker` stays falsy exactly as it did for the old fixtures.
-    ...(row.kicker ? { kicker: row.kicker } : {}),
+    pinned: row.pinned,
+    urgent: row.urgent,
+    // The optional deck is omitted entirely when empty so the reader's
+    // `bulletin.deck` stays falsy exactly as it did for the old fixtures.
     ...(row.deck ? { deck: row.deck } : {}),
-    // The hero banner is omitted entirely when absent, the same way `kicker`
-    // and `deck` are — a bulletin with no hero keeps the exact shape the
+    // The hero banner (and its required alt) are omitted entirely when absent,
+    // the same way `deck` is — a bulletin with no hero keeps the exact shape the
     // phase-1 fixtures had (callers read it back with `?? null`).
     ...(row.heroImageUrl ? { hero_image_url: row.heroImageUrl } : {}),
+    ...(row.heroImageUrl && row.heroImageAlt ? { hero_image_alt: row.heroImageAlt } : {}),
     body_markdown: row.bodyMarkdown,
     created_at: row.publishedAt.toISOString(),
     author_name: formatAuthorName(row.author),
-    // The expiry travels as an ISO string, or `null` for a notice that never
-    // ages out. The board's active/expired partition reads exactly this.
+    // The expiry travels as an ISO string, or `null` for a post that never
+    // ages out. The board deletes expired rows before returning the rest.
     expires_at: row.expiresAt ? row.expiresAt.toISOString() : null,
     // Optional in the portal type: omitted entirely when there is no link, so
     // `bulletin.linked_sop_id` stays falsy exactly as in the fixtures.

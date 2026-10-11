@@ -1256,16 +1256,19 @@ export const BulletinScalarFieldEnum = {
   title: 'title',
   bodyMarkdown: 'bodyMarkdown',
   departments: 'departments',
-  priority: 'priority',
-  format: 'format',
-  kicker: 'kicker',
+  pinned: 'pinned',
+  urgent: 'urgent',
   deck: 'deck',
   heroImageUrl: 'heroImageUrl',
+  heroImageAlt: 'heroImageAlt',
   linkedArticleId: 'linkedArticleId',
   authorId: 'authorId',
   publishedAt: 'publishedAt',
   expiresAt: 'expiresAt',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  priority: 'priority',
+  format: 'format',
+  kicker: 'kicker'
 } as const
 
 export type BulletinScalarFieldEnum = (typeof BulletinScalarFieldEnum)[keyof typeof BulletinScalarFieldEnum]
@@ -1463,6 +1466,13 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 

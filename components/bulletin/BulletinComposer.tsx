@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { Eye, ImagePlus, OctagonAlert, PenLine, TriangleAlert, X } from "lucide-react";
+import { Eye, ImagePlus, OctagonAlert, PenLine, X } from "lucide-react";
 import { ArticleSearch } from "@/components/editor/ArticleSearch";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
@@ -18,30 +18,21 @@ import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { ApiRequestError, createBulletin, patchBulletin, type BulletinPayload } from "@/lib/bulletin/api";
 import { uploadImage } from "@/lib/editor/api";
-import {
-  BULLETIN_FORMATS,
-  BULLETIN_FORMAT_LABELS,
-  DECK_MAX_LENGTH,
-  KICKER_MAX_LENGTH,
-  formatHasHero,
-} from "@/lib/bulletin/format";
+import { HERO_ALT_MAX_LENGTH } from "@/lib/bulletin/hero";
 import {
   BULLETIN_TITLE_MAX_LENGTH,
-  canPostPriority,
-  expiryLabel,
+  DECK_MAX_LENGTH,
   shouldClearAcksForUrgentEdit,
   validateBulletinDraft,
   type BulletinIssue,
 } from "@/lib/bulletin/lifecycle";
 import { buildLinkRegistry, extractHeadingIds } from "@/lib/links";
-import { roleAtLeast, type Role } from "@/lib/roles";
+import type { Role } from "@/lib/roles";
 import { cx } from "@/lib/utils";
 import {
   CLINICAL_DEPARTMENTS,
   DEPARTMENT_LABELS,
   type Bulletin,
-  type BulletinFormat,
-  type BulletinPriority,
   type ClinicalDepartment,
   type KnowledgeArticle,
 } from "@/types/portal";
@@ -50,10 +41,14 @@ import {
  * Bulletin composer — the shared write surface, used to post a new notice and
  * to edit an existing one ("edit mode": prefilled, `Edit bulletin`, Save).
  *
+ * Prompt 6c collapsed this to one simple model. In order: headline → deck
+ * (optional) → departments → body → hero picker (always visible) → Options
+ * (Pinned / Urgent / Expire+date) → linked SOP. There are no templates, no
+ * priority dropdown, no format selector, no kicker, and no forced expiry.
+ *
  * One editor, used twice: the body is the same full Tiptap (and reader) as
  * procedures. A bulletin skips the change-summary, reviewer, and publish
- * workflow — it is live the moment it is posted, so the shape is the same but
- * the ceremony is not.
+ * workflow — it is live the moment it is posted.
  */
 
 export interface BulletinComposerProps {
@@ -65,12 +60,6 @@ export interface BulletinComposerProps {
   onPosted: (bulletin: Bulletin) => void;
   onSaved: (bulletin: Bulletin) => void;
 }
-
-const PRIORITY_OPTIONS: ReadonlyArray<{ value: BulletinPriority; label: string; hint: string }> = [
-  { value: "normal", label: "Notice", hint: "An ordinary announcement. May be posted without an expiry." },
-  { value: "pinned", label: "Pinned", hint: "A standing reminder that floats above ordinary notices." },
-  { value: "urgent", label: "Urgent", hint: "A shift-level alert. Always expires; needs the clinical lead role." },
-];
 
 function readMarkdown(editor: Editor): string {
   return (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown().trim();
@@ -86,14 +75,6 @@ function toLocalDateTimeInput(ms: number): string {
   const date = new Date(ms);
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-/** The body scaffolding the two template cards insert, keyed by kind. */
-function templateScaffolding(kind: "notice" | "announcement", title: string): string {
-  if (kind === "announcement") {
-    return `# ${title}\n\n> [!tip] In their own words: "..."`;
-  }
-  return `# ${title}\n\n> [!note]`;
 }
 
 function FeedbackError({ error }: { error: { status: number; message: string } }) {
@@ -114,7 +95,6 @@ function FeedbackError({ error }: { error: { status: number; message: string } }
 
 export default function BulletinComposer({
   mode,
-  role,
   articles,
   initial = null,
   onClose,
@@ -122,12 +102,16 @@ export default function BulletinComposer({
   onSaved,
 }: BulletinComposerProps) {
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [departments, setDepartments] = useState<ClinicalDepartment[]>(initial?.departments ?? []);
-  const [priority, setPriority] = useState<BulletinPriority>(initial?.priority ?? "normal");
-  const [format, setFormat] = useState<BulletinFormat>(initial?.format ?? "notice");
-  const [kicker, setKicker] = useState(initial?.kicker ?? "");
   const [deck, setDeck] = useState(initial?.deck ?? "");
-  const [expires, setExpires] = useState("");
+  const [departments, setDepartments] = useState<ClinicalDepartment[]>(initial?.departments ?? []);
+  const [pinned, setPinned] = useState(initial?.pinned ?? false);
+  const [urgent, setUrgent] = useState(initial?.urgent ?? false);
+  const [expireEnabled, setExpireEnabled] = useState(() => Boolean(initial?.expires_at));
+  const [expires, setExpires] = useState(() => {
+    if (!initial?.expires_at) return "";
+    const parsed = new Date(initial.expires_at);
+    return Number.isNaN(parsed.getTime()) ? "" : toLocalDateTimeInput(parsed.getTime());
+  });
   const [linkedSlug, setLinkedSlug] = useState(() => {
     if (!initial?.linked_sop_id) return "";
     return articles.find((article) => article.id === initial.linked_sop_id)?.slug ?? "";
@@ -137,8 +121,6 @@ export default function BulletinComposer({
   const [busy, setBusy] = useState(false);
   const [issues, setIssues] = useState<BulletinIssue[]>([]);
   const [serverError, setServerError] = useState<{ status: number; message: string } | null>(null);
-  // The urgent "must expire" refusal is shown inline under the expiry input.
-  const [expiryError, setExpiryError] = useState<string | null>(null);
   // `min` for the datetime-local input — captured once at mount (this component
   // is client-only, imported with `ssr: false`).
   const [minExpiry] = useState(() => toLocalDateTimeInput(Date.now()));
@@ -146,16 +128,13 @@ export default function BulletinComposer({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [imagePickerNonce, setImagePickerNonce] = useState(0);
-  // Hero banner (featured / announcement only). The stored value survives a
-  // switch to `notice` (the field hides, the state keeps it) and resurfaces when
-  // a hero tier is chosen again.
+  // The optional hero banner (always available) and its required alt text.
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(initial?.hero_image_url ?? null);
+  const [heroAlt, setHeroAlt] = useState(initial?.hero_image_alt ?? "");
   const [heroBusy, setHeroBusy] = useState(false);
   const [heroError, setHeroError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const heroInputRef = useRef<HTMLInputElement | null>(null);
-
-  const canPostRestricted = roleAtLeast(role, "clinical_lead");
 
   const [extensions] = useState(() =>
     buildEditorExtensions({
@@ -214,55 +193,52 @@ export default function BulletinComposer({
   const clearsAcks =
     mode === "edit" && initial
       ? shouldClearAcksForUrgentEdit(
-          { priority: initial.priority, title: initial.title, body_markdown: initial.body_markdown },
-          { priority, title: title.trim(), body_markdown: markdown },
+          { urgent: initial.urgent, title: initial.title, body_markdown: initial.body_markdown },
+          { urgent, title: title.trim(), body_markdown: markdown },
         )
       : false;
 
   const issueFor = (field: BulletinIssue["field"]) => issues.filter((issue) => issue.field === field);
 
   // `datetime-local` parses as local time, matching the composer's convention.
-  const expiresAtIso = (): string | null | undefined => {
-    if (expires.length === 0) return undefined; // keep current / apply priority default
+  const expiresAtIso = (): string | null => {
+    if (expires.length === 0) return null;
     const parsed = new Date(expires);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
-  };
-
-  /** Replace the whole body with a template's scaffolding (undoable via Ctrl+Z). */
-  const insertTemplate = (kind: "notice" | "announcement") => {
-    if (!editor) return;
-    editor.commands.setContent(templateScaffolding(kind, title), { emitUpdate: true });
-    editor.commands.focus();
-    setTab("write");
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
   };
 
   const submit = async () => {
     if (busy) return;
     const body = editor ? readMarkdown(editor) : markdown;
-    const result = validateBulletinDraft(
-      { title, body_markdown: body, departments, priority, expires_at: expiresAtIso() ?? undefined },
-      { canPostRestricted },
-    );
-    setIssues(result.errors);
-    setExpiryError(null);
-    if (result.errors.length > 0) return;
+    const result = validateBulletinDraft({
+      title,
+      body_markdown: body,
+      departments,
+      deck: deck.trim() || null,
+      // A checked-but-empty expiry is a client-only refusal.
+      expires_at: expireEnabled ? expires || null : null,
+      hero_image_url: heroImageUrl,
+      hero_image_alt: heroImageUrl ? heroAlt.trim() : null,
+    });
+    const errors = [...result.errors];
+    if (expireEnabled && expires.length === 0) {
+      errors.push({ field: "expiry", code: "expiry_required", message: "Pick a date and time, or untick Expire." });
+    }
+    setIssues(errors);
+    if (errors.length > 0) return;
 
     const payload: BulletinPayload = {
       title: title.trim(),
       body_markdown: body,
       departments,
-      priority,
-      format,
-      // Featured fields are only sent when the featured tier is chosen; an
-      // empty string is normalised to null by the API.
-      ...(format === "featured" ? { kicker: kicker.trim() || null, deck: deck.trim() || null } : {}),
-      // The hero banner travels only for the tiers that render one; omitting it
-      // from a `notice` payload leaves any stored value untouched.
-      ...(formatHasHero(format) ? { heroImageUrl } : {}),
+      pinned,
+      urgent,
+      deck: deck.trim() || null,
+      heroImageUrl: heroImageUrl ?? null,
+      heroImageAlt: heroImageUrl ? heroAlt.trim() : null,
       linked_article_id: linkedId,
+      expires_at: expireEnabled ? expiresAtIso() : null,
     };
-    const expiresIso = expiresAtIso();
-    if (expiresIso !== undefined) payload.expires_at = expiresIso;
 
     setBusy(true);
     setServerError(null);
@@ -272,18 +248,11 @@ export default function BulletinComposer({
       if (mode === "edit") onSaved(saved);
       else onPosted(saved);
     } catch (caught) {
-      // The tricky refusal — "an urgent notice must expire" — belongs beside the
-      // field it is about, not at the foot of the form.
-      if (caught instanceof ApiRequestError && caught.code === "urgent_requires_expiry") {
-        setExpiryError(caught.message);
-        setServerError(null);
-      } else {
-        setServerError(
-          caught instanceof ApiRequestError
-            ? { status: caught.status, message: caught.message }
-            : { status: 0, message: "Something went wrong while posting. Nothing was lost; try again." },
-        );
-      }
+      setServerError(
+        caught instanceof ApiRequestError
+          ? { status: caught.status, message: caught.message }
+          : { status: 0, message: "Something went wrong while posting. Nothing was lost; try again." },
+      );
       setBusy(false);
     }
   };
@@ -309,6 +278,9 @@ export default function BulletinComposer({
       setHeroBusy(false);
     }
   };
+
+  const checkboxClass =
+    "mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 accent-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <Modal
@@ -351,6 +323,27 @@ export default function BulletinComposer({
           ))}
         </div>
 
+        <div>
+          <label htmlFor="bulletin-deck" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Deck <span className="font-normal text-zinc-500">(optional)</span>
+          </label>
+          <input
+            id="bulletin-deck"
+            value={deck}
+            maxLength={DECK_MAX_LENGTH}
+            onChange={(event) => setDeck(event.target.value)}
+            aria-invalid={issueFor("deck").length > 0 ? true : undefined}
+            placeholder="A one-line summary shown under the headline."
+            className={cx(fieldClass, issueFor("deck").length > 0 && "border-red-300")}
+            disabled={busy}
+          />
+          {issueFor("deck").map((issue) => (
+            <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
+              {issue.message}
+            </p>
+          ))}
+        </div>
+
         <fieldset>
           <legend className="mb-1.5 text-[13px] font-medium text-zinc-800">Departments</legend>
           <div className="flex flex-wrap gap-1.5">
@@ -385,33 +378,6 @@ export default function BulletinComposer({
             </p>
           ))}
         </fieldset>
-
-        {/* Template scaffolding — clicking a card replaces the whole body. */}
-        <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-            Start from a template <span className="font-normal text-zinc-500">(replaces the body)</span>
-          </span>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={busy || !editor}
-              onClick={() => insertTemplate("notice")}
-              className="rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="block text-[13px] font-semibold text-zinc-800">Formal notice</span>
-              <span className="mt-0.5 block text-xs leading-5 text-zinc-500">A headline and a note block to fill in.</span>
-            </button>
-            <button
-              type="button"
-              disabled={busy || !editor}
-              onClick={() => insertTemplate("announcement")}
-              className="rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="block text-[13px] font-semibold text-zinc-800">Announcement</span>
-              <span className="mt-0.5 block text-xs leading-5 text-zinc-500">A headline and a warm pull-quote to fill in.</span>
-            </button>
-          </div>
-        </div>
 
         {/* Body: write / preview */}
         <div>
@@ -537,208 +503,178 @@ export default function BulletinComposer({
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="bulletin-priority" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-              Priority
-            </label>
-            <select
-              id="bulletin-priority"
-              value={priority}
-              onChange={(event) => setPriority(event.target.value as BulletinPriority)}
-              className={cx(fieldClass, "mb-1")}
-              disabled={busy}
-            >
-              {PRIORITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} disabled={!canPostPriority(role, option.value)}>
-                  {option.label}
-                  {canPostPriority(role, option.value) ? "" : " — clinical lead only"}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs leading-5 text-zinc-500">
-              {PRIORITY_OPTIONS.find((option) => option.value === priority)?.hint}
-              {!canPostRestricted && priority !== "normal"
-                ? " You do not hold the clinical lead role."
-                : null}
-            </p>
-            {issueFor("priority").map((issue) => (
-              <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
-                {issue.message}
-              </p>
-            ))}
-          </div>
-
-          <div>
-            <label htmlFor="bulletin-expires" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-              Expires <span className="font-normal text-zinc-500">(optional)</span>
-            </label>
-            <input
-              id="bulletin-expires"
-              type="datetime-local"
-              min={minExpiry}
-              value={expires}
-              onChange={(event) => setExpires(event.target.value)}
-              className={cx(fieldClass, "mb-1", expiryError && "border-red-300")}
-              disabled={busy}
-            />
-            <p className="text-xs leading-5 text-zinc-500">
-              {mode === "edit"
-                ? `Leave blank to keep the current expiry. Changing the priority applies: ${expiryLabel(priority)}.`
-                : `Leave blank for the default: ${expiryLabel(priority)}.`}
-            </p>
-            {expiryError ? (
-              <p role="alert" className="mt-1 text-xs text-red-700">
-                {expiryError}
-              </p>
-            ) : null}
-            {issueFor("expiry").map((issue) => (
-              <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
-                {issue.message}
-              </p>
-            ))}
-          </div>
-        </div>
-
+        {/* Hero image — always available, with required alt text. */}
         <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">Format</span>
-          <div role="radiogroup" aria-label="Bulletin format" className="flex flex-wrap gap-1.5">
-            {BULLETIN_FORMATS.map((value) => {
-              const selected = format === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={busy}
-                  onClick={() => setFormat(value)}
-                  className={cx(
-                    "flex h-7 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
-                    selected
-                      ? "border-teal-600/40 bg-teal-50 text-teal-800"
-                      : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
-                  )}
-                >
-                  {BULLETIN_FORMAT_LABELS[value]}
-                </button>
-              );
-            })}
-          </div>
-          {format === "announcement" ? (
-            <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-              Distinct hero rendering ships in prompt 6 — previews as a formal notice for now.
-            </p>
-          ) : null}
-          {format === "featured" ? (
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="bulletin-kicker" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-                  Kicker pill <span className="font-normal text-zinc-500">(optional)</span>
-                </label>
-                <input
-                  id="bulletin-kicker"
-                  value={kicker}
-                  maxLength={KICKER_MAX_LENGTH}
-                  onChange={(event) => setKicker(event.target.value)}
-                  placeholder="Pinned · Monthly"
-                  className={fieldClass}
-                  disabled={busy}
-                />
-              </div>
-              <div>
-                <label htmlFor="bulletin-deck" className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-                  Deck <span className="font-normal text-zinc-500">(optional)</span>
-                </label>
-                <input
-                  id="bulletin-deck"
-                  value={deck}
-                  maxLength={DECK_MAX_LENGTH}
-                  onChange={(event) => setDeck(event.target.value)}
-                  placeholder="A warm one-liner under the headline"
-                  className={fieldClass}
-                  disabled={busy}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {formatHasHero(format) ? (
-            <div className="mt-3">
-              <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-                Hero image <span className="font-normal text-zinc-500">(optional)</span>
-              </span>
-              {heroImageUrl ? (
-                <div className="space-y-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded preview */}
-                  <img
-                    src={heroImageUrl}
-                    alt="Hero image preview"
-                    className="h-[120px] w-full rounded-lg border border-zinc-200/80 object-cover"
-                  />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => heroInputRef.current?.click()}
-                      disabled={busy || heroBusy}
-                      className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <ImagePlus size={13} strokeWidth={1.75} aria-hidden="true" />
-                      Replace
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHeroImageUrl(null);
-                        setHeroError(null);
-                      }}
-                      disabled={busy || heroBusy}
-                      className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <X size={13} strokeWidth={1.75} aria-hidden="true" />
-                      Remove
-                    </button>
-                    {heroBusy ? (
-                      <span role="status" className="text-xs text-zinc-500">
-                        Uploading…
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Hero image <span className="font-normal text-zinc-500">(optional)</span>
+          </span>
+          {heroImageUrl ? (
+            <div className="space-y-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- uploaded preview */}
+              <img
+                src={heroImageUrl}
+                alt={heroAlt.trim() || "Hero image preview"}
+                className="h-[120px] w-full rounded-lg border border-zinc-200/80 object-cover"
+              />
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => heroInputRef.current?.click()}
                   disabled={busy || heroBusy}
-                  className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
-                  {heroBusy ? "Uploading…" : "Add hero image"}
+                  <ImagePlus size={13} strokeWidth={1.75} aria-hidden="true" />
+                  Replace
                 </button>
-              )}
-              {heroError ? (
-                <p role="alert" className="mt-1.5 text-xs text-red-700">
-                  {heroError}
-                </p>
-              ) : null}
-              <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-                A full-width banner above the card. Stored on the bulletin, never in the body.
-              </p>
-              <input
-                ref={heroInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                data-testid="bulletin-hero-file-input"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  if (file) void uploadHeroImage(file);
-                }}
-              />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeroImageUrl(null);
+                    setHeroAlt("");
+                    setHeroError(null);
+                  }}
+                  disabled={busy || heroBusy}
+                  className="flex h-7 items-center gap-1.5 rounded-lg border border-zinc-300/70 bg-white px-2.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <X size={13} strokeWidth={1.75} aria-hidden="true" />
+                  Remove
+                </button>
+                {heroBusy ? (
+                  <span role="status" className="text-xs text-zinc-500">
+                    Uploading…
+                  </span>
+                ) : null}
+              </div>
+              <div>
+                <label htmlFor="bulletin-hero-alt" className="mb-1 block text-[12.5px] font-medium text-zinc-700">
+                  Alt text <span className="font-normal text-zinc-500">(required)</span>
+                </label>
+                <input
+                  id="bulletin-hero-alt"
+                  value={heroAlt}
+                  maxLength={HERO_ALT_MAX_LENGTH}
+                  onChange={(event) => setHeroAlt(event.target.value)}
+                  aria-invalid={issueFor("hero_alt").length > 0 ? true : undefined}
+                  placeholder="Describe the image for screen readers."
+                  className={cx(fieldClass, issueFor("hero_alt").length > 0 && "border-red-300")}
+                  disabled={busy}
+                />
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => heroInputRef.current?.click()}
+              disabled={busy || heroBusy}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
+              {heroBusy ? "Uploading…" : "Add hero image"}
+            </button>
+          )}
+          {heroError ? (
+            <p role="alert" className="mt-1.5 text-xs text-red-700">
+              {heroError}
+            </p>
           ) : null}
+          {issueFor("hero_alt").map((issue) => (
+            <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
+              {issue.message}
+            </p>
+          ))}
+          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
+            A full-width banner above the headline. Stored on the bulletin, never in the body.
+          </p>
+          <input
+            ref={heroInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            data-testid="bulletin-hero-file-input"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void uploadHeroImage(file);
+            }}
+          />
         </div>
+
+        {/* Options — the two flags and the opt-in expiry, grouped. */}
+        <fieldset className="rounded-xl border border-zinc-300/70 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+          <legend className="px-1 text-[13px] font-medium text-zinc-800">Options</legend>
+          <div className="space-y-3">
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={pinned}
+                onChange={(event) => setPinned(event.target.checked)}
+                disabled={busy}
+                className={checkboxClass}
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-zinc-800">Pinned</span>
+                <span className="block text-xs leading-5 text-zinc-500">
+                  Floats to the top of the board and gets the dark calling-card treatment.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={urgent}
+                onChange={(event) => setUrgent(event.target.checked)}
+                disabled={busy}
+                className={checkboxClass}
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-zinc-800">Urgent</span>
+                <span className="block text-xs leading-5 text-zinc-500">
+                  Adds the red flag. Editing an urgent notice clears its acknowledgements.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={expireEnabled}
+                onChange={(event) => {
+                  setExpireEnabled(event.target.checked);
+                  if (!event.target.checked) setExpires("");
+                }}
+                disabled={busy}
+                className={checkboxClass}
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-zinc-800">Expire</span>
+                <span className="block text-xs leading-5 text-zinc-500">
+                  Silently deleted on expiry. Leave unticked and the post lives until you delete it.
+                </span>
+              </span>
+            </label>
+            {expireEnabled ? (
+              <div className="pl-6">
+                <label htmlFor="bulletin-expires" className="mb-1 block text-[12.5px] font-medium text-zinc-700">
+                  Expires at
+                </label>
+                <input
+                  id="bulletin-expires"
+                  type="datetime-local"
+                  min={minExpiry}
+                  value={expires}
+                  onChange={(event) => setExpires(event.target.value)}
+                  aria-invalid={issueFor("expiry").length > 0 ? true : undefined}
+                  className={cx(fieldClass, issueFor("expiry").length > 0 && "border-red-300")}
+                  disabled={busy}
+                />
+                {issueFor("expiry").map((issue) => (
+                  <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
+                    {issue.message}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </fieldset>
 
         <div>
           <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
@@ -768,7 +704,7 @@ export default function BulletinComposer({
 
         {clearsAcks ? (
           <aside role="note" className="flex gap-3 rounded-[10px] border border-amber-200 bg-amber-50/80 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
-            <TriangleAlert size={15} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0 text-amber-700" />
+            <OctagonAlert size={15} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0 text-amber-700" />
             Saving clearing acknowledgements: this will change an urgent notice, so everyone who acknowledged the current
             text must acknowledge the new one.
           </aside>

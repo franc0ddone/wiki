@@ -130,16 +130,19 @@ export const BulletinScalarFieldEnum = {
   title: 'title',
   bodyMarkdown: 'bodyMarkdown',
   departments: 'departments',
-  priority: 'priority',
-  format: 'format',
-  kicker: 'kicker',
+  pinned: 'pinned',
+  urgent: 'urgent',
   deck: 'deck',
   heroImageUrl: 'heroImageUrl',
+  heroImageAlt: 'heroImageAlt',
   linkedArticleId: 'linkedArticleId',
   authorId: 'authorId',
   publishedAt: 'publishedAt',
   expiresAt: 'expiresAt',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  priority: 'priority',
+  format: 'format',
+  kicker: 'kicker'
 } as const
 
 export type BulletinScalarFieldEnum = (typeof BulletinScalarFieldEnum)[keyof typeof BulletinScalarFieldEnum]

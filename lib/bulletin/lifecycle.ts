@@ -1,76 +1,44 @@
 /**
  * Bulletin lifecycle rules — pure, framework-free, database-free.
  *
- * The expiry defaults, the priority gate, and the "editing an urgent notice
- * clears its acknowledgements" rule all live here so the API, the composer UI,
- * and `scripts/verify-frontend.ts` share one definition. `lib/data/bulletins.ts`
- * re-exports `BULLETIN_EXPIRY_DEFAULTS` / `defaultExpiryFor` from this module so
- * nothing about the stored behaviour moved.
+ * Prompt 6c collapsed the bulletin model to one shape: title, optional deck,
+ * body, optional hero, two opt-in flags (`pinned`, `urgent`) and an opt-in
+ * expiry. Everything the old priority/format machinery did — TTL defaults, the
+ * "urgent must expire" rule, the clinical-lead priority gate — is gone. What
+ * remains lives here so the composer UI, the API, and `scripts/verify-frontend.ts`
+ * share one definition.
  */
-import type { BulletinPriority } from "@/types/portal";
-import { roleAtLeast, type Role } from "@/lib/roles";
 
 /** Matches the API's `requireString(body, "title", { maxLength: 300 })`. */
 export const BULLETIN_TITLE_MAX_LENGTH = 300;
 
-const HOUR_MS = 60 * 60 * 1000;
+/** The deck is a plain-text one-liner under the headline. */
+export const DECK_MAX_LENGTH = 200;
 
 /**
- * Default time-to-live per priority, used when a client posts no `expires_at`.
- *
- * The rule this encodes: nothing accumulates forever. An `urgent` notice is a
- * shift-level instruction — 72 hours is the documented default. A `pinned`
- * notice is a standing reminder that still has to be re-affirmed — 30 days. A
- * `normal` notice is a plain announcement and may be posted without an expiry.
- */
-export const BULLETIN_EXPIRY_DEFAULTS: Record<BulletinPriority, number | null> = {
-  urgent: 72 * HOUR_MS,
-  pinned: 30 * 24 * HOUR_MS,
-  normal: null,
-};
-
-export function defaultExpiryFor(priority: BulletinPriority, from: Date = new Date()): Date | null {
-  const ttl = BULLETIN_EXPIRY_DEFAULTS[priority];
-  return ttl === null ? null : new Date(from.getTime() + ttl);
-}
-
-/** An `urgent` or `pinned` notice floats to the top of every board — a lead's call. */
-export function priorityRequiresClinicalLead(priority: BulletinPriority): boolean {
-  return priority === "urgent" || priority === "pinned";
-}
-
-/** Who may post at this priority. `author`+ for `normal`, `clinical_lead`+ otherwise. */
-export function canPostPriority(role: Role | null | undefined, priority: BulletinPriority): boolean {
-  if (role === null || role === undefined) return false;
-  return priorityRequiresClinicalLead(priority)
-    ? roleAtLeast(role, "clinical_lead")
-    : roleAtLeast(role, "author");
-}
-
-/** The effective window, in words, for the composer's Expires field. */
-export function expiryLabel(priority: BulletinPriority): string {
-  if (priority === "urgent") return "72 hours from now";
-  if (priority === "pinned") return "30 days from now";
-  return "No expiry";
-}
-
-/**
- * Editing an `urgent` notice with changed content clears its acknowledgements:
- * a critical alert that has been rewritten must be re-acknowledged by the
- * people who relied on the old text. Edits to `normal` / `pinned` keep theirs,
- * and a no-op save never clears anything.
+ * Editing an `urgent` bulletin with changed content clears its acknowledgements:
+ * a critical alert that has been rewritten must be re-acknowledged by the people
+ * who relied on the old text. Edits to a non-urgent post keep theirs, and a
+ * no-op save never clears anything.
  */
 export function shouldClearAcksForUrgentEdit(
-  current: { priority: BulletinPriority; title: string; body_markdown: string },
-  next: { priority: BulletinPriority; title: string; body_markdown: string },
+  current: { urgent: boolean; title: string; body_markdown: string },
+  next: { urgent: boolean; title: string; body_markdown: string },
 ): boolean {
-  if (next.priority !== "urgent") return false;
+  if (!next.urgent) return false;
   return next.title !== current.title || next.body_markdown !== current.body_markdown;
 }
 
 /* ------------------------------------------------------------- validation */
 
-export type BulletinIssueField = "title" | "body" | "departments" | "priority" | "expiry" | "linked";
+export type BulletinIssueField =
+  | "title"
+  | "body"
+  | "departments"
+  | "deck"
+  | "expiry"
+  | "hero_alt"
+  | "linked";
 
 export interface BulletinIssue {
   field: BulletinIssueField;
@@ -83,9 +51,13 @@ export interface BulletinDraft {
   title: string;
   body_markdown: string;
   departments: readonly string[];
-  priority: BulletinPriority;
-  /** ISO-8601 string, `null` for "never", or `undefined` for "apply the default". */
+  deck?: string | null;
+  /** ISO-8601 string, or `null` for "never expires". */
   expires_at?: string | null;
+  /** A hero URL, or `null`/absent for "no hero". */
+  hero_image_url?: string | null;
+  /** Required whenever `hero_image_url` is set. */
+  hero_image_alt?: string | null;
 }
 
 export interface BulletinValidationResult {
@@ -93,16 +65,11 @@ export interface BulletinValidationResult {
   warnings: BulletinIssue[];
 }
 
-const PRIORITIES: readonly BulletinPriority[] = ["normal", "urgent", "pinned"];
-
 /**
  * Client-side pre-flight for the composer. The API is the real gate; this makes
- * the same refusals visible before a round trip and never downgrades silently.
+ * the same refusals visible before a round trip.
  */
-export function validateBulletinDraft(
-  draft: BulletinDraft,
-  options: { canPostRestricted: boolean },
-): BulletinValidationResult {
+export function validateBulletinDraft(draft: BulletinDraft): BulletinValidationResult {
   const errors: BulletinIssue[] = [];
 
   const title = draft.title.trim();
@@ -128,17 +95,11 @@ export function validateBulletinDraft(
     });
   }
 
-  if (!PRIORITIES.includes(draft.priority)) {
+  if (draft.deck && draft.deck.length > DECK_MAX_LENGTH) {
     errors.push({
-      field: "priority",
-      code: "priority_invalid",
-      message: "`priority` must be one of `normal`, `urgent`, `pinned`.",
-    });
-  } else if (priorityRequiresClinicalLead(draft.priority) && !options.canPostRestricted) {
-    errors.push({
-      field: "priority",
-      code: "priority_forbidden",
-      message: `Posting an ${draft.priority} bulletin requires the clinical lead role or higher.`,
+      field: "deck",
+      code: "deck_too_long",
+      message: `The deck is ${draft.deck.length} characters; the limit is ${DECK_MAX_LENGTH}.`,
     });
   }
 
@@ -147,11 +108,15 @@ export function validateBulletinDraft(
     if (Number.isNaN(parsed.getTime())) {
       errors.push({ field: "expiry", code: "expiry_invalid", message: "The expiry is not a valid date." });
     }
-  } else if (draft.expires_at === null && draft.priority === "urgent") {
+  }
+
+  // A hero image must carry alt text — the API refuses it with 422
+  // `missing_hero_alt`, and this surfaces the same refusal inline.
+  if (draft.hero_image_url && !(draft.hero_image_alt ?? "").trim()) {
     errors.push({
-      field: "expiry",
-      code: "urgent_requires_expiry",
-      message: "An urgent notice must expire. Leave the default 72 hours, or set a date.",
+      field: "hero_alt",
+      code: "missing_hero_alt",
+      message: "Add alt text for the hero image before saving.",
     });
   }
 
