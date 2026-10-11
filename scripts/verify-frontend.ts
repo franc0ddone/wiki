@@ -36,6 +36,7 @@ import type { Transaction } from "@tiptap/pm/state";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { Schema } from "@tiptap/pm/model";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
+import { DragHandle } from "@tiptap/extension-drag-handle";
 import {
   closeDoubleQuote,
   closeSingleQuote,
@@ -430,7 +431,8 @@ check("composer validation blocks the fields the API would refuse", () => {
   assert.deepEqual(codes({ title: "   " }), ["title_empty"]);
   assert.deepEqual(codes({ title: "x".repeat(301) }), ["title_too_long"]);
   assert.deepEqual(codes({ body_markdown: "" }), ["body_empty"]);
-  assert.deepEqual(codes({ departments: [] }), ["no_departments"]);
+  // Departments are optional now: a post with none is an all-staff post.
+  assert.deepEqual(codes({ departments: [] }), []);
   assert.deepEqual(codes({ deck: "x".repeat(DECK_MAX_LENGTH + 1) }), ["deck_too_long"]);
   assert.deepEqual(codes({ expires_at: "not-a-date" }), ["expiry_invalid"]);
   // A hero image without alt text is the API's `missing_hero_alt`, surfaced inline.
@@ -1010,7 +1012,13 @@ check("the bulletin hero is a Dove Black calling card with a centred meta line",
   assert.ok(html.includes("bg-[#20241E]"), "the hero ground is Dove Black");
   assert.ok(html.includes("border-[rgba(175,190,35,0.30)]"), "the hero frame is the faint #AFBE23 hairline");
   assert.ok(html.includes("text-[#AFBE23]"), "the headline is #AFBE23");
+  assert.ok(html.includes("text-[48px]"), "the headline is 48px");
+  assert.ok(html.includes("font-bold"), "the headline is weight 700");
+  assert.ok(html.includes("dw-display"), "the headline uses the display face");
   assert.ok(html.includes("text-[#c9c9bd]/80"), "the departments/date line is muted #c9c9bd");
+  // A fixed 48rem cap, centred — identical width with or without the sidebar.
+  assert.ok(html.includes("max-w-3xl"), "the hero is capped at max-w-3xl (48rem)");
+  assert.ok(html.includes("mx-auto"), "the hero is centred");
   assert.ok(html.includes("Welcome to the team, Nadia"));
   assert.match(html, /Priya Raghunathan/);
   assert.match(html, /Sep 28, 2026/);
@@ -1028,8 +1036,8 @@ check("the hero renders the deck as a #c9c9bd line, and nothing when absent", ()
   );
   assert.match(
     withDeck,
-    /<p class="[^"]*text-\[#c9c9bd\][^"]*">The new bands take effect Monday\.<\/p>/,
-    "the deck must render as a muted #c9c9bd subtitle line",
+    /<p class="[^"]*text-\[24px\][^"]*text-\[#c9c9bd\][^"]*">The new bands take effect Monday\.<\/p>/,
+    "the deck must render as a 24px muted #c9c9bd subtitle line",
   );
   assert.equal((withDeck.match(/<p/g) ?? []).length, 1, "the deck is the hero's only paragraph line");
 
@@ -1239,6 +1247,13 @@ check("bulletin-only blocks are registered for bulletins and never for articles"
     assert.ok(!articleNames.includes(name), `${name} leaked into the article schema`);
     assert.ok(bulletinNames.includes(name), `${name} missing from the bulletin schema`);
   }
+});
+
+check("the bulletin composer omits the block drag handle; the article editor keeps it", () => {
+  const composerNames = buildEditorExtensions({ bulletinBlocks: true, dragHandle: false }).map((e) => e.name);
+  assert.ok(!composerNames.includes(DragHandle.name), "the drag handle leaked into the bulletin composer");
+  const articleNames = buildEditorExtensions().map((e) => e.name);
+  assert.ok(articleNames.includes(DragHandle.name), "the article editor lost its drag handle");
 });
 
 check("the editor carries custom table serializers (merged cells need them)", () => {

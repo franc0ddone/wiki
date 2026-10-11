@@ -70,6 +70,14 @@ body {
   color: #18181b;
 }
 
+/*
+ * The bulletin calling-card display face — Domine 700, self-hosted via
+ * `next/font` (`--font-display` on <html>), with a serif fallback.
+ */
+.dw-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+}
+
 h1,
 h2,
 h3 {
@@ -397,6 +405,15 @@ input[type="search"]::-webkit-search-decoration {
   position: absolute;
   color: #a1a1aa;
   pointer-events: none;
+}
+
+/*
+ * The bulletin composer's body is a bulletin, not a procedure, so its
+ * empty-state placeholder says so. Scoped by id so the article editor keeps its
+ * own wording.
+ */
+#bulletin-body > p:first-child:last-child:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: "Write the bulletin…";
 }
 
 /* Callouts */

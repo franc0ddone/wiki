@@ -87,13 +87,8 @@ export function validateBulletinDraft(draft: BulletinDraft): BulletinValidationR
     errors.push({ field: "body", code: "body_empty", message: "Write the notice before posting it." });
   }
 
-  if (draft.departments.length === 0) {
-    errors.push({
-      field: "departments",
-      code: "no_departments",
-      message: "Choose at least one department so the right team sees this.",
-    });
-  }
+  // Departments are optional filter tags, not a visibility boundary — a post
+  // with none is an all-staff post. (Kept as a field so a tag can be added.)
 
   if (draft.deck && draft.deck.length > DECK_MAX_LENGTH) {
     errors.push({

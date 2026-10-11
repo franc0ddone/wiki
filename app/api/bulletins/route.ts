@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
     const bulletin = await createBulletin({
       title: requireString(body, "title", { maxLength: 300 }),
       body_markdown: requireString(body, "body_markdown", { minLength: 1 }),
-      departments: requireStringArray(body, "departments"),
+      // Departments are optional filter tags: a post with none is all-staff.
+      departments: requireStringArray(body, "departments", { allowEmpty: true }),
       pinned: optionalBoolean(body, "pinned") ?? false,
       urgent: optionalBoolean(body, "urgent") ?? false,
       deck: optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null,

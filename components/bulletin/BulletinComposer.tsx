@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { Eye, ImagePlus, OctagonAlert, PenLine, X } from "lucide-react";
+import { ChevronDown, Eye, ImagePlus, OctagonAlert, PenLine, X } from "lucide-react";
 import { ArticleSearch } from "@/components/editor/ArticleSearch";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
@@ -42,9 +42,11 @@ import {
  * to edit an existing one ("edit mode": prefilled, `Edit bulletin`, Save).
  *
  * Prompt 6c collapsed this to one simple model. In order: headline → deck
- * (optional) → departments → body → hero picker (always visible) → Options
- * (Pinned / Urgent / Expire+date) → linked SOP. There are no templates, no
- * priority dropdown, no format selector, no kicker, and no forced expiry.
+ * (optional) → hero image (always available) → body → departments (optional,
+ * an enclosed dropdown) → Options (Pinned, which requires an expiry — four
+ * preset chips — beneath it, and Urgent) → linked SOP. There are no templates,
+ * no priority dropdown, no format selector, no kicker, and no TTL defaults —
+ * expiry is opt-in for an ordinary post and required for a pinned one.
  *
  * One editor, used twice: the body is the same full Tiptap (and reader) as
  * procedures. A bulletin skips the change-summary, reviewer, and publish
@@ -66,15 +68,29 @@ function readMarkdown(editor: Editor): string {
 }
 
 /**
- * `YYYY-MM-DDTHH:mm` in the browser's own local time, for a
- * `<input type="datetime-local">` value or `min`. `datetime-local` values parse
- * as local time, so `new Date(value).toISOString()` is the matching conversion
- * (see `expiresAtIso` below).
+ * One-tap expiry presets — the only expiry UI. Each lands at end-of-day
+ * **11:45 PM** (the last 15-minute increment), so a pinned "tomorrow" notice
+ * stays up through tomorrow.
  */
-function toLocalDateTimeInput(ms: number): string {
-  const date = new Date(ms);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+const EXPIRY_PRESETS = [
+  { days: 1, label: "Tomorrow" },
+  { days: 3, label: "In 3 days" },
+  { days: 7, label: "In 1 week" },
+  { days: 30, label: "In 30 days" },
+] as const;
+
+/** `days` out from `from`, at 11:45 PM local — a preset's datetime. */
+function expiryPresetDate(days: number, from: Date = new Date()): Date {
+  const target = new Date(from);
+  target.setDate(target.getDate() + days);
+  target.setHours(23, 45, 0, 0);
+  return target;
+}
+
+/** The department-dropdown button label. Empty means an all-staff post. */
+function departmentSummary(departments: readonly ClinicalDepartment[]): string {
+  if (departments.length === 0) return "All staff";
+  return departments.length === 1 ? "1 department" : `${departments.length} departments`;
 }
 
 function FeedbackError({ error }: { error: { status: number; message: string } }) {
@@ -106,12 +122,14 @@ export default function BulletinComposer({
   const [departments, setDepartments] = useState<ClinicalDepartment[]>(initial?.departments ?? []);
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
   const [urgent, setUrgent] = useState(initial?.urgent ?? false);
-  const [expireEnabled, setExpireEnabled] = useState(() => Boolean(initial?.expires_at));
-  const [expires, setExpires] = useState(() => {
-    if (!initial?.expires_at) return "";
+  // The chosen expiry datetime (set from a preset chip, or carried in by an
+  // edit). `null` means no expiry is set.
+  const [expiryDate, setExpiryDate] = useState<Date | null>(() => {
+    if (!initial?.expires_at) return null;
     const parsed = new Date(initial.expires_at);
-    return Number.isNaN(parsed.getTime()) ? "" : toLocalDateTimeInput(parsed.getTime());
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   });
+  const [deptOpen, setDeptOpen] = useState(false);
   const [linkedSlug, setLinkedSlug] = useState(() => {
     if (!initial?.linked_sop_id) return "";
     return articles.find((article) => article.id === initial.linked_sop_id)?.slug ?? "";
@@ -121,9 +139,6 @@ export default function BulletinComposer({
   const [busy, setBusy] = useState(false);
   const [issues, setIssues] = useState<BulletinIssue[]>([]);
   const [serverError, setServerError] = useState<{ status: number; message: string } | null>(null);
-  // `min` for the datetime-local input — captured once at mount (this component
-  // is client-only, imported with `ssr: false`).
-  const [minExpiry] = useState(() => toLocalDateTimeInput(Date.now()));
   const [imageDialog, setImageDialog] = useState<ImageDialogMode | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
@@ -142,6 +157,9 @@ export default function BulletinComposer({
       onImage: () => setImagePickerNonce((value) => value + 1),
       // Bulletin-only blocks: CTA button, Steps, Spotlight.
       bulletinBlocks: true,
+      // No block drag handle: its grip read as a modal-window handle the modal
+      // does not have.
+      dragHandle: false,
     }),
   );
   const editor = useEditor({
@@ -200,12 +218,15 @@ export default function BulletinComposer({
 
   const issueFor = (field: BulletinIssue["field"]) => issues.filter((issue) => issue.field === field);
 
-  // `datetime-local` parses as local time, matching the composer's convention.
-  const expiresAtIso = (): string | null => {
-    if (expires.length === 0) return null;
-    const parsed = new Date(expires);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  };
+  // Expiry is only settable on a pinned post (pinning means expiring — there is
+  // no permanent pin). Tapping a preset chip is the only way to set it.
+  const expirySet = pinned && expiryDate !== null;
+  // The chosen datetime → the ISO string the API stores. Only a pinned post
+  // carries an expiry (unchanged API contract).
+  const expiresAtIso = (): string | null => (expirySet && expiryDate ? expiryDate.toISOString() : null);
+
+  /** A preset chip: `days` out at 11:45 PM. */
+  const applyExpiryPreset = (days: number) => setExpiryDate(expiryPresetDate(days));
 
   const submit = async () => {
     if (busy) return;
@@ -215,14 +236,16 @@ export default function BulletinComposer({
       body_markdown: body,
       departments,
       deck: deck.trim() || null,
-      // A checked-but-empty expiry is a client-only refusal.
-      expires_at: expireEnabled ? expires || null : null,
+      expires_at: expiresAtIso(),
       hero_image_url: heroImageUrl,
       hero_image_alt: heroImageUrl ? heroAlt.trim() : null,
     });
     const errors = [...result.errors];
-    if (expireEnabled && expires.length === 0) {
-      errors.push({ field: "expiry", code: "expiry_required", message: "Pick a date and time, or untick Expire." });
+    // Pinned posts must expire — there is no permanent pin.
+    if (pinned && expiryDate === null) {
+      errors.push({ field: "expiry", code: "expiry_required", message: "Pinned posts need an expiry date." });
+    } else if (expirySet && expiryDate && expiryDate.getTime() <= Date.now()) {
+      errors.push({ field: "expiry", code: "expiry_not_future", message: "Expiry must be in the future." });
     }
     setIssues(errors);
     if (errors.length > 0) return;
@@ -237,7 +260,7 @@ export default function BulletinComposer({
       heroImageUrl: heroImageUrl ?? null,
       heroImageAlt: heroImageUrl ? heroAlt.trim() : null,
       linked_article_id: linkedId,
-      expires_at: expireEnabled ? expiresAtIso() : null,
+      expires_at: expiresAtIso(),
     };
 
     setBusy(true);
@@ -344,165 +367,6 @@ export default function BulletinComposer({
           ))}
         </div>
 
-        <fieldset>
-          <legend className="mb-1.5 text-[13px] font-medium text-zinc-800">Departments</legend>
-          <div className="flex flex-wrap gap-1.5">
-            {CLINICAL_DEPARTMENTS.map((department) => {
-              const selected = departments.includes(department);
-              return (
-                <button
-                  key={department}
-                  type="button"
-                  aria-pressed={selected}
-                  disabled={busy}
-                  onClick={() =>
-                    setDepartments((current) =>
-                      current.includes(department) ? current.filter((entry) => entry !== department) : [...current, department],
-                    )
-                  }
-                  className={cx(
-                    "flex h-7 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
-                    selected
-                      ? "border-teal-600/40 bg-teal-50 text-teal-800"
-                      : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
-                  )}
-                >
-                  {DEPARTMENT_LABELS[department]}
-                </button>
-              );
-            })}
-          </div>
-          {issueFor("departments").map((issue) => (
-            <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
-              {issue.message}
-            </p>
-          ))}
-        </fieldset>
-
-        {/* Body: write / preview */}
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-zinc-800">Body</span>
-            <div role="tablist" aria-label="Body view" className="flex gap-1 rounded-lg bg-zinc-100 p-0.5">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "write"}
-                onClick={() => setTab("write")}
-                className={cx(
-                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
-                  tab === "write" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
-                )}
-              >
-                <PenLine size={13} strokeWidth={1.75} aria-hidden="true" />
-                Write
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "preview"}
-                onClick={() => setTab("preview")}
-                className={cx(
-                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
-                  tab === "preview" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
-                )}
-              >
-                <Eye size={13} strokeWidth={1.75} aria-hidden="true" />
-                Preview
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-zinc-300/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
-            {tab === "write" ? (
-              <div onKeyDownCapture={onFindKeyDownCapture} onDragOver={drop.onDragOver} onDrop={drop.onDrop}>
-                {editor ? (
-                  <EditorToolbar
-                    editor={editor}
-                    onLink={() => setLinkDialogOpen(true)}
-                    onImage={(selected) => {
-                      if (!editor) return;
-                      if (selected) {
-                        const attrs = editor.getAttributes("image") as { src?: string; alt?: string; title?: string | null };
-                        if (attrs.src) {
-                          setImageDialog({ kind: "alt", src: attrs.src, alt: attrs.alt ?? "", title: attrs.title ?? "" });
-                        }
-                        return;
-                      }
-                      fileInputRef.current?.click();
-                    }}
-                  />
-                ) : (
-                  <div className="h-11 border-b border-zinc-200" />
-                )}
-                {editor ? (
-                  <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-200 bg-zinc-50/60 px-3 py-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-400">Insert</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        editor.chain().focus().insertContent({ type: "ctaButton", attrs: { label: "Read more", href: "https://" } }).run()
-                      }
-                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-                    >
-                      CTA button
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        editor.chain().focus().insertContent({ type: "steps", attrs: { steps: [{ title: "", description: "" }] } }).run()
-                      }
-                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-                    >
-                      Steps
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        editor.chain().focus().insertContent({ type: "spotlight", attrs: { entries: [{ initials: "", name: "", label: "" }] } }).run()
-                      }
-                      className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-                    >
-                      Spotlight
-                    </button>
-                  </div>
-                ) : null}
-                {editor && findOpen ? <FindReplaceBar editor={editor} onClose={() => setFindOpen(false)} /> : null}
-                <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
-                  {editor ? (
-                    <>
-                      <EditorBubbleMenu editor={editor} linkDialogOpen={linkDialogOpen} onLink={() => setLinkDialogOpen(true)} />
-                      <EditorContent editor={editor} />
-                    </>
-                  ) : (
-                    <p className="text-[13px] text-zinc-500" role="status">
-                      Loading editor…
-                    </p>
-                  )}
-                </div>
-                {editor && drop.pending ? (
-                  <DropImagePopover
-                    editor={editor}
-                    file={drop.pending.file}
-                    pos={drop.pending.pos}
-                    anchor={drop.pending.anchor}
-                    onClose={drop.clear}
-                  />
-                ) : null}
-              </div>
-            ) : (
-              <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
-                <MarkdownReader source={markdown.length > 0 ? markdown : "_Nothing to preview yet._"} showTableOfContents={false} />
-              </div>
-            )}
-          </div>
-          {issueFor("body").map((issue) => (
-            <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
-              {issue.message}
-            </p>
-          ))}
-        </div>
-
         {/* Hero image — always available, with required alt text. */}
         <div>
           <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
@@ -583,7 +447,7 @@ export default function BulletinComposer({
             </p>
           ))}
           <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-            A full-width banner above the headline. Stored on the bulletin, never in the body.
+            A full-width banner below the title card. Stored on the bulletin, never in the body.
           </p>
           <input
             ref={heroInputRef}
@@ -599,6 +463,198 @@ export default function BulletinComposer({
           />
         </div>
 
+        {/* Body: write / preview */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[13px] font-medium text-zinc-800">Body</span>
+            <div role="tablist" aria-label="Body view" className="flex gap-1 rounded-lg bg-zinc-100 p-0.5">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "write"}
+                onClick={() => setTab("write")}
+                className={cx(
+                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                  tab === "write" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
+                )}
+              >
+                <PenLine size={13} strokeWidth={1.75} aria-hidden="true" />
+                Write
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "preview"}
+                onClick={() => setTab("preview")}
+                className={cx(
+                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                  tab === "preview" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
+                )}
+              >
+                <Eye size={13} strokeWidth={1.75} aria-hidden="true" />
+                Preview
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-300/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
+            {tab === "write" ? (
+              <div onKeyDownCapture={onFindKeyDownCapture} onDragOver={drop.onDragOver} onDrop={drop.onDrop}>
+                {/* One scroll area: the formatting toolbar and the INSERT row are
+                    sticky at its top, so the body text scrolls beneath them. */}
+                <div className="max-h-[42vh] overflow-y-auto">
+                  {editor ? (
+                    <div className="sticky top-0 z-20 bg-white">
+                      <EditorToolbar
+                        editor={editor}
+                        onLink={() => setLinkDialogOpen(true)}
+                        onImage={(selected) => {
+                          if (!editor) return;
+                          if (selected) {
+                            const attrs = editor.getAttributes("image") as { src?: string; alt?: string; title?: string | null };
+                            if (attrs.src) {
+                              setImageDialog({ kind: "alt", src: attrs.src, alt: attrs.alt ?? "", title: attrs.title ?? "" });
+                            }
+                            return;
+                          }
+                          fileInputRef.current?.click();
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-200 bg-zinc-50 px-3 py-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-400">Insert</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            editor.chain().focus().insertContent({ type: "ctaButton", attrs: { label: "Read more", href: "https://" } }).run()
+                          }
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                        >
+                          Insert link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            editor.chain().focus().insertContent({ type: "steps", attrs: { steps: [{ title: "", description: "" }] } }).run()
+                          }
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                        >
+                          Steps
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            editor.chain().focus().insertContent({ type: "spotlight", attrs: { entries: [{ initials: "", name: "", label: "" }] } }).run()
+                          }
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                        >
+                          Spotlight
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-11 border-b border-zinc-200" />
+                  )}
+                  {editor && findOpen ? <FindReplaceBar editor={editor} onClose={() => setFindOpen(false)} /> : null}
+                  <div className="px-5 py-5">
+                    {editor ? (
+                      <>
+                        <EditorBubbleMenu editor={editor} linkDialogOpen={linkDialogOpen} onLink={() => setLinkDialogOpen(true)} />
+                        <EditorContent editor={editor} />
+                      </>
+                    ) : (
+                      <p className="text-[13px] text-zinc-500" role="status">
+                        Loading editor…
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {editor && drop.pending ? (
+                  <DropImagePopover
+                    editor={editor}
+                    file={drop.pending.file}
+                    pos={drop.pending.pos}
+                    anchor={drop.pending.anchor}
+                    onClose={drop.clear}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <div className="max-h-[42vh] overflow-y-auto px-5 py-5">
+                <MarkdownReader source={markdown.length > 0 ? markdown : "_Nothing to preview yet._"} showTableOfContents={false} />
+              </div>
+            )}
+          </div>
+          {issueFor("body").map((issue) => (
+            <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
+              {issue.message}
+            </p>
+          ))}
+        </div>
+
+        {/* Departments — optional filter tags, in an enclosed dropdown. */}
+        <div
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setDeptOpen(false);
+          }}
+        >
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Departments <span className="font-normal text-zinc-500">(optional)</span>
+          </span>
+          <button
+            type="button"
+            aria-haspopup="true"
+            aria-expanded={deptOpen}
+            aria-controls="bulletin-departments"
+            disabled={busy}
+            onClick={() => setDeptOpen((current) => !current)}
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-zinc-300/70 bg-white px-3 text-[13.5px] text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span className="truncate">{departmentSummary(departments)}</span>
+            <ChevronDown
+              size={15}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className={cx("shrink-0 text-zinc-400 transition-transform", deptOpen && "rotate-180")}
+            />
+          </button>
+          {deptOpen ? (
+            <div
+              id="bulletin-departments"
+              role="group"
+              aria-label="Departments"
+              className="mt-1.5 grid grid-cols-1 gap-x-3 gap-y-1.5 rounded-lg border border-zinc-300/70 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:grid-cols-3"
+            >
+              {CLINICAL_DEPARTMENTS.map((department) => (
+                <label key={department} className="flex items-center gap-2 text-[13px] text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={departments.includes(department)}
+                    onChange={() =>
+                      setDepartments((current) =>
+                        current.includes(department)
+                          ? current.filter((entry) => entry !== department)
+                          : [...current, department],
+                      )
+                    }
+                    disabled={busy}
+                    className={checkboxClass}
+                  />
+                  <span className="truncate">{DEPARTMENT_LABELS[department]}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
+            Optional — leave empty for an all-staff post. Departments are filter tags, not a visibility boundary:
+            everyone sees every bulletin.
+          </p>
+          {issueFor("departments").map((issue) => (
+            <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
+              {issue.message}
+            </p>
+          ))}
+        </div>
+
         {/* Options — the two flags and the opt-in expiry, grouped. */}
         <fieldset className="rounded-xl border border-zinc-300/70 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
           <legend className="px-1 text-[13px] font-medium text-zinc-800">Options</legend>
@@ -607,7 +663,12 @@ export default function BulletinComposer({
               <input
                 type="checkbox"
                 checked={pinned}
-                onChange={(event) => setPinned(event.target.checked)}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setPinned(checked);
+                  // Unticking clears the expiry; a fresh tick starts with none.
+                  if (!checked) setExpiryDate(null);
+                }}
                 disabled={busy}
                 className={checkboxClass}
               />
@@ -618,6 +679,43 @@ export default function BulletinComposer({
                 </span>
               </span>
             </label>
+
+            {pinned ? (
+              <div role="group" aria-label="Expiry date and time" className="border-l border-zinc-200 pl-3.5">
+                <span className="mb-1 block text-[12.5px] font-medium text-zinc-700">
+                  Expires <span className="font-normal text-zinc-500">(required for a pinned post)</span>
+                </span>
+                <div role="group" aria-label="Expiry presets" className="flex flex-wrap items-center gap-1.5">
+                  {EXPIRY_PRESETS.map((preset) => {
+                    const presetDate = expiryPresetDate(preset.days);
+                    const selected = expiryDate !== null && presetDate.getTime() === expiryDate.getTime();
+                    return (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={busy}
+                        onClick={() => applyExpiryPreset(preset.days)}
+                        className={cx(
+                          "flex h-7 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50",
+                          selected
+                            ? "border-[#5F6E00] bg-[#E6EBA5] text-[#5F6E00]"
+                            : "border-zinc-300/60 bg-white text-zinc-600 hover:border-[#5F6E00]/40 hover:text-[#5F6E00]",
+                        )}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {issueFor("expiry").map((issue) => (
+                  <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
+                    {issue.message}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+
             <label className="flex items-start gap-2.5">
               <input
                 type="checkbox"
@@ -629,50 +727,10 @@ export default function BulletinComposer({
               <span>
                 <span className="block text-[13px] font-medium text-zinc-800">Urgent</span>
                 <span className="block text-xs leading-5 text-zinc-500">
-                  Adds the red flag. Editing an urgent notice clears its acknowledgements.
+                  A red flag on the post only. Editing an urgent notice clears its acknowledgements.
                 </span>
               </span>
             </label>
-            <label className="flex items-start gap-2.5">
-              <input
-                type="checkbox"
-                checked={expireEnabled}
-                onChange={(event) => {
-                  setExpireEnabled(event.target.checked);
-                  if (!event.target.checked) setExpires("");
-                }}
-                disabled={busy}
-                className={checkboxClass}
-              />
-              <span>
-                <span className="block text-[13px] font-medium text-zinc-800">Expire</span>
-                <span className="block text-xs leading-5 text-zinc-500">
-                  Silently deleted on expiry. Leave unticked and the post lives until you delete it.
-                </span>
-              </span>
-            </label>
-            {expireEnabled ? (
-              <div className="pl-6">
-                <label htmlFor="bulletin-expires" className="mb-1 block text-[12.5px] font-medium text-zinc-700">
-                  Expires at
-                </label>
-                <input
-                  id="bulletin-expires"
-                  type="datetime-local"
-                  min={minExpiry}
-                  value={expires}
-                  onChange={(event) => setExpires(event.target.value)}
-                  aria-invalid={issueFor("expiry").length > 0 ? true : undefined}
-                  className={cx(fieldClass, issueFor("expiry").length > 0 && "border-red-300")}
-                  disabled={busy}
-                />
-                {issueFor("expiry").map((issue) => (
-                  <p key={issue.code} role="alert" className="mt-1 text-xs text-red-700">
-                    {issue.message}
-                  </p>
-                ))}
-              </div>
-            ) : null}
           </div>
         </fieldset>
 

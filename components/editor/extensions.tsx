@@ -1542,12 +1542,19 @@ export interface EditorExtensionOptions {
    * those nodes can never appear in — or be pasted into — an article.
    */
   bulletinBlocks: boolean;
+  /**
+   * Register the block drag handle. Defaults to `true`. The bulletin composer
+   * passes `false`: its grip read as a modal-window handle the (non-movable)
+   * modal does not have.
+   */
+  dragHandle: boolean;
 }
 
 export function buildEditorExtensions(options: Partial<EditorExtensionOptions> = {}) {
   const onLink = options.onLink ?? (() => {});
   const onImage = options.onImage ?? (() => {});
   const bulletinBlocks = options.bulletinBlocks === true;
+  const dragHandle = options.dragHandle !== false;
   return [
     StarterKit.configure({
       // Paragraphs and headings are re-declared below: their stored form
@@ -1631,7 +1638,10 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
     // The drop indicator 5b shipped without: a 2px petroleum-teal line where a
     // dragged block will land. No custom CSS class needed.
     Dropcursor.configure({ color: "#0f766e", width: 2 }),
-    DragHandle.configure({
+    // The block drag handle is opt-out: the bulletin composer passes
+    // `dragHandle: false`, because its grip read as a modal-window handle the
+    // modal does not have.
+    ...(dragHandle ? [DragHandle.configure({
       render: createDragHandleElement,
       // Nested handles are enabled so list items get one too; the default rules
       // already exclude table structure (rows/cells) and deprioritise the list
@@ -1645,7 +1655,7 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
           { id: "dragWrappersAsUnit", evaluate: dragWrappersAsUnit },
         ],
       },
-    }),
+    })] : []),
     // Bulletin-only blocks, registered by flag so articles can never carry them.
     ...(bulletinBlocks ? [CtaButton, Steps, Spotlight] : []),
   ];

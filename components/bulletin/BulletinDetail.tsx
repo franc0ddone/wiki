@@ -312,7 +312,6 @@ export function BulletinDetail({
         header={
           <>
             {actionRow}
-            {heroImage}
             <BulletinHero
               title={bulletin.title}
               deck={bulletin.deck}
@@ -320,6 +319,7 @@ export function BulletinDetail({
               departments={bulletin.departments}
               publishedAt={bulletin.created_at}
             />
+            {heroImage}
           </>
         }
         footer={
