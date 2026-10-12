@@ -39,9 +39,6 @@ enum ArticleStatus {
   published
 }
 
-/// **Unused since prompt 6c.** Superseded by the `pinned` / `urgent` booleans on
-/// `Bulletin`; the column and this enum survive only so the existing data is not
-/// migrated away. No application code reads or writes `priority`.
 enum BulletinPriority {
   urgent
   pinned
@@ -68,15 +65,6 @@ enum RoleRequestStatus {
   pending
   approved
   declined
-}
-
-/// **Unused since prompt 6c.** The three-tier bulletin format was deleted; the
-/// column and this enum survive only so the existing data is not migrated away.
-/// No application code reads or writes `format`.
-enum BulletinFormat {
-  notice
-  announcement
-  featured
 }
 
 // --------------------------------------------------------------------- users
@@ -106,12 +94,6 @@ model User {
   authoredBulletins Bulletin[]
   articleVersions  ArticleVersion[]
   bulletinAcks     BulletinAck[]
-  /// Bounded ❤️🎉👍 reactions this user has left on bulletins.
-  bulletinReactions BulletinReaction[]
-  /// Files this user attached to articles (`SetNull` when the account is removed).
-  uploadedAttachments ArticleAttachment[]
-  /// Files this user attached to bulletins (`SetNull` when the account is removed).
-  uploadedBulletinAttachments BulletinAttachment[]
 
   /// Requests this user has raised (the "request author access" flow).
   roleRequests        RoleRequest[] @relation("RoleRequestRequester")
@@ -156,7 +138,6 @@ model Article {
   reviewer User?  @relation("ArticleReviewer", fields: [reviewerId], references: [id])
   versions ArticleVersion[]
   bulletins Bulletin[]
-  attachments ArticleAttachment[]
 
   @@index([status])
   @@index([updatedAt(sort: Desc)])
@@ -198,22 +179,7 @@ model Bulletin {
   bodyMarkdown String @map("body_markdown")
   departments  String[]
 
-  /// Pinned: floats to the top of every board and renders as the dark
-  /// calling-card hero (detail) / dark mini-card (board rail).
-  pinned Boolean @default(false)
-  /// Urgent: an opt-in red visual flag. Not a tier — just a chip.
-  urgent Boolean @default(false)
-
-  /// The muted subtitle line under the headline (plain text). Optional, whole
-  /// life of the post.
-  deck String?
-
-  /// An optional hero banner image rendered above the headline, whatever the
-  /// post. `https://` URL or a relative portal path; null = no hero.
-  heroImageUrl String? @map("hero_image_url")
-  /// Required whenever `heroImageUrl` is set (max 280 chars), rendered as the
-  /// `<img alt>`.
-  heroImageAlt String? @map("hero_image_alt")
+  priority BulletinPriority @default(normal)
 
   linkedArticleId String? @map("linked_article_id") @db.Uuid
 
@@ -222,30 +188,19 @@ model Bulletin {
   /// When the notice went up. Exposed to the frontend as `created_at`.
   publishedAt DateTime @map("published_at")
 
-  /// Opt-in expiry. On board fetch, rows with `expiresAt <= now()` are silently
-  /// deleted. Null = the post lives until it is manually deleted.
+  /// Pinned and urgent notices age out; nothing accumulates forever. The API
+  /// applies a default window per priority when the client omits one.
   expiresAt DateTime? @map("expires_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  // --- Legacy columns (prompt 6c). Left in place, never read or written by the
-  //     application; the data is preserved rather than migrated away. ---
-  /// Unused. Superseded by `pinned` / `urgent`.
-  priority BulletinPriority @default(normal)
-  /// Unused. The presentation tier was deleted.
-  format BulletinFormat @default(notice)
-  /// Unused. The eyebrow pill was deleted (departments are the tags).
-  kicker String?
-
   linkedArticle Article? @relation(fields: [linkedArticleId], references: [id], onDelete: SetNull)
   author        User     @relation(fields: [authorId], references: [id])
   acks          BulletinAck[]
-  reactions     BulletinReaction[]
-  /// Files attached to this notice (PDF / DOCX / XLSX / PPTX / TXT / CSV).
-  attachments   BulletinAttachment[]
 
   @@index([publishedAt(sort: Desc)])
   @@index([expiresAt])
+  @@index([priority])
   @@map("bulletins")
 }
 
@@ -264,98 +219,6 @@ model BulletinAck {
   @@unique([bulletinId, userId])
   @@index([bulletinId])
   @@map("bulletin_acks")
-}
-
-/// A bounded reaction on a bulletin: one row per (bulletin, user, emoji).
-///
-/// The emoji is validated against the fixed allowlist (`❤️` `🎉` `👍`) in
-/// `lib/bulletin/reactions.ts` before the row is written; the unique constraint
-/// is what makes a rapid double-toggle idempotent — the write path inserts and
-/// treats a P2002 as "already reacted, so delete it" (toggle off).
-model BulletinReaction {
-  id String @id @default(uuid()) @db.Uuid
-
-  bulletinId String @map("bulletin_id") @db.Uuid
-  userId     String @map("user_id") @db.Uuid
-  emoji      String
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  bulletin Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([bulletinId, userId, emoji])
-  @@index([bulletinId])
-  @@map("bulletin_reactions")
-}
-
-/// A file attached to an article (PDF / DOCX / XLSX).
-///
-/// Attachments belong to the article, not to a version, so they persist across
-/// republication and the reader lists them on the current version. The object
-/// key is server-derived (`attachments/<uuid>/<sanitized-fileName>`) and is
-/// never exposed to the client — the reader streams through the API instead.
-model ArticleAttachment {
-  id String @id @default(uuid()) @db.Uuid
-
-  articleId String @map("article_id") @db.Uuid
-  fileName  String @map("file_name")
-  fileKey   String @map("file_key")
-  mimeType  String @map("mime_type")
-  sizeBytes Int    @map("size_bytes")
-
-  /// Nullable: removing the uploader's account must not delete the article's
-  /// attachments, so the FK is `SetNull` rather than `Cascade`.
-  uploadedById String? @map("uploaded_by_id") @db.Uuid
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  article    Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-
-  @@index([articleId])
-  @@map("article_attachments")
-}
-
-/// A file attached to a bulletin (PDF / DOCX / XLSX / PPTX / TXT / CSV).
-///
-/// The bulletin counterpart of `ArticleAttachment`, and deliberately identical
-/// in shape and semantics: the file belongs to the bulletin — not to any edit
-/// of it — so it survives every later save, the object key is server-derived
-/// (`attachments/<uuid>/<sanitized-fileName>`) and never crosses the wire (the
-/// reader streams through the API), and the uploader FK is `SetNull` so
-/// removing an account never removes a notice's files.
-///
-/// **`bulletinId` is nullable, and that is the staging mechanism.** A composer
-/// writing a *new* notice has no id to attach to yet, so a file chosen before
-/// the first save is stored with `bulletinId = null` ("staged") and linked to
-/// the bulletin when it is created — the same shape as the hero image, which is
-/// uploaded immediately and referenced by URL in the saved payload. A staged
-/// row that is never linked is swept after `STAGED_ATTACHMENT_TTL_MS`
-/// (`lib/bulletin/lifecycle.ts`): its object is deleted from storage and then
-/// the row itself. `Cascade` on the bulletin FK still means a deleted notice
-/// takes its linked attachments with it.
-model BulletinAttachment {
-  id String @id @default(uuid()) @db.Uuid
-
-  /// Null while the attachment is staged for a bulletin that does not exist yet.
-  bulletinId String? @map("bulletin_id") @db.Uuid
-  fileName   String  @map("file_name")
-  fileKey    String  @map("file_key")
-  mimeType   String  @map("mime_type")
-  sizeBytes  Int     @map("size_bytes")
-
-  /// Nullable: removing the uploader's account must not delete the bulletin's
-  /// attachments, so the FK is `SetNull` rather than `Cascade`.
-  uploadedById String? @map("uploaded_by_id") @db.Uuid
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  bulletin   Bulletin? @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
-  uploadedBy User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-
-  @@index([bulletinId])
-  @@index([bulletinId, createdAt])
-  @@map("bulletin_attachments")
 }
 
 // ----------------------------------------------------------- role requests
