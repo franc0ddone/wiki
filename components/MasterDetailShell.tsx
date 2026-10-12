@@ -226,6 +226,19 @@ export interface MasterDetailShellProps<T> {
   listSubtitle?: string;
   /** Optional controls beside the rail title (e.g. a "New" button). */
   listActions?: ReactNode;
+  /**
+   * An optional leading group, drawn above `items` under its own caption — the
+   * bulletin board's pinned section. The caption is what separates it from the
+   * rest of the rail; rows are otherwise identical to the list's (same chrome,
+   * selection, keyboard path), so the only difference between the groups is
+   * where they sit and how each row is rendered.
+   */
+  leadingGroup?: {
+    /** The section caption, e.g. `"Pinned"`. */
+    label: string;
+    items: readonly T[];
+    renderItem: (item: T, isSelected: boolean) => ReactNode;
+  };
   /** Rendered below the list inside the same scroll container (e.g. an expired tray). */
   listFooter?: ReactNode;
 
@@ -254,6 +267,7 @@ export function MasterDetailShell<T>({
   listTitle,
   listSubtitle,
   listActions,
+  leadingGroup,
   listFooter,
   searchQuery,
   onSearchChange,
@@ -269,6 +283,41 @@ export function MasterDetailShell<T>({
 }: MasterDetailShellProps<T>) {
   const hasSelection = selectedId !== null;
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * One row, whatever group it belongs to: the shell owns the chrome, the
+   * selection ring and the identity; `content` is the caller's inner content
+   * (the list's own renderer, or the leading group's).
+   */
+  const renderRow = (item: T, content: (item: T, isSelected: boolean) => ReactNode) => {
+    const id = getId(item);
+    const isSelected = id === selectedId;
+    return (
+      <li key={id}>
+        <button
+          type="button"
+          onClick={() => onSelect(id)}
+          aria-current={isSelected ? "true" : undefined}
+          className={cx(
+            "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
+            isSelected
+              ? "border-zinc-300/60 bg-teal-50/60 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
+              : "border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:shadow-[0_2px_6px_rgba(16,24,40,0.08)]",
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={cx(
+              "absolute inset-y-0 left-0 w-[3px] bg-[#0F766E] transition-opacity",
+              isSelected ? "opacity-100" : "opacity-0",
+            )}
+          />
+          {content(item, isSelected)}
+        </button>
+      </li>
+    );
+  };
 
   // A new selection starts reading from the top.
   useEffect(() => {
@@ -318,40 +367,27 @@ export function MasterDetailShell<T>({
         <div className="h-px shrink-0 bg-zinc-200/80" />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-          {items.length === 0 ? (
+          {items.length === 0 && (leadingGroup?.items.length ?? 0) === 0 ? (
             <div className="p-3">{emptyListState}</div>
           ) : (
-            <ul role="list" className="space-y-1.5">
-              {items.map((item) => {
-                const id = getId(item);
-                const isSelected = id === selectedId;
-                return (
-                  <li key={id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(id)}
-                      aria-current={isSelected ? "true" : undefined}
-                      className={cx(
-                        "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
-                        isSelected
-                          ? "border-zinc-300/60 bg-teal-50/60 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
-                          : "border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:shadow-[0_2px_6px_rgba(16,24,40,0.08)]",
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          "absolute inset-y-0 left-0 w-[3px] bg-[#0F766E] transition-opacity",
-                          isSelected ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      {renderListItem(item, isSelected)}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {leadingGroup && leadingGroup.items.length > 0 ? (
+                <section aria-label={leadingGroup.label} className="mb-3">
+                  <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                    {leadingGroup.label}
+                  </p>
+                  <ul role="list" className="space-y-1.5">
+                    {leadingGroup.items.map((item) => renderRow(item, leadingGroup.renderItem))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {items.length > 0 ? (
+                <ul role="list" className="space-y-1.5">
+                  {items.map((item) => renderRow(item, renderListItem))}
+                </ul>
+              ) : null}
+            </>
           )}
           {listFooter}
         </div>

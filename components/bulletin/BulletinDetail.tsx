@@ -11,10 +11,11 @@ import {
   Users,
 } from "lucide-react";
 import { MarkdownReader } from "@/components/MarkdownReader";
-import { AcknowledgedPill, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { AcknowledgedMark, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { BulletinAttachments } from "@/components/bulletin/BulletinAttachments";
+import { PinnedActions } from "@/components/bulletin/PinnedStrip";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import {
   acknowledgeBulletin,
@@ -27,38 +28,24 @@ import {
 import { BULLETIN_REACTION_EMOJIS } from "@/lib/bulletin/reactions";
 import { roleAtLeast, type Role } from "@/lib/roles";
 import { cx, formatDateTime } from "@/lib/utils";
-import {
-  DEPARTMENT_LABELS,
-  type Bulletin,
-  type ClinicalDepartment,
-  type KnowledgeArticle,
-} from "@/types/portal";
+import { DEPARTMENT_LABELS, type Bulletin, type KnowledgeArticle } from "@/types/portal";
 
 /**
  * Bulletin reader — exactly one layout for every bulletin (prompt 6c follow-up).
  *
  * The dark calling card (`BulletinHero`) is the universal header: it renders
  * for pinned, urgent, and plain posts alike, with the title, the optional deck,
- * and the author/departments/date meta line. An optional hero banner sits above
- * it. `pinned` / `urgent` change nothing here except the red urgent chip. The
- * body, the bounded ❤️🎉👍 reaction row, the ack row, and the linked-SOP card
- * are the same for all of them.
+ * and the author/departments/date meta line. An optional hero banner sits
+ * beneath it. `pinned` / `urgent` change nothing here except the red urgent
+ * chip — a pinned notice needs no pinned distinction in its body, because it
+ * already sits in the pinned section of the rail. The body, the bounded
+ * ❤️🎉👍 reaction row, the ack row, and the linked-SOP card are the same for all
+ * of them.
+ *
+ * Two things are new since: the author's pin controls (quiet, author-only, above
+ * the hero) and a single muted line of departments at the very bottom — the rail
+ * no longer repeats them on every card.
  */
-
-function DepartmentTags({ departments }: { departments: readonly ClinicalDepartment[] }) {
-  return (
-    <span className="flex flex-wrap items-center gap-1">
-      {departments.map((department) => (
-        <span
-          key={department}
-          className="whitespace-nowrap rounded-full border border-teal-600/30 bg-teal-50/50 px-2 py-px text-xs font-medium text-teal-700"
-        >
-          {DEPARTMENT_LABELS[department]}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 export interface BulletinDetailProps {
   bulletin: Bulletin;
@@ -69,6 +56,15 @@ export interface BulletinDetailProps {
   now: number;
   /** True when the viewer may edit/delete this notice (author of it, or a lead). */
   canEdit: boolean;
+  /**
+   * True when the viewer *wrote* this notice — narrower than `canEdit` on
+   * purpose: unpinning and changing the expiry are the author's alone, so a
+   * clinical lead or an admin reading someone else's post sees the pin label
+   * and no buttons.
+   */
+  isAuthor: boolean;
+  /** Applies an unpin / expiry change from the pin strip. */
+  onPinChange: (patch: { pinned?: boolean; expires_at?: string | null }) => Promise<void>;
   onOpenArticle: (articleId: string) => void;
   onOpenArticleBySlug: (slug: string, anchor?: string) => void;
   onEdit: () => void;
@@ -82,6 +78,8 @@ export function BulletinDetail({
   viewerId,
   now,
   canEdit,
+  isAuthor,
+  onPinChange,
   onOpenArticle,
   onOpenArticleBySlug,
   onEdit,
@@ -271,16 +269,31 @@ export function BulletinDetail({
     </div>
   );
 
+  /**
+   * The departments, stated once — a footnote at the very bottom of the post.
+   * The rail cards stopped carrying pills, so this is where the information
+   * lives; a post with none is an all-staff notice, and says so.
+   */
+  const departmentFootnote = (
+    <p className="text-xs text-zinc-500">
+      Departments:{" "}
+      {bulletin.departments.length > 0
+        ? bulletin.departments.map((department) => DEPARTMENT_LABELS[department]).join(" · ")
+        : "All staff"}
+    </p>
+  );
+
+  /**
+   * The badges and the viewer's own actions. Departments are no longer pill-ed
+   * here — they are stated once, quietly, in the footnote at the very bottom of
+   * the post. Acknowledging is a read-state, so it shows as a small dove-green
+   * check rather than a pill competing with the urgent flag.
+   */
   const actionRow = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
         {bulletin.urgent ? <UrgentChip /> : null}
-        {myAck ? (
-          <AcknowledgedPill />
-        ) : (
-          <ExpiryChip expiresAt={bulletin.expires_at} now={now} />
-        )}
-        <DepartmentTags departments={bulletin.departments} />
+        {myAck ? <AcknowledgedMark /> : <ExpiryChip expiresAt={bulletin.expires_at} now={now} />}
       </div>
       {canEdit ? (
         <div className="flex shrink-0 items-center gap-1.5 print:hidden">
@@ -313,6 +326,8 @@ export function BulletinDetail({
         header={
           <>
             {actionRow}
+            {/* The author's pin controls, quietly, under the reader's own actions. */}
+            <PinnedActions bulletin={bulletin} isAuthor={isAuthor} onChange={onPinChange} />
             <BulletinHero
               title={bulletin.title}
               deck={bulletin.deck}
@@ -382,6 +397,8 @@ export function BulletinDetail({
             </div>
 
             {linkedCard}
+
+            {departmentFootnote}
           </div>
         }
       />

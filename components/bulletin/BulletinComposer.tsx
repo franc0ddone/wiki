@@ -31,6 +31,7 @@ import {
 } from "@/lib/bulletin/api";
 import { uploadImage } from "@/lib/editor/api";
 import { HERO_ALT_MAX_LENGTH } from "@/lib/bulletin/hero";
+import { EXPIRY_PRESETS, expiryPresetDate } from "@/lib/bulletin/expiry";
 import {
   BULLETIN_TITLE_MAX_LENGTH,
   DECK_MAX_LENGTH,
@@ -90,24 +91,12 @@ function readMarkdown(editor: Editor): string {
 }
 
 /**
- * One-tap expiry presets — the only expiry UI. Each lands at end-of-day
- * **11:45 PM** (the last 15-minute increment), so a pinned "tomorrow" notice
- * stays up through tomorrow.
+ * The expiry presets both this composer and the detail view's "Change expiry"
+ * picker use come from `lib/bulletin/expiry.ts` (`EXPIRY_PRESETS` /
+ * `expiryPresetDate`), so the two surfaces can never offer different windows.
+ * Each lands at end-of-day **11:45 PM** (the last 15-minute increment), so a
+ * pinned "tomorrow" notice stays up through tomorrow.
  */
-const EXPIRY_PRESETS = [
-  { days: 1, label: "Tomorrow" },
-  { days: 3, label: "In 3 days" },
-  { days: 7, label: "In 1 week" },
-  { days: 30, label: "In 30 days" },
-] as const;
-
-/** `days` out from `from`, at 11:45 PM local — a preset's datetime. */
-function expiryPresetDate(days: number, from: Date = new Date()): Date {
-  const target = new Date(from);
-  target.setDate(target.getDate() + days);
-  target.setHours(23, 45, 0, 0);
-  return target;
-}
 
 /** The department-dropdown button label. Empty means an all-staff post. */
 function departmentSummary(departments: readonly ClinicalDepartment[]): string {

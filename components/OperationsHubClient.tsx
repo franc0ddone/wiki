@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
-import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
@@ -25,7 +25,7 @@ import { ReferencedBy } from "@/components/ReferencedBy";
 import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
-import { deleteBulletin, listBulletins } from "@/lib/bulletin/api";
+import { deleteBulletin, listBulletins, patchBulletin } from "@/lib/bulletin/api";
 import { matchesDepartment } from "@/lib/data/filters";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
 import { roleAtLeast, type Role } from "@/lib/roles";
@@ -241,11 +241,26 @@ function RowTimestamp({ iso, withTime }: { iso: string; withTime: boolean }) {
 }
 
 /**
- * A board row. Every row is the same simple white row (prompt 6c follow-up):
- * author · date, title, excerpt, department tags, and the urgent / expiry chips
- * where applicable. A pinned post carries no marker here — it only sorts first.
+ * A board row — the same component for both groups: the pinned section at the
+ * top of the rail and the ordinary feed beneath it. Author · date, title,
+ * excerpt, and one badge line; the only difference is that badge line, which for
+ * a pinned row states the date it comes down instead of the relative chip.
+ *
+ * Department pills are gone from both variants (see `BulletinRowBadges`): the
+ * rail indexes departments for its filter chips and does not repeat them on
+ * every card.
  */
-function BulletinRow({ bulletin, isSelected, now }: { bulletin: Bulletin; isSelected: boolean; now: number }) {
+function BulletinRow({
+  bulletin,
+  isSelected,
+  now,
+  variant = "standard",
+}: {
+  bulletin: Bulletin;
+  isSelected: boolean;
+  now: number;
+  variant?: "pinned" | "standard";
+}) {
   return (
     <span className="block">
       <span className="flex items-center justify-between gap-3">
@@ -265,11 +280,7 @@ function BulletinRow({ bulletin, isSelected, now }: { bulletin: Bulletin; isSele
       <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
         {excerpt(bulletin.body_markdown)}
       </span>
-      <span className="mt-2 flex flex-wrap items-center gap-1">
-        {bulletin.urgent ? <UrgentChip /> : null}
-        <ExpiryChip expiresAt={bulletin.expires_at} now={now} />
-        <DepartmentTags departments={bulletin.departments} />
-      </span>
+      <BulletinRowBadges bulletin={bulletin} now={now} variant={variant} />
     </span>
   );
 }
@@ -499,6 +510,22 @@ export function OperationsHubClient({
     [refreshBulletins],
   );
 
+  /**
+   * The pin strip's write — unpin, or change the expiry. It goes through the
+   * same PATCH the composer uses, so authorship and validation stay the API's
+   * (`requireEditableBulletin`), and the board is refetched afterwards so the
+   * rail marker and the detail label both show the new state. A refusal is
+   * re-thrown: the strip prints the API's own message.
+   */
+  const handlePinChange = useCallback(
+    async (id: string, patch: { pinned?: boolean; expires_at?: string | null }) => {
+      await patchBulletin(id, patch);
+      setBulletinRevision((current) => current + 1);
+      await refreshBulletins(id);
+    },
+    [refreshBulletins],
+  );
+
   const handleDeleted = useCallback(
     async (bulletin: Bulletin) => {
       setBoardError(null);
@@ -618,6 +645,14 @@ export function OperationsHubClient({
     () => [...filteredBulletins].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
     [filteredBulletins],
   );
+  /**
+   * The rail is two groups, not one list with a marker on some rows: pinned
+   * notices render in their own section at the top (the shell's `leadingGroup`),
+   * everything else below it in recency order. Both groups come out of the same
+   * filtered board, so a search or a department filter drops out of both.
+   */
+  const pinnedBulletins = useMemo(() => boardBulletins.filter((bulletin) => bulletin.pinned), [boardBulletins]);
+  const feedBulletins = useMemo(() => boardBulletins.filter((bulletin) => !bulletin.pinned), [boardBulletins]);
   const selectedBulletin = useMemo(
     () => boardBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
     [boardBulletins, selectedBulletinId],
@@ -687,7 +722,18 @@ export function OperationsHubClient({
       <main className="flex min-h-0 flex-1 flex-col print:block">
         {activeView === "bulletins" ? (
           <MasterDetailShell
-            items={boardBulletins}
+            items={feedBulletins}
+            leadingGroup={
+              pinnedBulletins.length > 0
+                ? {
+                    label: "Pinned",
+                    items: pinnedBulletins,
+                    renderItem: (bulletin, isSelected) => (
+                      <BulletinRow bulletin={bulletin} isSelected={isSelected} now={now} variant="pinned" />
+                    ),
+                  }
+                : undefined
+            }
             getId={(bulletin) => bulletin.id}
             selectedId={selectedBulletin?.id ?? null}
             onSelect={setSelectedBulletinId}
@@ -724,6 +770,8 @@ export function OperationsHubClient({
                   viewerId={viewerId ?? ""}
                   now={now}
                   canEdit={canManageBulletin(selectedBulletin)}
+                  isAuthor={authoredIds.includes(selectedBulletin.id)}
+                  onPinChange={(patch) => handlePinChange(selectedBulletin.id, patch)}
                   onOpenArticle={openArticle}
                   onOpenArticleBySlug={openArticleBySlug}
                   onEdit={() => setComposer({ mode: "edit", bulletin: selectedBulletin })}

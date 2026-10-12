@@ -165,7 +165,7 @@ function CalloutMenu({ editor, active }: { editor: Editor; active: CalloutVarian
           role="menu"
           aria-label="Callout type"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 top-[calc(100%+6px)] z-30 w-64 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.22),0_2px_6px_rgba(24,24,27,0.06)]"
+          className="absolute left-0 top-[calc(100%+6px)] z-30 max-h-80 w-64 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.22),0_2px_6px_rgba(24,24,27,0.06)]"
         >
           {CALLOUT_VARIANTS.map((variant, index) => (
             <button

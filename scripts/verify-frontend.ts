@@ -132,7 +132,13 @@ import {
   normalizeHeroImageAlt,
   normalizeHeroImageUrl,
 } from "@/lib/bulletin/hero";
-import { relativeExpiryLabel } from "@/lib/bulletin/expiry";
+import {
+  EXPIRY_PRESETS,
+  expiryPresetDate,
+  pinExpiryShortLabel,
+  pinnedRailLabel,
+  relativeExpiryLabel,
+} from "@/lib/bulletin/expiry";
 import {
   createBulletin,
   getBulletinById,
@@ -183,8 +189,12 @@ import {
 import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
-import { AcknowledgedPill, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { AcknowledgedMark, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
+import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
+import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
+import type { Bulletin } from "@/types/portal";
 import { dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
 
 let passed = 0;
@@ -1012,13 +1022,196 @@ check("a post with no expiry renders no chip", () => {
   assert.equal(html, "");
 });
 
-check("the urgent flag is the red chip; the acknowledged pill is dove green", () => {
+check("the urgent flag is the red chip; acknowledging is a quiet dove-green check", () => {
   const urgent = renderToStaticMarkup(createElement(UrgentChip));
   assert.match(urgent, /border-red-200 bg-red-50 text-red-700/);
   assert.match(urgent, /Urgent/);
-  const acked = renderToStaticMarkup(createElement(AcknowledgedPill));
-  assert.match(acked, /border-\[#5F6E00\] bg-\[#E6EBA5\] text-\[#5F6E00\]/);
-  assert.match(acked, /Acknowledged/);
+
+  const acked = renderToStaticMarkup(createElement(AcknowledgedMark));
+  assert.match(acked, /aria-label="Acknowledged"/);
+  assert.ok(acked.includes("text-[#5F6E00]"), "the mark is dove green");
+  assert.ok(!acked.includes("rounded-full") && !acked.includes("border"), "it must not be a pill any more");
+  assert.ok(!acked.includes(">Acknowledged<"), "the word is not spelled out — the mark is the whole signal");
+});
+
+/* --------------------------------------------------------------- pin state */
+
+const NOW = Date.parse("2026-10-11T19:00:00.000Z");
+
+/** A minimal, valid bulletin for rendering the rail and the reader. */
+const railBulletin = (overrides: Partial<Bulletin> = {}): Bulletin => ({
+  id: "b1",
+  title: "Blood bank fridge temperature check",
+  departments: ["ER"],
+  pinned: false,
+  urgent: false,
+  body_markdown: "Body.",
+  created_at: "2026-10-11T18:00:00.000Z",
+  author_name: "Trevor Lindqvist",
+  expires_at: null,
+  ...overrides,
+});
+
+check("a pinned row's date is absolute: 'Oct 14', with the year only when it differs", () => {
+  // Oct 14, 3 PM in the facility's timezone (America/Los_Angeles).
+  assert.equal(pinExpiryShortLabel("2026-10-14T22:00:00.000Z", NOW), "Oct 14");
+  assert.equal(pinExpiryShortLabel("2027-01-05T20:00:00.000Z", NOW), "Jan 5, 2027");
+});
+
+check("the pin line belongs to pinned posts alone", () => {
+  const expiry = "2026-10-14T22:00:00.000Z";
+  assert.equal(pinnedRailLabel({ pinned: true, expires_at: expiry }, NOW), "until Oct 14");
+  assert.equal(pinnedRailLabel({ pinned: false, expires_at: expiry }, NOW), null);
+  assert.equal(pinnedRailLabel({ pinned: false, expires_at: null }, NOW), null);
+  // A row that predates the pin-requires-an-expiry rule carries no date.
+  assert.equal(pinnedRailLabel({ pinned: true, expires_at: null }, NOW), null);
+});
+
+check("the pinned group's card shows the date and no 'Pinned' pill; no card shows departments", () => {
+  const pinnedCard = renderToStaticMarkup(
+    createElement(BulletinRowBadges, {
+      bulletin: railBulletin({
+        pinned: true,
+        expires_at: "2026-10-14T22:00:00.000Z",
+        departments: ["ER", "ICU"],
+      }),
+      now: NOW,
+      variant: "pinned",
+    }),
+  );
+  assert.match(pinnedCard, /until Oct 14/);
+  assert.match(pinnedCard, /text-zinc-500/, "the date is muted");
+  assert.ok(!pinnedCard.includes("Pinned"), "the section says it is pinned — the card must not repeat it");
+  assert.ok(!pinnedCard.includes("in 3d"), "the relative chip belongs to the feed, not to the pinned group");
+  assert.ok(!pinnedCard.includes("ER") && !pinnedCard.includes("ICU"), "no department pills on a rail card");
+
+  const feedCard = renderToStaticMarkup(
+    createElement(BulletinRowBadges, {
+      bulletin: railBulletin({
+        expires_at: new Date(NOW + 3 * 3_600_000).toISOString(),
+        departments: ["ER", "ICU"],
+      }),
+      now: NOW,
+      variant: "standard",
+    }),
+  );
+  assert.match(feedCard, /in 3h/);
+  assert.ok(!feedCard.includes("until"), "an unpinned card carries no pin text");
+  assert.ok(!feedCard.includes("ER") && !feedCard.includes("ICU"), "no department pills on a rail card");
+
+  // The one badge meant to shout keeps its full red pill, in both groups.
+  const urgentCard = renderToStaticMarkup(
+    createElement(BulletinRowBadges, { bulletin: railBulletin({ urgent: true }), now: NOW, variant: "standard" }),
+  );
+  assert.match(urgentCard, /Urgent/);
+  assert.match(urgentCard, /border-red-200 bg-red-50 text-red-700/);
+});
+
+check("the pinned section renders above the feed, and only an empty board shows the empty state", () => {
+  const renderRail = (items: readonly string[], pinnedItems: readonly string[]) =>
+    renderToStaticMarkup(
+      createElement(
+        MasterDetailShell<string>,
+        {
+          items,
+          getId: (item: string) => item,
+          selectedId: null,
+          onSelect: () => {},
+          renderListItem: (item: string) => createElement("span", null, `feed:${item}`),
+          leadingGroup:
+            pinnedItems.length > 0
+              ? {
+                  label: "Pinned",
+                  items: pinnedItems,
+                  renderItem: (item: string) => createElement("span", null, `pinned:${item}`),
+                }
+              : undefined,
+          detail: null,
+          listTitle: "Bulletin Board",
+          searchQuery: "",
+          onSearchChange: () => {},
+          searchPlaceholder: "Search notices",
+          searchLabel: "Search bulletins",
+          activeDepartment: "All" as const,
+          onDepartmentChange: () => {},
+          counts: {},
+          emptyListState: createElement("span", null, "NOTHING HERE"),
+          emptyDetailState: null,
+          detailLabel: "Bulletin reader",
+        },
+      ),
+    );
+
+  const both = renderRail(["feed-1"], ["pinned-1"]);
+  const captionAt = both.indexOf("Pinned");
+  const pinnedAt = both.indexOf("pinned:pinned-1");
+  const feedAt = both.indexOf("feed:feed-1");
+  assert.ok(captionAt >= 0 && pinnedAt > captionAt, "the caption sits above the pinned group");
+  assert.ok(feedAt > pinnedAt, "the feed renders below the pinned group");
+
+  // A board that is all pinned notices is not an empty board.
+  const onlyPinned = renderRail([], ["pinned-1"]);
+  assert.ok(onlyPinned.includes("pinned:pinned-1"));
+  assert.ok(!onlyPinned.includes("NOTHING HERE"), "an all-pinned board must not read as empty");
+
+  // With nothing at all, the empty state is what renders — and no caption.
+  const nothing = renderRail([], []);
+  assert.ok(nothing.includes("NOTHING HERE"));
+  assert.ok(!nothing.includes("Pinned"), "an empty rail shows no pinned caption");
+});
+
+check("the detail states the departments once, and the pin controls are the author's alone", () => {
+  const render = (overrides: Partial<Bulletin>, isAuthor: boolean) =>
+    renderToStaticMarkup(
+      createElement(BulletinDetail, {
+        bulletin: railBulletin(overrides),
+        articles: [],
+        viewerRole: "staff" as const,
+        viewerId: "u1",
+        now: NOW,
+        canEdit: false,
+        isAuthor,
+        onPinChange: async () => {},
+        onOpenArticle: () => {},
+        onOpenArticleBySlug: () => {},
+        onEdit: () => {},
+        onDelete: () => {},
+      }),
+    );
+
+  const withDepartments = render({ departments: ["ER", "ICU"] }, false);
+  assert.match(withDepartments, /Departments:/);
+  assert.match(withDepartments, /ER · ICU/, "the footnote joins the labels");
+  assert.ok(
+    !withDepartments.includes("rounded-full border border-teal-600/30"),
+    "the detail no longer pill-s the departments",
+  );
+
+  const allStaff = render({ departments: [] }, false);
+  assert.match(allStaff, /Departments:/);
+  assert.match(allStaff, /All staff/, "a post with no departments says so");
+
+  // Pinned, non-author: no pin label, no pin controls.
+  const asOtherViewer = render({ pinned: true, expires_at: "2026-10-14T22:00:00.000Z" }, false);
+  assert.ok(!asOtherViewer.includes("Pinned until"), "the label is gone from the detail");
+  assert.ok(!asOtherViewer.includes("Unpin") && !asOtherViewer.includes("Change expiry"));
+
+  // Pinned, its author: the two quiet controls, and still no label.
+  const asAuthor = render({ pinned: true, expires_at: "2026-10-14T22:00:00.000Z" }, true);
+  assert.ok(asAuthor.includes("Unpin") && asAuthor.includes("Change expiry"));
+  assert.ok(!asAuthor.includes("Pinned until"));
+});
+
+check("the expiry presets are the four chips, landing at 11:45 PM", () => {
+  assert.deepEqual(
+    EXPIRY_PRESETS.map((preset) => preset.label),
+    ["Tomorrow", "In 3 days", "In 1 week", "In 30 days"],
+  );
+  const from = new Date("2026-10-11T09:00:00");
+  const target = expiryPresetDate(3, from);
+  assert.equal(target.getDate(), 14);
+  assert.equal(target.getHours(), 23);
+  assert.equal(target.getMinutes(), 45);
 });
 
 check("the bulletin hero is a Dove Black calling card with a centred meta line", () => {
@@ -1736,6 +1929,49 @@ async function runDatabaseChecks(): Promise<void> {
   check("removing the uploader's account keeps the notice's file (uploaded_by_id → null)", () => {
     assert.equal(keptRow?.uploadedById ?? null, null);
     assert.equal(keptRow?.fileName, `handbook-${stamp}.txt`);
+  });
+
+  /* ---- pin state: unpin, and change the expiry from the detail ---- */
+
+  const pinnedNotice = await createBulletin({
+    title: `Pinned strip ${stamp}`,
+    body_markdown: "Body",
+    departments: [],
+    pinned: true,
+    expires_at: new Date(Date.now() + 3 * 86_400_000),
+    author_id: author.id,
+  });
+  check("a pinned notice arrives with its pin and its expiry", () => {
+    assert.equal(pinnedNotice.pinned, true);
+    assert.ok(pinnedNotice.expires_at, "a pinned post must carry an expiry");
+  });
+
+  // "Change expiry" writes exactly one field, through the same PATCH the
+  // composer uses — the pin itself is untouched.
+  const movedIso = expiryPresetDate(7).toISOString();
+  const movedExpiry = await updateBulletin(
+    pinnedNotice.id,
+    { expires_at: new Date(movedIso) },
+    { id: author.id, role: "author" },
+  );
+  check("the chip picker moves the expiry and leaves the pin alone", () => {
+    assert.equal(movedExpiry.pinned, true);
+    assert.equal(movedExpiry.expires_at, movedIso);
+  });
+
+  // "Unpin" clears the pin and its expiry, and the notice stays published.
+  const unpinned = await updateBulletin(
+    pinnedNotice.id,
+    { pinned: false, expires_at: null },
+    { id: author.id, role: "author" },
+  );
+  check("unpinning leaves the notice published, with no pin and no expiry", () => {
+    assert.equal(unpinned.pinned, false);
+    assert.equal(unpinned.expires_at, null);
+  });
+  const boardAfterUnpin = await getBulletins();
+  check("the unpinned notice is still on the board", () => {
+    assert.ok(boardAfterUnpin.some((row) => row.id === pinnedNotice.id));
   });
 
   /* ---- staged attachments: upload while composing, link on save ---- */
