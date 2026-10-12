@@ -70,6 +70,7 @@ export interface BulletinRowInput {
   departments: string[];
   pinned: boolean;
   urgent: boolean;
+  ackRequired: boolean;
   deck: string | null;
   heroImageUrl: string | null;
   heroImageAlt: string | null;
@@ -87,6 +88,7 @@ export function toBulletin(row: BulletinRowInput): Bulletin {
     departments: asDepartments(row.departments),
     pinned: row.pinned,
     urgent: row.urgent,
+    ack_required: row.ackRequired,
     // The optional deck is omitted entirely when empty so the reader's
     // `bulletin.deck` stays falsy exactly as it did for the old fixtures.
     ...(row.deck ? { deck: row.deck } : {}),
@@ -98,8 +100,8 @@ export function toBulletin(row: BulletinRowInput): Bulletin {
     body_markdown: row.bodyMarkdown,
     created_at: row.publishedAt.toISOString(),
     author_name: formatAuthorName(row.author),
-    // The expiry travels as an ISO string, or `null` for a post that never
-    // ages out. The board deletes expired rows before returning the rest.
+    // The expiry travels as an ISO string, or `null` for a post with nothing
+    // scheduled. The board *unpins* an expired row rather than deleting it.
     expires_at: row.expiresAt ? row.expiresAt.toISOString() : null,
     // Optional in the portal type: omitted entirely when there is no link, so
     // `bulletin.linked_sop_id` stays falsy exactly as in the fixtures.

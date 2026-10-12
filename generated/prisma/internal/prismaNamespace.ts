@@ -1333,6 +1333,7 @@ export const BulletinScalarFieldEnum = {
   departments: 'departments',
   pinned: 'pinned',
   urgent: 'urgent',
+  ackRequired: 'ackRequired',
   deck: 'deck',
   heroImageUrl: 'heroImageUrl',
   heroImageAlt: 'heroImageAlt',

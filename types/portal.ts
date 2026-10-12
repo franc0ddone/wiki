@@ -103,6 +103,11 @@ export interface Bulletin {
   pinned: boolean;
   /** Opt-in red chip treatment. Not a tier — just a visual flag. */
   urgent: boolean;
+  /**
+   * Opt-in: the notice asks each reader to acknowledge it. Off by default.
+   * When false the reader carries no acknowledgement UI at all.
+   */
+  ack_required: boolean;
   /** The muted subtitle line under the headline (plain text, max 200 chars). */
   deck?: string | null;
   /**
@@ -120,9 +125,9 @@ export interface Bulletin {
   created_at: string;
   author_name: string;
   /**
-   * When the post is silently deleted on the next board fetch — ISO 8601, or
-   * `null` for a post that lives until it is manually deleted. Expiry is
-   * purely opt-in.
+   * The scheduled end of a pinned boost — ISO 8601, or `null` for a post with
+   * nothing scheduled. When it passes the post is **unpinned** (it returns to
+   * the feed by `created_at`); it is never deleted. Expiry is purely opt-in.
    */
   expires_at: string | null;
   /** Optional id of the `KnowledgeArticle` this bulletin references. */

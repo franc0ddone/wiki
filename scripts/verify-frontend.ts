@@ -140,7 +140,9 @@ import {
   relativeExpiryLabel,
 } from "@/lib/bulletin/expiry";
 import {
+  BULLETIN_PAGE_SIZE,
   createBulletin,
+  getBulletinBoard,
   getBulletinById,
   getBulletins,
   getReactionSummary,
@@ -189,8 +191,9 @@ import {
 import { BulletinHeadline } from "@/components/bulletin/BulletinHeadline";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
-import { AcknowledgedMark, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
+import { BulletinActionsMenu } from "@/components/bulletin/PinnedStrip";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
@@ -1022,16 +1025,10 @@ check("a post with no expiry renders no chip", () => {
   assert.equal(html, "");
 });
 
-check("the urgent flag is the red chip; acknowledging is a quiet dove-green check", () => {
+check("the urgent flag is the red chip", () => {
   const urgent = renderToStaticMarkup(createElement(UrgentChip));
   assert.match(urgent, /border-red-200 bg-red-50 text-red-700/);
   assert.match(urgent, /Urgent/);
-
-  const acked = renderToStaticMarkup(createElement(AcknowledgedMark));
-  assert.match(acked, /aria-label="Acknowledged"/);
-  assert.ok(acked.includes("text-[#5F6E00]"), "the mark is dove green");
-  assert.ok(!acked.includes("rounded-full") && !acked.includes("border"), "it must not be a pill any more");
-  assert.ok(!acked.includes(">Acknowledged<"), "the word is not spelled out — the mark is the whole signal");
 });
 
 /* --------------------------------------------------------------- pin state */
@@ -1045,6 +1042,7 @@ const railBulletin = (overrides: Partial<Bulletin> = {}): Bulletin => ({
   departments: ["ER"],
   pinned: false,
   urgent: false,
+  ack_required: false,
   body_markdown: "Body.",
   created_at: "2026-10-11T18:00:00.000Z",
   author_name: "Trevor Lindqvist",
@@ -1160,7 +1158,7 @@ check("the pinned section renders above the feed, and only an empty board shows 
   assert.ok(!nothing.includes("Pinned"), "an empty rail shows no pinned caption");
 });
 
-check("the detail states the departments once, and the pin controls are the author's alone", () => {
+check("the detail states the departments once, and the actions menu is the author's alone", () => {
   const render = (overrides: Partial<Bulletin>, isAuthor: boolean) =>
     renderToStaticMarkup(
       createElement(BulletinDetail, {
@@ -1169,7 +1167,6 @@ check("the detail states the departments once, and the pin controls are the auth
         viewerRole: "staff" as const,
         viewerId: "u1",
         now: NOW,
-        canEdit: false,
         isAuthor,
         onPinChange: async () => {},
         onOpenArticle: () => {},
@@ -1191,15 +1188,33 @@ check("the detail states the departments once, and the pin controls are the auth
   assert.match(allStaff, /Departments:/);
   assert.match(allStaff, /All staff/, "a post with no departments says so");
 
-  // Pinned, non-author: no pin label, no pin controls.
+  // Non-author (even pinned): no ⋯ menu at all — no admin/lead override.
   const asOtherViewer = render({ pinned: true, expires_at: "2026-10-14T22:00:00.000Z" }, false);
-  assert.ok(!asOtherViewer.includes("Pinned until"), "the label is gone from the detail");
-  assert.ok(!asOtherViewer.includes("Unpin") && !asOtherViewer.includes("Change expiry"));
+  assert.ok(!asOtherViewer.includes("Notice actions"), "a non-author gets no actions menu");
+  assert.ok(!asOtherViewer.includes("Pinned until"), "the old pin label is gone from the detail");
 
-  // Pinned, its author: the two quiet controls, and still no label.
+  // Its author (pinned): the ⋯ trigger is there. The actions live inside the
+  // closed menu, so none of them render until it is opened.
   const asAuthor = render({ pinned: true, expires_at: "2026-10-14T22:00:00.000Z" }, true);
-  assert.ok(asAuthor.includes("Unpin") && asAuthor.includes("Change expiry"));
-  assert.ok(!asAuthor.includes("Pinned until"));
+  assert.match(asAuthor, /aria-label="Notice actions"/);
+
+  // The menu itself is strictly the author's.
+  const menuHidden = renderToStaticMarkup(
+    createElement(BulletinActionsMenu, {
+      bulletin: { pinned: true, expires_at: null },
+      isAuthor: false,
+      onEdit: () => {},
+      onRequestDelete: () => {},
+      onChange: async () => {},
+    }),
+  );
+  assert.equal(menuHidden, "", "a non-author's actions menu renders nothing");
+
+  // Acknowledgement is opt-in: the control shows only on a notice that asked for it.
+  const noAck = render({ ack_required: false }, true);
+  assert.ok(!noAck.includes("Acknowledge"), "a notice without ack_required shows no acknowledge control");
+  const withAck = render({ ack_required: true }, true);
+  assert.match(withAck, /Acknowledge/, "an ack-required notice offers the control");
 });
 
 check("the expiry presets are the four chips, landing at 11:45 PM", () => {
@@ -1665,6 +1680,20 @@ async function runDatabaseChecks(): Promise<void> {
   check("the flags default to false", () => {
     assert.equal(unflagged.pinned, false);
     assert.equal(unflagged.urgent, false);
+    assert.equal(unflagged.ack_required, false);
+  });
+
+  const acking = await createBulletin({
+    title: "Needs acknowledgment",
+    body_markdown: "Body",
+    departments: ["ER"],
+    ack_required: true,
+    author_id: author.id,
+  });
+  const refetchedAcking = await getBulletinById(acking.id);
+  check("`ack_required` round-trips through the data layer", () => {
+    assert.equal(acking.ack_required, true);
+    assert.equal(refetchedAcking?.ack_required, true);
   });
 
   /* ---- hero banner (DB) ---- */
@@ -1729,21 +1758,67 @@ async function runDatabaseChecks(): Promise<void> {
     assert.equal(noExpiry.expires_at, null);
   });
 
-  // Silent delete: fetching the board removes rows whose expiry has passed.
+  // Pin expiry unpins: fetching the board lifts a past-expiry pin back into the
+  // feed (`pinned = false`, `expires_at = null`) rather than deleting it.
   const pastExpiry = await createBulletin({
     title: "Already expired",
     body_markdown: "Body",
     departments: ["ER"],
+    pinned: true,
     expires_at: new Date(Date.now() - 60_000),
     author_id: author.id,
   });
-  const board = await getBulletins();
-  check("an expired post is silently deleted by the board fetch", () => {
-    assert.ok(!board.some((row) => row.id === pastExpiry.id), "the expired post was returned");
+  const unpinBoard = await getBulletins();
+  check("an expired pin is unpinned by the board fetch, not deleted", () => {
+    const swept = unpinBoard.find((row) => row.id === pastExpiry.id);
+    assert.ok(swept, "the expired post was dropped from the board");
+    assert.equal(swept?.pinned, false, "the expired pin must be lifted");
+    assert.equal(swept?.expires_at, null, "the expiry must be cleared");
   });
-  const swept = await db.bulletin.findUnique({ where: { id: pastExpiry.id }, select: { id: true } });
-  check("the expired post is gone from the database, not just hidden", () => {
-    assert.equal(swept, null, "the expired post survived the sweep");
+  const sweptRow = await db.bulletin.findUnique({
+    where: { id: pastExpiry.id },
+    select: { pinned: true, expiresAt: true },
+  });
+  check("the expired pin survives in the database — nothing is deleted", () => {
+    assert.ok(sweptRow, "the expired post was deleted");
+    assert.equal(sweptRow?.pinned, false);
+    assert.equal(sweptRow?.expiresAt, null);
+  });
+
+  /* ---- board pagination (DB) ---- */
+
+  // Enough fresh unpinned notices that page one is full and more remain.
+  for (let i = 0; i < BULLETIN_PAGE_SIZE * 2 + 1; i += 1) {
+    await createBulletin({
+      title: `Feed page ${stamp} ${i}`,
+      body_markdown: "Body",
+      departments: [],
+      author_id: author.id,
+    });
+  }
+
+  const pageOne = await getBulletinBoard();
+  check("the unpinned feed paginates at 30 and hands back a cursor", () => {
+    assert.equal(pageOne.items.length, BULLETIN_PAGE_SIZE);
+    assert.equal(typeof pageOne.next_cursor, "string");
+    assert.ok(pageOne.items.every((row) => !row.pinned), "the feed must carry no pinned notice");
+  });
+  check("the pinned section is returned complete, unpaginated", () => {
+    assert.ok(pageOne.pinned.length >= 1);
+    assert.ok(pageOne.pinned.every((row) => row.pinned), "the pinned section carried an unpinned row");
+  });
+
+  const pageTwo = await getBulletinBoard({ cursor: pageOne.next_cursor });
+  check("the cursor returns the next page without repeating a row", () => {
+    const firstIds = new Set(pageOne.items.map((row) => row.id));
+    assert.equal(pageTwo.items.length, BULLETIN_PAGE_SIZE);
+    assert.ok(pageTwo.items.every((row) => !firstIds.has(row.id)), "a page repeated a row");
+  });
+
+  const wholeFeed = await getBulletinBoard({ limit: null });
+  check("`limit: null` returns the whole feed — the search/filter bypass", () => {
+    assert.equal(wholeFeed.next_cursor, null);
+    assert.ok(wholeFeed.items.length > BULLETIN_PAGE_SIZE, "the bypass did not fetch past the first page");
   });
 
   /* ---- reactions (DB) ---- */

@@ -6,16 +6,15 @@ import {
   Check,
   FileText,
   Megaphone,
-  Pencil,
   Trash2,
   Users,
 } from "lucide-react";
 import { MarkdownReader } from "@/components/MarkdownReader";
-import { AcknowledgedMark, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
+import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
 import { BulletinAttachments } from "@/components/bulletin/BulletinAttachments";
-import { PinnedActions } from "@/components/bulletin/PinnedStrip";
+import { BulletinActionsMenu } from "@/components/bulletin/PinnedStrip";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import {
   acknowledgeBulletin,
@@ -54,16 +53,13 @@ export interface BulletinDetailProps {
   viewerId: string;
   /** The tick-driven clock shared with the board, for the relative expiry chip. */
   now: number;
-  /** True when the viewer may edit/delete this notice (author of it, or a lead). */
-  canEdit: boolean;
   /**
-   * True when the viewer *wrote* this notice — narrower than `canEdit` on
-   * purpose: unpinning and changing the expiry are the author's alone, so a
-   * clinical lead or an admin reading someone else's post sees the pin label
-   * and no buttons.
+   * True when the viewer *wrote* this notice. The ⋯ actions menu (Edit, Unpin,
+   * Change expiry, Delete) is this author's alone — a clinical lead or an admin
+   * reading someone else's post gets no menu, no admin override.
    */
   isAuthor: boolean;
-  /** Applies an unpin / expiry change from the pin strip. */
+  /** Applies an unpin / expiry change from the ⋯ actions menu. */
   onPinChange: (patch: { pinned?: boolean; expires_at?: string | null }) => Promise<void>;
   onOpenArticle: (articleId: string) => void;
   onOpenArticleBySlug: (slug: string, anchor?: string) => void;
@@ -77,7 +73,6 @@ export function BulletinDetail({
   viewerRole,
   viewerId,
   now,
-  canEdit,
   isAuthor,
   onPinChange,
   onOpenArticle,
@@ -116,8 +111,10 @@ export function BulletinDetail({
 
   // The pane is keyed by bulletin id upstream, so switching notices is a fresh
   // mount with `acks === null` already. The fetch is inline + abortable (the
-  // pattern the backlinks panel uses) so it never setStates after unmount.
+  // pattern the backlinks panel uses) so it never setStates after unmount. A
+  // notice that does not request acknowledgement never fetches a roster.
   useEffect(() => {
+    if (!bulletin.ack_required) return;
     const controller = new AbortController();
     (async () => {
       try {
@@ -128,7 +125,7 @@ export function BulletinDetail({
       }
     })();
     return () => controller.abort();
-  }, [bulletin.id]);
+  }, [bulletin.id, bulletin.ack_required]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -284,37 +281,25 @@ export function BulletinDetail({
   );
 
   /**
-   * The badges and the viewer's own actions. Departments are no longer pill-ed
+   * The status flags and the author's actions. Departments are no longer pill-ed
    * here — they are stated once, quietly, in the footnote at the very bottom of
-   * the post. Acknowledging is a read-state, so it shows as a small dove-green
-   * check rather than a pill competing with the urgent flag.
+   * the post. The flags (the urgent pill, the relative expiry chip) are
+   * indicators and stay put; the author's Edit / Unpin / Change expiry / Delete
+   * live behind the ⋯ menu at the top-right, for the post's author alone.
    */
   const actionRow = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
         {bulletin.urgent ? <UrgentChip /> : null}
-        {myAck ? <AcknowledgedMark /> : <ExpiryChip expiresAt={bulletin.expires_at} now={now} />}
+        <ExpiryChip expiresAt={bulletin.expires_at} now={now} />
       </div>
-      {canEdit ? (
-        <div className="flex shrink-0 items-center gap-1.5 print:hidden">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-          >
-            <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 text-[13px] font-medium text-red-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
-          >
-            <Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />
-            Delete
-          </button>
-        </div>
-      ) : null}
+      <BulletinActionsMenu
+        bulletin={bulletin}
+        isAuthor={isAuthor}
+        onEdit={onEdit}
+        onRequestDelete={() => setConfirmDelete(true)}
+        onChange={onPinChange}
+      />
     </div>
   );
 
@@ -326,8 +311,6 @@ export function BulletinDetail({
         header={
           <>
             {actionRow}
-            {/* The author's pin controls, quietly, under the reader's own actions. */}
-            <PinnedActions bulletin={bulletin} isAuthor={isAuthor} onChange={onPinChange} />
             <BulletinHero
               title={bulletin.title}
               deck={bulletin.deck}
@@ -345,56 +328,60 @@ export function BulletinDetail({
 
             {reactionsRow}
 
-            <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[13px] text-zinc-600">
-                  <Users size={15} strokeWidth={1.75} aria-hidden="true" className="text-zinc-400" />
-                  <span>
-                    {acks === null
-                      ? "Loading acknowledgements…"
-                      : acks.length === 0
-                        ? "No one has acknowledged this yet."
-                        : `${acks.length} ${acks.length === 1 ? "person has" : "people have"} acknowledged this.`}
-                  </span>
-                </div>
-                {canAck ? (
-                  myAck ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800">
-                      <Check size={14} strokeWidth={2} aria-hidden="true" />
-                      Acknowledged {formatDateTime(myAck.acked_at)}
+            {/* Acknowledgement is opt-in: a notice that did not request it shows no
+                acknowledge control, no roster, and no count. */}
+            {bulletin.ack_required ? (
+              <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[13px] text-zinc-600">
+                    <Users size={15} strokeWidth={1.75} aria-hidden="true" className="text-zinc-400" />
+                    <span>
+                      {acks === null
+                        ? "Loading acknowledgements…"
+                        : acks.length === 0
+                          ? "No one has acknowledged this yet."
+                          : `${acks.length} ${acks.length === 1 ? "person has" : "people have"} acknowledged this.`}
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handleAck()}
-                      disabled={ackBusy}
-                      className={cx(primaryButton, "h-8 px-3 text-[13px]")}
-                    >
-                      <Check size={14} strokeWidth={2} aria-hidden="true" />
-                      {ackBusy ? "Recording…" : "Acknowledge"}
-                    </button>
-                  )
+                  </div>
+                  {canAck ? (
+                    myAck ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800">
+                        <Check size={14} strokeWidth={2} aria-hidden="true" />
+                        Acknowledged {formatDateTime(myAck.acked_at)}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleAck()}
+                        disabled={ackBusy}
+                        className={cx(primaryButton, "h-8 px-3 text-[13px]")}
+                      >
+                        <Check size={14} strokeWidth={2} aria-hidden="true" />
+                        {ackBusy ? "Recording…" : "Acknowledge"}
+                      </button>
+                    )
+                  ) : null}
+                </div>
+                {ackError ? (
+                  <p role="alert" className="mt-2 text-xs text-red-700">
+                    {ackError}
+                  </p>
+                ) : null}
+
+                {showRoster && acks && acks.length > 0 ? (
+                  <ul className="mt-3 space-y-1 border-t border-zinc-200 pt-3">
+                    {acks.map((entry) => (
+                      <li key={entry.user_id} className="flex items-center justify-between gap-3 text-[13px] text-zinc-700">
+                        <span className="truncate font-medium text-zinc-800">{entry.name}</span>
+                        <time dateTime={entry.acked_at} className="shrink-0 tabular-nums text-xs text-zinc-500">
+                          {formatDateTime(entry.acked_at)}
+                        </time>
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </div>
-              {ackError ? (
-                <p role="alert" className="mt-2 text-xs text-red-700">
-                  {ackError}
-                </p>
-              ) : null}
-
-              {showRoster && acks && acks.length > 0 ? (
-                <ul className="mt-3 space-y-1 border-t border-zinc-200 pt-3">
-                  {acks.map((entry) => (
-                    <li key={entry.user_id} className="flex items-center justify-between gap-3 text-[13px] text-zinc-700">
-                      <span className="truncate font-medium text-zinc-800">{entry.name}</span>
-                      <time dateTime={entry.acked_at} className="shrink-0 tabular-nums text-xs text-zinc-500">
-                        {formatDateTime(entry.acked_at)}
-                      </time>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
+            ) : null}
 
             {linkedCard}
 

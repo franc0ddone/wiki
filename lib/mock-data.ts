@@ -259,6 +259,7 @@ export const BULLETINS: readonly Bulletin[] = [
     departments: ["ICU", "ER"],
     pinned: false,
     urgent: true,
+    ack_required: false,
     linked_sop_id: "3f2b9c14-8a7d-4e51-9b0c-6d1e2f4a7c88",
     created_at: "2026-09-20T21:10:00.000Z",
     author_name: "Dr. Maya Okonkwo, Lead Emergency Clinician",
@@ -284,6 +285,7 @@ export const BULLETINS: readonly Bulletin[] = [
     departments: ["Radiology", "ER"],
     pinned: false,
     urgent: false,
+    ack_required: false,
     created_at: "2026-09-20T13:05:00.000Z",
     author_name: "Marcus Oyelaran, Diagnostic Imaging Lead",
     body_markdown: [
@@ -307,6 +309,7 @@ export const BULLETINS: readonly Bulletin[] = [
     departments: ["CSR", "Finance"],
     pinned: true,
     urgent: false,
+    ack_required: true,
     linked_sop_id: "1d5b7e94-6c30-4a12-b8f5-9e2d0c7a4b63",
     created_at: "2026-09-18T15:45:00.000Z",
     author_name: "Priya Raghunathan, Client Experience Coordinator",
@@ -335,6 +338,7 @@ export const BULLETINS: readonly Bulletin[] = [
     departments: ["Finance", "ICU"],
     pinned: false,
     urgent: false,
+    ack_required: false,
     created_at: "2026-09-16T13:20:00.000Z",
     author_name: "Nadia Fournier, Practice Finance Manager",
     body_markdown: [

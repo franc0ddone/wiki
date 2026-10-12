@@ -1,19 +1,19 @@
 /**
  * The small marks shared by the board rail and the bulletin detail header: the
- * "Urgent" red flag, the quiet relative expiry chip, the muted "until Oct 14"
- * that a pinned row carries, and the quiet dove-green acknowledged check.
+ * "Urgent" red flag, the quiet relative expiry chip, and the muted "until Oct 14"
+ * that a pinned row carries.
  *
  * Prompt 6c: urgency is a plain opt-in flag (no countdown tint, no pulsing dot).
  * The rework after it: pinned posts live in their own section at the top of the
- * rail, so a pinned row carries the *date* and no "Pinned" pill; and
- * acknowledging is a read-state the viewer produced, so it is a checkmark rather
- * than a pill competing with the one badge that is meant to shout.
+ * rail, so a pinned row carries the *date* and no "Pinned" pill. Prompt 6e
+ * removed the lone acknowledged check that used to sit above the hero — the
+ * acknowledgement card further down is the one place acknowledgement is stated.
  *
  * Pure and presentational so `scripts/verify-frontend.ts` can render each one
  * with `renderToStaticMarkup` and assert the exact classes. The affirmative
  * treatment is the dove-green colorway — never an orange emoji.
  */
-import { Check, Clock, TriangleAlert } from "lucide-react";
+import { Clock, TriangleAlert } from "lucide-react";
 import { pinnedRailLabel, relativeExpiryLabel } from "@/lib/bulletin/expiry";
 import { cx } from "@/lib/utils";
 
@@ -37,28 +37,6 @@ export function ExpiryChip({ expiresAt, now }: { expiresAt: string | null; now: 
     <span className={cx(PILL_BASE, "border-zinc-200 bg-zinc-50 text-zinc-500")}>
       <Clock size={12} strokeWidth={2} aria-hidden="true" />
       {relativeExpiryLabel(expiresAt, now)}
-    </span>
-  );
-}
-
-/**
- * The acknowledged read-state, as a quiet mark rather than a pill: a small
- * dove-green check whose meaning lives in its accessible name (and its
- * tooltip), not in a label taking up a pill's worth of the row.
- *
- * Acknowledging is something the viewer *did* to a notice, not a category of
- * notice — so it does not compete with the urgent flag, which is meant to
- * shout. Replaces the old full "Acknowledged" pill.
- */
-export function AcknowledgedMark() {
-  return (
-    <span
-      role="img"
-      aria-label="Acknowledged"
-      title="Acknowledged"
-      className="inline-flex items-center text-[#5F6E00]"
-    >
-      <Check size={14} strokeWidth={2.5} aria-hidden="true" />
     </span>
   );
 }

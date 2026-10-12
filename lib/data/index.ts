@@ -35,6 +35,8 @@ export {
 
 export {
   getBulletins,
+  getBulletinBoard,
+  BULLETIN_PAGE_SIZE,
   getBulletinById,
   getBulletinAcks,
   getAuthoredBulletinIds,
@@ -44,6 +46,8 @@ export {
   deleteBulletin,
   acknowledgeBulletin,
   type BulletinFilters,
+  type BulletinBoardFilters,
+  type BulletinBoard,
   type CreateBulletinInput,
   type UpdateBulletinInput,
   type AckResult,

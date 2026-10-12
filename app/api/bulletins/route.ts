@@ -11,20 +11,37 @@ import {
   requireStringArray,
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
-import { createBulletin, getBulletins, type BulletinFilters } from "@/lib/data/bulletins";
+import { createBulletin, getBulletinBoard, type BulletinBoardFilters } from "@/lib/data/bulletins";
 import { DECK_MAX_LENGTH } from "@/lib/bulletin/lifecycle";
 import { normalizeHeroImageAlt, normalizeHeroImageUrl } from "@/lib/bulletin/hero";
 import type { Department } from "@/types/portal";
 
 /**
- * `GET  /api/bulletins` — the board. Expired posts are silently deleted by the
- *                        data layer before the rest are returned.
+ * `GET  /api/bulletins` — the board, paginated. The pinned section is returned
+ *                        complete (its own unpaginated query); the unpinned feed
+ *                        is one page of `limit` posts plus a `next_cursor`. A
+ *                        notice past its pin expiry is *unpinned* by the data
+ *                        layer, not deleted.
  * `POST /api/bulletins` — post. Requires `author`+.
+ *
+ * Query: `department`, `q` (unused by the board UI, which filters client-side),
+ * `limit` (default 30; `all` fetches the whole feed — the search/filter bypass),
+ * `cursor` (opaque, from a previous response's `next_cursor`).
  *
  * Prompt 6c: no priority/format tiers. A bulletin carries `pinned` / `urgent`
  * booleans, an optional deck, an optional hero image (with required alt text),
- * and an opt-in expiry.
+ * and an opt-in expiry. Prompt 6e adds `ack_required` (opt-in acknowledgement).
  */
+
+const DEFAULT_LIMIT = 30;
+
+/** `all` → no limit; an integer → that page size; anything else → the default. */
+function parseLimit(raw: string | null): number | null | undefined {
+  if (raw === null) return undefined;
+  if (raw === "all") return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,12 +49,14 @@ export async function GET(request: NextRequest) {
 
     const params = request.nextUrl.searchParams;
 
-    const filters: BulletinFilters = {
+    const filters: BulletinBoardFilters = {
       department: (params.get("department") ?? "All") as Department,
       ...(params.get("q") ? { q: params.get("q") as string } : {}),
+      limit: parseLimit(params.get("limit")),
+      cursor: params.get("cursor"),
     };
 
-    return Response.json(await getBulletins(filters));
+    return Response.json(await getBulletinBoard(filters));
   } catch (error) {
     return errorResponse(error);
   }
@@ -67,6 +86,7 @@ export async function POST(request: NextRequest) {
       departments: requireStringArray(body, "departments", { allowEmpty: true }),
       pinned: optionalBoolean(body, "pinned") ?? false,
       urgent: optionalBoolean(body, "urgent") ?? false,
+      ack_required: optionalBoolean(body, "ack_required") ?? false,
       deck: optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null,
       hero_image_url: heroImageUrl,
       hero_image_alt: heroImageAlt,

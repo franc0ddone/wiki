@@ -12,6 +12,8 @@ export interface BulletinPayload {
   /** Opt-in flags. */
   pinned?: boolean;
   urgent?: boolean;
+  /** Opt-in: ask each reader to acknowledge the notice. */
+  ack_required?: boolean;
   /** The optional muted subtitle under the headline. */
   deck?: string | null;
   /** The optional hero banner. `null` = none. */
@@ -29,8 +31,29 @@ export interface BulletinPayload {
   attachment_ids?: string[];
 }
 
-export function listBulletins(): Promise<Bulletin[]> {
-  return request<Bulletin[]>("/api/bulletins");
+/**
+ * One page of the board: the complete pinned section, a page of the unpinned
+ * feed, and the cursor for the next page (`null` when the feed is exhausted).
+ */
+export interface BulletinBoardPage {
+  pinned: Bulletin[];
+  items: Bulletin[];
+  next_cursor: string | null;
+}
+
+export interface ListBulletinsOptions {
+  /** Unpinned page size; `"all"` fetches the whole feed (the search/filter bypass). Omitted → the server default (30). */
+  limit?: number | "all";
+  /** Opaque cursor from a previous page's `next_cursor`. */
+  cursor?: string | null;
+}
+
+export function listBulletins(options: ListBulletinsOptions = {}): Promise<BulletinBoardPage> {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  return request<BulletinBoardPage>(`/api/bulletins${query ? `?${query}` : ""}`);
 }
 
 export function createBulletin(payload: BulletinPayload): Promise<Bulletin> {

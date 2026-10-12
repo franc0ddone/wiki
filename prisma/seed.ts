@@ -228,6 +228,7 @@ async function main() {
       departments: [...bulletin.departments],
       pinned: bulletin.pinned,
       urgent: bulletin.urgent,
+      ackRequired: bulletin.ack_required,
       deck: bulletin.deck ?? null,
       heroImageUrl: bulletin.hero_image_url ?? null,
       heroImageAlt: bulletin.hero_image_alt ?? null,

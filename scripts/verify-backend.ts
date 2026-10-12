@@ -173,25 +173,31 @@ async function main() {
     );
   });
 
-  await test("an expired bulletin is silently deleted when the board is fetched", async () => {
+  await test("an expired pin is unpinned when the board is fetched, not deleted", async () => {
     const marker = `${PREFIX}-expired`;
     const bulletin = await createBulletin({
       title: `${marker} notice`,
       body_markdown: "Verification fixture.",
       departments: ["ER"],
+      pinned: true,
       // Deliberately already in the past.
       expires_at: new Date(Date.now() - 60_000),
       author_id: author.id,
     });
 
     const board = await getBulletins();
-    assert(
-      !board.some((row) => row.id === bulletin.id),
-      "an expired bulletin appeared on the board",
-    );
+    const swept = board.find((row) => row.id === bulletin.id);
+    assert(swept, "the expired bulletin was removed from the board");
+    assertEqual(swept?.pinned, false, "the expired pin was not lifted");
+    assertEqual(swept?.expires_at, null, "the expiry was not cleared");
 
-    const gone = await db.bulletin.findUnique({ where: { id: bulletin.id }, select: { id: true } });
-    assertEqual(gone, null, "the expired bulletin survived the sweep");
+    const row = await db.bulletin.findUnique({
+      where: { id: bulletin.id },
+      select: { pinned: true, expiresAt: true },
+    });
+    assert(row, "the expired bulletin was deleted from the database");
+    assertEqual(row?.pinned, false, "the pin was not lifted in the database");
+    assertEqual(row?.expiresAt, null, "the expiry was not cleared in the database");
   });
 
   /* ------------------------------------------------- publishing + versions */

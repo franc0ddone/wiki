@@ -30,6 +30,7 @@ export type BulletinMinAggregateOutputType = {
   bodyMarkdown: string | null
   pinned: boolean | null
   urgent: boolean | null
+  ackRequired: boolean | null
   deck: string | null
   heroImageUrl: string | null
   heroImageAlt: string | null
@@ -49,6 +50,7 @@ export type BulletinMaxAggregateOutputType = {
   bodyMarkdown: string | null
   pinned: boolean | null
   urgent: boolean | null
+  ackRequired: boolean | null
   deck: string | null
   heroImageUrl: string | null
   heroImageAlt: string | null
@@ -69,6 +71,7 @@ export type BulletinCountAggregateOutputType = {
   departments: number
   pinned: number
   urgent: number
+  ackRequired: number
   deck: number
   heroImageUrl: number
   heroImageAlt: number
@@ -90,6 +93,7 @@ export type BulletinMinAggregateInputType = {
   bodyMarkdown?: true
   pinned?: true
   urgent?: true
+  ackRequired?: true
   deck?: true
   heroImageUrl?: true
   heroImageAlt?: true
@@ -109,6 +113,7 @@ export type BulletinMaxAggregateInputType = {
   bodyMarkdown?: true
   pinned?: true
   urgent?: true
+  ackRequired?: true
   deck?: true
   heroImageUrl?: true
   heroImageAlt?: true
@@ -129,6 +134,7 @@ export type BulletinCountAggregateInputType = {
   departments?: true
   pinned?: true
   urgent?: true
+  ackRequired?: true
   deck?: true
   heroImageUrl?: true
   heroImageAlt?: true
@@ -222,6 +228,7 @@ export type BulletinGroupByOutputType = {
   departments: string[]
   pinned: boolean
   urgent: boolean
+  ackRequired: boolean
   deck: string | null
   heroImageUrl: string | null
   heroImageAlt: string | null
@@ -263,6 +270,7 @@ export type BulletinWhereInput = {
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
   urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
+  ackRequired?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
@@ -288,6 +296,7 @@ export type BulletinOrderByWithRelationInput = {
   departments?: Prisma.SortOrder
   pinned?: Prisma.SortOrder
   urgent?: Prisma.SortOrder
+  ackRequired?: Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageAlt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -316,6 +325,7 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
   urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
+  ackRequired?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
@@ -341,6 +351,7 @@ export type BulletinOrderByWithAggregationInput = {
   departments?: Prisma.SortOrder
   pinned?: Prisma.SortOrder
   urgent?: Prisma.SortOrder
+  ackRequired?: Prisma.SortOrder
   deck?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   heroImageAlt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -367,6 +378,7 @@ export type BulletinScalarWhereWithAggregatesInput = {
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   pinned?: Prisma.BoolWithAggregatesFilter<"Bulletin"> | boolean
   urgent?: Prisma.BoolWithAggregatesFilter<"Bulletin"> | boolean
+  ackRequired?: Prisma.BoolWithAggregatesFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
   heroImageAlt?: Prisma.StringNullableWithAggregatesFilter<"Bulletin"> | string | null
@@ -387,6 +399,7 @@ export type BulletinCreateInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -410,6 +423,7 @@ export type BulletinUncheckedCreateInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -433,6 +447,7 @@ export type BulletinUpdateInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -456,6 +471,7 @@ export type BulletinUncheckedUpdateInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -479,6 +495,7 @@ export type BulletinCreateManyInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -499,6 +516,7 @@ export type BulletinUpdateManyMutationInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -517,6 +535,7 @@ export type BulletinUncheckedUpdateManyInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -547,6 +566,7 @@ export type BulletinCountOrderByAggregateInput = {
   departments?: Prisma.SortOrder
   pinned?: Prisma.SortOrder
   urgent?: Prisma.SortOrder
+  ackRequired?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
   heroImageAlt?: Prisma.SortOrder
@@ -566,6 +586,7 @@ export type BulletinMaxOrderByAggregateInput = {
   bodyMarkdown?: Prisma.SortOrder
   pinned?: Prisma.SortOrder
   urgent?: Prisma.SortOrder
+  ackRequired?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
   heroImageAlt?: Prisma.SortOrder
@@ -585,6 +606,7 @@ export type BulletinMinOrderByAggregateInput = {
   bodyMarkdown?: Prisma.SortOrder
   pinned?: Prisma.SortOrder
   urgent?: Prisma.SortOrder
+  ackRequired?: Prisma.SortOrder
   deck?: Prisma.SortOrder
   heroImageUrl?: Prisma.SortOrder
   heroImageAlt?: Prisma.SortOrder
@@ -764,6 +786,7 @@ export type BulletinCreateWithoutAuthorInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -786,6 +809,7 @@ export type BulletinUncheckedCreateWithoutAuthorInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -837,6 +861,7 @@ export type BulletinScalarWhereInput = {
   departments?: Prisma.StringNullableListFilter<"Bulletin">
   pinned?: Prisma.BoolFilter<"Bulletin"> | boolean
   urgent?: Prisma.BoolFilter<"Bulletin"> | boolean
+  ackRequired?: Prisma.BoolFilter<"Bulletin"> | boolean
   deck?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageUrl?: Prisma.StringNullableFilter<"Bulletin"> | string | null
   heroImageAlt?: Prisma.StringNullableFilter<"Bulletin"> | string | null
@@ -857,6 +882,7 @@ export type BulletinCreateWithoutLinkedArticleInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -879,6 +905,7 @@ export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -927,6 +954,7 @@ export type BulletinCreateWithoutAcksInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -949,6 +977,7 @@ export type BulletinUncheckedCreateWithoutAcksInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -987,6 +1016,7 @@ export type BulletinUpdateWithoutAcksInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1009,6 +1039,7 @@ export type BulletinUncheckedUpdateWithoutAcksInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1031,6 +1062,7 @@ export type BulletinCreateWithoutReactionsInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1053,6 +1085,7 @@ export type BulletinUncheckedCreateWithoutReactionsInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1091,6 +1124,7 @@ export type BulletinUpdateWithoutReactionsInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1113,6 +1147,7 @@ export type BulletinUncheckedUpdateWithoutReactionsInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1135,6 +1170,7 @@ export type BulletinCreateWithoutAttachmentsInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1157,6 +1193,7 @@ export type BulletinUncheckedCreateWithoutAttachmentsInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1195,6 +1232,7 @@ export type BulletinUpdateWithoutAttachmentsInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1217,6 +1255,7 @@ export type BulletinUncheckedUpdateWithoutAttachmentsInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1239,6 +1278,7 @@ export type BulletinCreateManyAuthorInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1258,6 +1298,7 @@ export type BulletinUpdateWithoutAuthorInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1280,6 +1321,7 @@ export type BulletinUncheckedUpdateWithoutAuthorInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1302,6 +1344,7 @@ export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1321,6 +1364,7 @@ export type BulletinCreateManyLinkedArticleInput = {
   departments?: Prisma.BulletinCreatedepartmentsInput | string[]
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: string | null
   heroImageUrl?: string | null
   heroImageAlt?: string | null
@@ -1340,6 +1384,7 @@ export type BulletinUpdateWithoutLinkedArticleInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1362,6 +1407,7 @@ export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1384,6 +1430,7 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
   departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
   pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ackRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1452,6 +1499,7 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   departments?: boolean
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: boolean
   heroImageUrl?: boolean
   heroImageAlt?: boolean
@@ -1478,6 +1526,7 @@ export type BulletinSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   departments?: boolean
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: boolean
   heroImageUrl?: boolean
   heroImageAlt?: boolean
@@ -1500,6 +1549,7 @@ export type BulletinSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   departments?: boolean
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: boolean
   heroImageUrl?: boolean
   heroImageAlt?: boolean
@@ -1522,6 +1572,7 @@ export type BulletinSelectScalar = {
   departments?: boolean
   pinned?: boolean
   urgent?: boolean
+  ackRequired?: boolean
   deck?: boolean
   heroImageUrl?: boolean
   heroImageAlt?: boolean
@@ -1535,7 +1586,7 @@ export type BulletinSelectScalar = {
   kicker?: boolean
 }
 
-export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "pinned" | "urgent" | "deck" | "heroImageUrl" | "heroImageAlt" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt" | "priority" | "format" | "kicker", ExtArgs["result"]["bulletin"]>
+export type BulletinOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "bodyMarkdown" | "departments" | "pinned" | "urgent" | "ackRequired" | "deck" | "heroImageUrl" | "heroImageAlt" | "linkedArticleId" | "authorId" | "publishedAt" | "expiresAt" | "createdAt" | "priority" | "format" | "kicker", ExtArgs["result"]["bulletin"]>
 export type BulletinInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   linkedArticle?: boolean | Prisma.Bulletin$linkedArticleArgs<ExtArgs>
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1580,6 +1631,12 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
      */
     urgent: boolean
     /**
+     * Opt-in: the notice asks each reader to acknowledge it. Off by default.
+     * When true the reader shows the Acknowledge control; when false it carries
+     * no acknowledgement UI at all.
+     */
+    ackRequired: boolean
+    /**
      * The muted subtitle line under the headline (plain text). Optional, whole
      * life of the post.
      */
@@ -1601,8 +1658,10 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
      */
     publishedAt: Date
     /**
-     * Opt-in expiry. On board fetch, rows with `expiresAt <= now()` are silently
-     * deleted. Null = the post lives until it is manually deleted.
+     * Opt-in expiry — a temporary boost, not a death sentence. On board fetch, a
+     * row with `expiresAt <= now()` is **unpinned** (`pinned = false`,
+     * `expiresAt = null`) and returns to the feed by its publish date; it is
+     * never deleted. Null = nothing scheduled.
      */
     expiresAt: Date | null
     createdAt: Date
@@ -2052,6 +2111,7 @@ export interface BulletinFieldRefs {
   readonly departments: Prisma.FieldRef<"Bulletin", 'String[]'>
   readonly pinned: Prisma.FieldRef<"Bulletin", 'Boolean'>
   readonly urgent: Prisma.FieldRef<"Bulletin", 'Boolean'>
+  readonly ackRequired: Prisma.FieldRef<"Bulletin", 'Boolean'>
   readonly deck: Prisma.FieldRef<"Bulletin", 'String'>
   readonly heroImageUrl: Prisma.FieldRef<"Bulletin", 'String'>
   readonly heroImageAlt: Prisma.FieldRef<"Bulletin", 'String'>

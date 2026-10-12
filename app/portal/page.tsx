@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { OperationsHubClient } from "@/components/OperationsHubClient";
 import { auth } from "@/lib/auth";
-import { getArticles, getAuthoredBulletinIds, getBulletins, getStaff } from "@/lib/data";
+import { getArticles, getAuthoredBulletinIds, getBulletinBoard, getStaff } from "@/lib/data";
 import { getLatestRoleRequestForUser, listRoleRequests } from "@/lib/data/role-requests";
 import { canRequestAuthorAccess, canReviewRoleRequests } from "@/lib/role-requests";
 import { isRole, roleAtLeast, type Role } from "@/lib/roles";
@@ -48,9 +48,9 @@ export default async function PortalPage({
 
   const role: Role = isRole(session.user.role) ? session.user.role : "readonly";
 
-  const [articles, bulletins, staff, params] = await Promise.all([
+  const [articles, board, staff, params] = await Promise.all([
     getArticles(),
-    getBulletins(),
+    getBulletinBoard(),
     getStaff(),
     searchParams,
   ]);
@@ -70,7 +70,7 @@ export default async function PortalPage({
   return (
     <OperationsHubClient
       articles={articles}
-      bulletins={bulletins}
+      board={{ pinned: board.pinned, items: board.items, nextCursor: board.next_cursor }}
       staff={staff}
       viewerRole={role}
       viewerId={session.user.id}

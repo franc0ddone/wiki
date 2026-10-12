@@ -39,6 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (body.pinned !== undefined) patch.pinned = optionalBoolean(body, "pinned") ?? false;
     if (body.urgent !== undefined) patch.urgent = optionalBoolean(body, "urgent") ?? false;
+    if (body.ack_required !== undefined) patch.ack_required = optionalBoolean(body, "ack_required") ?? false;
 
     if (body.deck !== undefined) {
       patch.deck = optionalString(body, "deck", { maxLength: DECK_MAX_LENGTH }) ?? null;

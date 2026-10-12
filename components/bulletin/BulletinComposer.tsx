@@ -55,9 +55,10 @@ import {
  * to edit an existing one ("edit mode": prefilled, `Edit bulletin`, Save).
  *
  * Prompt 6c collapsed this to one simple model. In order: headline → deck
- * (optional) → hero image (always available) → attachments (optional) → body →
+ * (optional) → hero image (always available) → body → attachments (optional) →
  * departments (optional, an enclosed dropdown) → Options (Pinned, which requires
- * an expiry — four preset chips — beneath it, and Urgent) → linked SOP. There
+ * an expiry — four preset chips — beneath it; Urgent; and Request
+ * acknowledgement) → linked SOP. There
  * are no templates, no priority dropdown, no format selector, no kicker, and no
  * TTL defaults — expiry is opt-in for an ordinary post and required for a
  * pinned one.
@@ -133,6 +134,7 @@ export default function BulletinComposer({
   const [departments, setDepartments] = useState<ClinicalDepartment[]>(initial?.departments ?? []);
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
   const [urgent, setUrgent] = useState(initial?.urgent ?? false);
+  const [ackRequired, setAckRequired] = useState(initial?.ack_required ?? false);
   // The chosen expiry datetime (set from a preset chip, or carried in by an
   // edit). `null` means no expiry is set.
   const [expiryDate, setExpiryDate] = useState<Date | null>(() => {
@@ -335,7 +337,11 @@ export default function BulletinComposer({
     const errors = [...result.errors];
     // Pinned posts must expire — there is no permanent pin.
     if (pinned && expiryDate === null) {
-      errors.push({ field: "expiry", code: "expiry_required", message: "Pinned posts need an expiry date." });
+      errors.push({
+        field: "expiry",
+        code: "expiry_required",
+        message: "Pinned posts need an expiry date. When the pin expires, the post returns to the feed.",
+      });
     } else if (expirySet && expiryDate && expiryDate.getTime() <= Date.now()) {
       errors.push({ field: "expiry", code: "expiry_not_future", message: "Expiry must be in the future." });
     }
@@ -348,6 +354,7 @@ export default function BulletinComposer({
       departments,
       pinned,
       urgent,
+      ack_required: ackRequired,
       deck: deck.trim() || null,
       heroImageUrl: heroImageUrl ?? null,
       heroImageAlt: heroImageUrl ? heroAlt.trim() : null,
@@ -415,11 +422,6 @@ export default function BulletinComposer({
   return (
     <Modal
       title={mode === "edit" ? "Edit bulletin" : "New bulletin"}
-      description={
-        mode === "edit"
-          ? "Changes go live the moment you save. Editing an urgent notice clears its acknowledgements."
-          : "Posting makes this notice live immediately — there is no review step for a bulletin."
-      }
       onClose={onClose}
       widthClass="max-w-3xl"
       dismissible={!busy}
@@ -553,9 +555,6 @@ export default function BulletinComposer({
               {issue.message}
             </p>
           ))}
-          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-            A full-width banner below the title card. Stored on the bulletin, never in the body.
-          </p>
           <input
             ref={heroInputRef}
             type="file"
@@ -568,130 +567,6 @@ export default function BulletinComposer({
               if (file) void uploadHeroImage(file);
             }}
           />
-        </div>
-
-        {/* Attachments — reference files the notice carries, listed below the body. */}
-        <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
-            Attachments <span className="font-normal text-zinc-500">(optional)</span>
-          </span>
-
-          <div className="space-y-2">
-            {attachments.length > 0 ? (
-              <ul className="space-y-1.5" data-testid="bulletin-attachment-list">
-                {attachments.map((item) => {
-                  // A staged file belongs to no notice yet: it is discarded on the
-                  // spot, because there is nothing to save it against.
-                  const staged = item.bulletin_id === null;
-                  const marked = removedIds.includes(item.id);
-                  return (
-                    <li
-                      key={item.id}
-                      className={cx(
-                        "flex items-center gap-2.5 rounded-lg border px-3 py-2",
-                        marked ? "border-zinc-200 bg-zinc-50" : "border-zinc-300/70 bg-white",
-                      )}
-                    >
-                      <AttachmentTypeIcon
-                        mimeType={item.mime_type}
-                        className={cx("shrink-0", marked ? "text-zinc-300" : "text-zinc-500")}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cx(
-                            "block truncate text-[13px] font-medium",
-                            marked ? "text-zinc-400 line-through" : "text-zinc-800",
-                          )}
-                        >
-                          {item.file_name}
-                        </span>
-                        <span className={cx("block text-xs", marked ? "text-zinc-400" : "text-zinc-500")}>
-                          {attachmentTypeLabel(item.mime_type, item.file_name)} · {formatBytes(item.size_bytes)}
-                          {staged ? <span className="text-zinc-400"> · attaches on save</span> : null}
-                        </span>
-                      </span>
-
-                      {marked ? (
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <span className="text-xs text-zinc-400">Removed on save</span>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setRemovedIds((current) => current.filter((entry) => entry !== item.id))}
-                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Undo
-                          </button>
-                        </span>
-                      ) : confirmRemoveId === item.id ? (
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <span className="text-xs text-zinc-500">
-                            {staged ? "Discard this file?" : "Remove on save?"}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              const target = item;
-                              setConfirmRemoveId(null);
-                              if (staged) void discardStaged(target);
-                              else setRemovedIds((current) => (current.includes(target.id) ? current : [...current, target.id]));
-                            }}
-                            className="flex h-7 items-center rounded-lg border border-red-200 bg-white px-2 text-[12.5px] font-medium text-red-700 transition-colors hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {staged ? "Discard" : "Remove"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setConfirmRemoveId(null)}
-                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Keep
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          aria-label={`${staged ? "Discard" : "Remove"} ${item.file_name}`}
-                          onClick={() => setConfirmRemoveId(item.id)}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-zinc-300/70 bg-white text-zinc-500 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-[13px] text-zinc-500" role="status">
-                {attachmentsLoading ? "Loading attachments…" : "No files attached yet."}
-              </p>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setAttachOpen(true)}
-              disabled={busy}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
-              Attach file
-            </button>
-          </div>
-
-          {attachError ? (
-            <p role="alert" className="mt-1.5 text-xs text-red-700">
-              {attachError}
-            </p>
-          ) : null}
-          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-            PDF, Word, Excel, PowerPoint, text, or CSV — up to 25 MB each. A file uploads as soon as you pick it and lands
-            on the notice when you save; it is listed below the post as a download, never rendered inline. Discarding a file
-            before you post deletes it straight away — on a posted notice, removing one deletes it when you save.
-          </p>
         </div>
 
         {/* Body: write / preview */}
@@ -822,6 +697,125 @@ export default function BulletinComposer({
           ))}
         </div>
 
+        {/* Attachments — reference files the notice carries, listed below the body. */}
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Attachments <span className="font-normal text-zinc-500">(optional)</span>
+          </span>
+
+          <div className="space-y-2">
+            {attachments.length > 0 ? (
+              <ul className="space-y-1.5" data-testid="bulletin-attachment-list">
+                {attachments.map((item) => {
+                  // A staged file belongs to no notice yet: it is discarded on the
+                  // spot, because there is nothing to save it against.
+                  const staged = item.bulletin_id === null;
+                  const marked = removedIds.includes(item.id);
+                  return (
+                    <li
+                      key={item.id}
+                      className={cx(
+                        "flex items-center gap-2.5 rounded-lg border px-3 py-2",
+                        marked ? "border-zinc-200 bg-zinc-50" : "border-zinc-300/70 bg-white",
+                      )}
+                    >
+                      <AttachmentTypeIcon
+                        mimeType={item.mime_type}
+                        className={cx("shrink-0", marked ? "text-zinc-300" : "text-zinc-500")}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cx(
+                            "block truncate text-[13px] font-medium",
+                            marked ? "text-zinc-400 line-through" : "text-zinc-800",
+                          )}
+                        >
+                          {item.file_name}
+                        </span>
+                        <span className={cx("block text-xs", marked ? "text-zinc-400" : "text-zinc-500")}>
+                          {attachmentTypeLabel(item.mime_type, item.file_name)} · {formatBytes(item.size_bytes)}
+                          {staged ? <span className="text-zinc-400"> · attaches on save</span> : null}
+                        </span>
+                      </span>
+
+                      {marked ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <span className="text-xs text-zinc-400">Removed on save</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setRemovedIds((current) => current.filter((entry) => entry !== item.id))}
+                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Undo
+                          </button>
+                        </span>
+                      ) : confirmRemoveId === item.id ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <span className="text-xs text-zinc-500">
+                            {staged ? "Discard this file?" : "Remove on save?"}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              const target = item;
+                              setConfirmRemoveId(null);
+                              if (staged) void discardStaged(target);
+                              else setRemovedIds((current) => (current.includes(target.id) ? current : [...current, target.id]));
+                            }}
+                            className="flex h-7 items-center rounded-lg border border-red-200 bg-white px-2 text-[12.5px] font-medium text-red-700 transition-colors hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {staged ? "Discard" : "Remove"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setConfirmRemoveId(null)}
+                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Keep
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={`${staged ? "Discard" : "Remove"} ${item.file_name}`}
+                          onClick={() => setConfirmRemoveId(item.id)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-zinc-300/70 bg-white text-zinc-500 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-[13px] text-zinc-500" role="status">
+                {attachmentsLoading ? "Loading attachments…" : "No files attached yet."}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setAttachOpen(true)}
+              disabled={busy}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+              Attach file
+            </button>
+          </div>
+
+          {attachError ? (
+            <p role="alert" className="mt-1.5 text-xs text-red-700">
+              {attachError}
+            </p>
+          ) : null}
+        </div>
+
         {/* Departments — optional filter tags, in an enclosed dropdown. */}
         <div
           onKeyDown={(event) => {
@@ -875,10 +869,6 @@ export default function BulletinComposer({
               ))}
             </div>
           ) : null}
-          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
-            Optional — leave empty for an all-staff post. Departments are filter tags, not a visibility boundary:
-            everyone sees every bulletin.
-          </p>
           {issueFor("departments").map((issue) => (
             <p key={issue.code} role="alert" className="mt-1.5 text-xs text-red-700">
               {issue.message}
@@ -903,12 +893,7 @@ export default function BulletinComposer({
                 disabled={busy}
                 className={checkboxClass}
               />
-              <span>
-                <span className="block text-[13px] font-medium text-zinc-800">Pinned</span>
-                <span className="block text-xs leading-5 text-zinc-500">
-                  Floats to the top of the board and gets the dark calling-card treatment.
-                </span>
-              </span>
+              <span className="text-[13px] font-medium text-zinc-800">Pinned</span>
             </label>
 
             {pinned ? (
@@ -955,12 +940,18 @@ export default function BulletinComposer({
                 disabled={busy}
                 className={checkboxClass}
               />
-              <span>
-                <span className="block text-[13px] font-medium text-zinc-800">Urgent</span>
-                <span className="block text-xs leading-5 text-zinc-500">
-                  A red flag on the post only. Editing an urgent notice clears its acknowledgements.
-                </span>
-              </span>
+              <span className="text-[13px] font-medium text-zinc-800">Urgent</span>
+            </label>
+
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={ackRequired}
+                onChange={(event) => setAckRequired(event.target.checked)}
+                disabled={busy}
+                className={checkboxClass}
+              />
+              <span className="text-[13px] font-medium text-zinc-800">Request acknowledgement</span>
             </label>
           </div>
         </fieldset>

@@ -372,7 +372,10 @@ export function MasterDetailShell<T>({
           ) : (
             <>
               {leadingGroup && leadingGroup.items.length > 0 ? (
-                <section aria-label={leadingGroup.label} className="mb-3">
+                // `mb-24` (≈ one tile) makes the boundary between the leading
+                // group and the feed unmistakable — the caption alone read as too
+                // slight a break.
+                <section aria-label={leadingGroup.label} className="mb-24">
                   <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                     {leadingGroup.label}
                   </p>

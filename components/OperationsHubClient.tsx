@@ -17,6 +17,7 @@ import {
 import { CommandPalette } from "@/components/CommandPalette";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
+import { FeedLoader } from "@/components/bulletin/FeedLoader";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
@@ -64,9 +65,19 @@ const BulletinComposer = dynamic(() => import("@/components/bulletin/BulletinCom
  * unchanged.
  */
 
+export interface BulletinBoardProps {
+  /** Every pinned notice (the section is never paginated). */
+  pinned: readonly Bulletin[];
+  /** The loaded pages of the unpinned feed, newest first. */
+  items: readonly Bulletin[];
+  /** Cursor for the next page; `null` when the feed is exhausted. */
+  nextCursor: string | null;
+}
+
 export interface OperationsHubClientProps {
   articles: readonly KnowledgeArticle[];
-  bulletins: readonly Bulletin[];
+  /** The board: the complete pinned section plus the first page of the feed. */
+  board: BulletinBoardProps;
   staff: readonly StaffMember[];
   /** The signed-in user's role; `null` when there is no session. Gates edit affordances only (the API enforces it regardless). */
   viewerRole?: Role | null;
@@ -431,7 +442,7 @@ const SEARCH_DEBOUNCE_MS = 150;
 
 export function OperationsHubClient({
   articles,
-  bulletins,
+  board,
   staff,
   viewerRole = null,
   viewerId = null,
@@ -453,7 +464,7 @@ export function OperationsHubClient({
     () => articles.find((article) => article.slug === initialArticleSlug)?.id ?? null,
   );
   const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(
-    bulletins[0]?.id ?? null,
+    board.pinned[0]?.id ?? board.items[0]?.id ?? null,
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -461,11 +472,16 @@ export function OperationsHubClient({
   const pendingAnchor = useRef<string | null>(null);
 
   /**
-   * The board is server-rendered into `bulletins`, then owned locally: posting,
-   * editing, and deleting mutate this list and re-fetch it from the API, so the
-   * board reflects the database rather than an optimistic guess.
+   * The board is server-rendered into `board` — the complete pinned section plus
+   * the first page of the feed — then owned locally. The pinned section is kept
+   * whole (few and self-expiring); the feed grows a page at a time via
+   * `next_cursor`, and every write re-fetches whatever the current mode needs so
+   * the rail reflects the database rather than an optimistic guess.
    */
-  const [bulletinList, setBulletinList] = useState<readonly Bulletin[]>(bulletins);
+  const [pinnedList, setPinnedList] = useState<readonly Bulletin[]>(board.pinned);
+  const [feedList, setFeedList] = useState<readonly Bulletin[]>(board.items);
+  const [feedCursor, setFeedCursor] = useState<string | null>(board.nextCursor);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [composer, setComposer] = useState<{ mode: "create" } | { mode: "edit"; bulletin: Bulletin } | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
   /**
@@ -479,15 +495,65 @@ export function OperationsHubClient({
   // are read at page load, so a notice posted now would not be in them yet).
   const [authoredIds, setAuthoredIds] = useState<readonly string[]>(authoredBulletinIds);
 
-  const refreshBulletins = useCallback(async (preferId?: string) => {
+  /**
+   * A settled search or a department other than "All" turns paging off and pulls
+   * the whole (small) matched set, so client-side Fuse search runs over every
+   * match rather than just the loaded page. Any query text counts as filtered —
+   * the refetch fires on the transition, not on every keystroke.
+   */
+  const isFiltered = searchQuery.trim().length > 0 || activeDepartment !== "All";
+
+  /**
+   * Re-fetch the board to match the current mode: the whole feed while a filter
+   * is active, otherwise the first page. Used after every write.
+   */
+  const refreshBoard = useCallback(
+    async (preferId?: string) => {
+      try {
+        const page = isFiltered ? await listBulletins({ limit: "all" }) : await listBulletins();
+        setPinnedList(page.pinned);
+        setFeedList(page.items);
+        setFeedCursor(page.next_cursor);
+        if (preferId) setSelectedBulletinId(preferId);
+      } catch {
+        // Keep the current list; the mutation itself already reported any error.
+      }
+    },
+    [isFiltered],
+  );
+
+  /**
+   * Load the next page of the feed and append it. Guarded so a scroll burst or a
+   * filter change cannot fire two overlapping requests. Appending adds below
+   * what is already on screen, so nothing jumps.
+   */
+  const loadMoreFeed = useCallback(async () => {
+    if (isFiltered || feedLoading || !feedCursor) return;
+    setFeedLoading(true);
     try {
-      const fresh = await listBulletins();
-      setBulletinList(fresh);
-      if (preferId) setSelectedBulletinId(preferId);
+      const page = await listBulletins({ cursor: feedCursor });
+      setFeedList((current) => [...current, ...page.items]);
+      setFeedCursor(page.next_cursor);
     } catch {
-      // Keep the current list; the mutation itself already reported any error.
+      // Leave the cursor in place so the next scroll (or the button) retries.
+    } finally {
+      setFeedLoading(false);
     }
-  }, []);
+  }, [isFiltered, feedLoading, feedCursor]);
+
+  /**
+   * When the filter mode flips, refetch to match it — page one for browsing, the
+   * whole set while a search or department filter is active. The first render is
+   * skipped: the server already delivered page one.
+   */
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      return;
+    }
+    void refreshBoard();
+  }, [isFiltered, refreshBoard]);
 
   const handlePosted = useCallback(
     async (created: Bulletin) => {
@@ -495,9 +561,9 @@ export function OperationsHubClient({
       setAuthoredIds((current) => (current.includes(created.id) ? current : [...current, created.id]));
       setSelectedBulletinId(created.id);
       setBulletinRevision((current) => current + 1);
-      await refreshBulletins(created.id);
+      await refreshBoard(created.id);
     },
-    [refreshBulletins],
+    [refreshBoard],
   );
 
   const handleSaved = useCallback(
@@ -505,25 +571,25 @@ export function OperationsHubClient({
       setComposer(null);
       setSelectedBulletinId(saved.id);
       setBulletinRevision((current) => current + 1);
-      await refreshBulletins(saved.id);
+      await refreshBoard(saved.id);
     },
-    [refreshBulletins],
+    [refreshBoard],
   );
 
   /**
-   * The pin strip's write — unpin, or change the expiry. It goes through the
-   * same PATCH the composer uses, so authorship and validation stay the API's
+   * The reader menu's pin write — unpin, or change the expiry. It goes through
+   * the same PATCH the composer uses, so authorship and validation stay the API's
    * (`requireEditableBulletin`), and the board is refetched afterwards so the
    * rail marker and the detail label both show the new state. A refusal is
-   * re-thrown: the strip prints the API's own message.
+   * re-thrown: the menu prints the API's own message.
    */
   const handlePinChange = useCallback(
     async (id: string, patch: { pinned?: boolean; expires_at?: string | null }) => {
       await patchBulletin(id, patch);
       setBulletinRevision((current) => current + 1);
-      await refreshBulletins(id);
+      await refreshBoard(id);
     },
-    [refreshBulletins],
+    [refreshBoard],
   );
 
   const handleDeleted = useCallback(
@@ -535,22 +601,15 @@ export function OperationsHubClient({
         setBoardError(caught instanceof Error ? caught.message : "Could not delete the notice.");
         return;
       }
-      setBulletinList((current) => current.filter((entry) => entry.id !== bulletin.id));
+      setPinnedList((current) => current.filter((entry) => entry.id !== bulletin.id));
+      setFeedList((current) => current.filter((entry) => entry.id !== bulletin.id));
       setSelectedBulletinId(null);
-      await refreshBulletins();
+      await refreshBoard();
     },
-    [refreshBulletins],
+    [refreshBoard],
   );
 
   const isAuthor = viewerRole !== null && roleAtLeast(viewerRole, "author");
-  /** Edit/delete on a notice: its author, or any clinical lead. The API re-checks. */
-  const canManageBulletin = useCallback(
-    (bulletin: Bulletin) =>
-      viewerRole !== null &&
-      roleAtLeast(viewerRole, "author") &&
-      (roleAtLeast(viewerRole, "clinical_lead") || authoredIds.includes(bulletin.id)),
-    [viewerRole, authoredIds],
-  );
   /**
    * An author may edit any procedure, including a published one: a plain save of
    * a live procedure republishes it (the API snapshots a new immutable version),
@@ -619,9 +678,10 @@ export function OperationsHubClient({
   };
 
   /* Search: one index per dataset, shared by the palette and the per-view fields. */
+  const knownBulletins = useMemo(() => [...pinnedList, ...feedList], [pinnedList, feedList]);
   const searchIndex = useMemo(
-    () => buildSearchIndex(articles, bulletinList, staff),
-    [articles, bulletinList, staff],
+    () => buildSearchIndex(articles, knownBulletins, staff),
+    [articles, knownBulletins, staff],
   );
   const debouncedQuery = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS);
   // Clearing the field must restore the full list immediately, not 150 ms later.
@@ -629,8 +689,8 @@ export function OperationsHubClient({
 
   /* Bulletin board */
   const searchedBulletins = useMemo(
-    () => rankBy(bulletinList, searchSurface(searchIndex, "bulletins", effectiveQuery)),
-    [bulletinList, searchIndex, effectiveQuery],
+    () => rankBy(knownBulletins, searchSurface(searchIndex, "bulletins", effectiveQuery)),
+    [knownBulletins, searchIndex, effectiveQuery],
   );
   const filteredBulletins = useMemo(
     () =>
@@ -639,24 +699,31 @@ export function OperationsHubClient({
       ),
     [searchedBulletins, activeDepartment],
   );
+  // Counts reflect what the rail has loaded (and, while a filter is active, the
+  // whole matched set — the filter bypass fetches it all).
   const bulletinCounts = useMemo(() => buildCounts(searchedBulletins), [searchedBulletins]);
-  // Pinned posts float to the top; order within each group is preserved.
-  const boardBulletins = useMemo(
-    () => [...filteredBulletins].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
-    [filteredBulletins],
-  );
   /**
    * The rail is two groups, not one list with a marker on some rows: pinned
    * notices render in their own section at the top (the shell's `leadingGroup`),
-   * everything else below it in recency order. Both groups come out of the same
-   * filtered board, so a search or a department filter drops out of both.
+   * everything else below it in recency order. The pinned group is always the
+   * whole pinned set; the feed is whatever pages have been loaded. Both come out
+   * of the same filtered board, so a search or a department filter drops out of
+   * both.
    */
-  const pinnedBulletins = useMemo(() => boardBulletins.filter((bulletin) => bulletin.pinned), [boardBulletins]);
-  const feedBulletins = useMemo(() => boardBulletins.filter((bulletin) => !bulletin.pinned), [boardBulletins]);
-  const selectedBulletin = useMemo(
-    () => boardBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
-    [boardBulletins, selectedBulletinId],
+  const pinnedBulletins = useMemo(
+    () => filteredBulletins.filter((bulletin) => bulletin.pinned),
+    [filteredBulletins],
   );
+  const feedBulletins = useMemo(
+    () => filteredBulletins.filter((bulletin) => !bulletin.pinned),
+    [filteredBulletins],
+  );
+  const selectedBulletin = useMemo(
+    () => filteredBulletins.find((bulletin) => bulletin.id === selectedBulletinId) ?? null,
+    [filteredBulletins, selectedBulletinId],
+  );
+  /** Another page exists only while browsing — a filter has already loaded them all. */
+  const feedHasMore = !isFiltered && feedCursor !== null;
 
   /* Knowledge base */
   const searchedArticles = useMemo(
@@ -695,7 +762,6 @@ export function OperationsHubClient({
         : searchedStaff.length;
   useSettledSearchLog(effectiveQuery, activeResultCount, activeSurface);
 
-  const isFiltered = searchQuery.trim().length > 0 || activeDepartment !== "All";
   const noMatchTitle = isFiltered ? "No matches" : "Nothing here yet";
   const noMatchMessage = isFiltered
     ? "Nothing matches the current search and department filter. Try fewer words, or an abbreviation."
@@ -760,6 +826,11 @@ export function OperationsHubClient({
             activeDepartment={activeDepartment}
             onDepartmentChange={setActiveDepartment}
             counts={bulletinCounts}
+            listFooter={
+              feedHasMore || feedLoading ? (
+                <FeedLoader hasMore={feedHasMore} loading={feedLoading} onLoadMore={loadMoreFeed} />
+              ) : undefined
+            }
             detail={
               selectedBulletin ? (
                 <BulletinDetail
@@ -769,7 +840,6 @@ export function OperationsHubClient({
                   viewerRole={viewerRole ?? "readonly"}
                   viewerId={viewerId ?? ""}
                   now={now}
-                  canEdit={canManageBulletin(selectedBulletin)}
                   isAuthor={authoredIds.includes(selectedBulletin.id)}
                   onPinChange={(patch) => handlePinChange(selectedBulletin.id, patch)}
                   onOpenArticle={openArticle}

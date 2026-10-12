@@ -24,17 +24,158 @@ export type { ReactionSummaryEntry };
  * Prompt 6c: one simple model. A bulletin carries `pinned` / `urgent` booleans
  * instead of the old priority/format tiers, and expiry is purely opt-in.
  *
- * Ordering: newest first (`published_at` descending). The fixtures had no order.
+ * Prompt 6e: expiry unpins rather than deletes (see `sweepExpiredPins`), a
+ * notice may ask for acknowledgement (`ackRequired`), and the board is fetched
+ * as pages (`getBulletinBoard`) so the rail does not render the whole history.
+ *
+ * Ordering: newest first (`published_at` desc, `id` desc for a stable cursor).
+ * The fixtures had no order.
  */
 
 const AUTHOR_SELECT = { select: { name: true, title: true } } as const;
+
+/** Default page size for the unpinned feed. Pinned notices are never paginated. */
+export const BULLETIN_PAGE_SIZE = 30;
 
 export interface BulletinFilters {
   /** `"All"` (or omitted) does not filter. */
   department?: Department;
   q?: string;
-  /** Injectable clock; defaults to now. Makes the silent-delete sweep testable. */
+  /** Injectable clock; defaults to now. Makes the expiry sweep testable. */
   now?: Date;
+}
+
+/** Filters for the paginated board: everything `BulletinFilters` has, plus paging. */
+export interface BulletinBoardFilters extends BulletinFilters {
+  /**
+   * Unpinned page size. Omitted → `BULLETIN_PAGE_SIZE`. `null` → no limit, all
+   * unpinned posts (the search / department-filter bypass).
+   */
+  limit?: number | null;
+  /** Opaque cursor from a previous page's `next_cursor`. Ignored with `limit: null`. */
+  cursor?: string | null;
+}
+
+/** One board fetch: the complete pinned section, one page of the feed, and the cursor. */
+export interface BulletinBoard {
+  /** Every pinned notice, newest first — few and self-expiring, never paginated. */
+  pinned: Bulletin[];
+  /** One page of the unpinned feed, newest first. */
+  items: Bulletin[];
+  /** Pass back as `cursor` for the next page; `null` when the feed is exhausted. */
+  next_cursor: string | null;
+}
+
+/**
+ * The one expiry sweep. A notice past its `expiresAt` is **unpinned**:
+ * `pinned = false`, `expiresAt = null`, still published. It returns to the feed
+ * at its original publish date. Nothing is deleted — a pin was a temporary
+ * boost, not a death sentence.
+ *
+ * Only pinned notices ever carry an expiry (the composer requires one for a
+ * pin, and an unpinned notice has no expiry control at all), so this sweep only
+ * ever sees pinned rows.
+ */
+async function sweepExpiredPins(now: Date): Promise<void> {
+  await getDb().bulletin.updateMany({
+    where: { expiresAt: { not: null, lte: now } },
+    data: { pinned: false, expiresAt: null },
+  });
+}
+
+/**
+ * The feed's total order is `(publishedAt desc, id desc)`; the cursor is the
+ * last row of the previous page, encoded so it is opaque to the client. `id`
+ * breaks ties for rows published in the same millisecond.
+ */
+function encodeFeedCursor(row: { publishedAt: Date; id: string }): string {
+  return Buffer.from(`${row.publishedAt.toISOString()}|${row.id}`, "utf8").toString("base64url");
+}
+
+function decodeFeedCursor(cursor: string): { publishedAt: Date; id: string } | null {
+  try {
+    const [iso, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
+    const publishedAt = new Date(iso);
+    if (!id || Number.isNaN(publishedAt.getTime())) return null;
+    return { publishedAt, id };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The board, paginated: the pinned section comes from its own unpaginated query
+ * (pinned notices are few and self-expiring), the unpinned feed is one page of
+ * `limit` posts plus a cursor. Both come out of the same filters, so a search or
+ * a department filter narrows both — callers pass `limit: null` when a filter is
+ * active so search runs over the whole (small) matched set.
+ */
+export async function getBulletinBoard(filters: BulletinBoardFilters = {}): Promise<BulletinBoard> {
+  const db = getDb();
+  const now = filters.now ?? new Date();
+
+  await sweepExpiredPins(now);
+  // The other silent sweep: attachments staged in a composer that was never
+  // saved. Object first, then the row (see `sweepStagedAttachments`).
+  await sweepStagedAttachments({ now });
+
+  const where = buildWhere(filters);
+  const orderBy: Prisma.BulletinOrderByWithRelationInput[] = [{ publishedAt: "desc" }, { id: "desc" }];
+
+  const pinnedRows = await db.bulletin.findMany({
+    where: { ...where, pinned: true },
+    include: { author: AUTHOR_SELECT },
+    orderBy,
+  });
+
+  const limit = filters.limit === undefined ? BULLETIN_PAGE_SIZE : filters.limit;
+
+  const feedWhere: Prisma.BulletinWhereInput = { ...where, pinned: false };
+  const cursor = filters.cursor ? decodeFeedCursor(filters.cursor) : null;
+  if (cursor) {
+    const base = feedWhere.AND ? (Array.isArray(feedWhere.AND) ? feedWhere.AND : [feedWhere.AND]) : [];
+    feedWhere.AND = [
+      ...base,
+      {
+        OR: [
+          { publishedAt: { lt: cursor.publishedAt } },
+          { publishedAt: cursor.publishedAt, id: { lt: cursor.id } },
+        ],
+      },
+    ];
+  }
+
+  // One extra row tells us whether another page exists without a count query.
+  const take = limit === null ? undefined : limit + 1;
+  const feedRows = await db.bulletin.findMany({
+    where: feedWhere,
+    include: { author: AUTHOR_SELECT },
+    orderBy,
+    ...(take === undefined ? {} : { take }),
+  });
+
+  const hasMore = limit !== null && feedRows.length > limit;
+  const pageRows = hasMore ? feedRows.slice(0, limit as number) : feedRows;
+  const last = pageRows.at(-1);
+
+  return {
+    pinned: pinnedRows.map(toBulletin),
+    items: pageRows.map(toBulletin),
+    next_cursor: hasMore && last ? encodeFeedCursor(last) : null,
+  };
+}
+
+/**
+ * The bulletins on the board, newest first — the whole set, pinned notices
+ * first. The unpin sweep runs before returning, so an expired pin is already
+ * back in the feed rather than removed.
+ *
+ * This is the unpaginated convenience (`getBulletinBoard` with `limit: null`);
+ * the board UI pages through `getBulletinBoard` instead.
+ */
+export async function getBulletins(filters: BulletinFilters = {}): Promise<Bulletin[]> {
+  const board = await getBulletinBoard({ ...filters, limit: null });
+  return [...board.pinned, ...board.items];
 }
 
 function buildWhere(filters: BulletinFilters): Prisma.BulletinWhereInput {
@@ -69,32 +210,7 @@ function buildWhere(filters: BulletinFilters): Prisma.BulletinWhereInput {
   return conditions.length > 0 ? { AND: conditions } : {};
 }
 
-/**
- * The bulletins on the board, newest first.
- *
- * **Silent delete.** Before returning, every row whose `expires_at` is at or
- * before `now` is removed in one `deleteMany`. An expired post is deleted, not
- * displayed — there is no tray, no notification, no ceremony.
- */
-export async function getBulletins(filters: BulletinFilters = {}): Promise<Bulletin[]> {
-  const db = getDb();
-  const now = filters.now ?? new Date();
-
-  await db.bulletin.deleteMany({ where: { expiresAt: { not: null, lte: now } } });
-  // The other silent sweep: attachments staged in a composer that was never
-  // saved. Object first, then the row (see `sweepStagedAttachments`).
-  await sweepStagedAttachments({ now });
-
-  const rows = await db.bulletin.findMany({
-    where: buildWhere(filters),
-    include: { author: AUTHOR_SELECT },
-    orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
-  });
-
-  return rows.map(toBulletin);
-}
-
-/** A single bulletin by id, or `null`. Expired rows are already gone. */
+/** A single bulletin by id, or `null`. */
 export async function getBulletinById(id: string): Promise<Bulletin | null> {
   const row = await getDb().bulletin.findUnique({
     where: { id },
@@ -121,6 +237,8 @@ export interface CreateBulletinInput {
   departments: string[];
   pinned?: boolean;
   urgent?: boolean;
+  /** Opt-in: ask each reader to acknowledge the notice. Default false. */
+  ack_required?: boolean;
   /** The optional headline subtitle. */
   deck?: string | null;
   /** The optional hero banner (`null` = none). */
@@ -174,6 +292,7 @@ export async function createBulletin(input: CreateBulletinInput): Promise<Bullet
         departments: input.departments,
         pinned: input.pinned ?? false,
         urgent: input.urgent ?? false,
+        ackRequired: input.ack_required ?? false,
         deck: trimOrNull(input.deck),
         heroImageUrl: trimOrNull(input.hero_image_url),
         heroImageAlt: trimOrNull(input.hero_image_alt),
@@ -273,6 +392,8 @@ export interface UpdateBulletinInput {
   departments?: string[];
   pinned?: boolean;
   urgent?: boolean;
+  /** Opt-in: ask each reader to acknowledge the notice. */
+  ack_required?: boolean;
   deck?: string | null;
   hero_image_url?: string | null;
   hero_image_alt?: string | null;
@@ -338,6 +459,7 @@ export async function updateBulletin(
       departments: true,
       pinned: true,
       urgent: true,
+      ackRequired: true,
       deck: true,
       heroImageUrl: true,
       heroImageAlt: true,
@@ -354,6 +476,7 @@ export async function updateBulletin(
   const nextDepartments = patch.departments ?? current.departments;
   const nextPinned = patch.pinned ?? current.pinned;
   const nextUrgent = patch.urgent ?? current.urgent;
+  const nextAck = patch.ack_required ?? current.ackRequired;
   const nextDeck = patch.deck === undefined ? current.deck : trimOrNull(patch.deck);
   const nextHeroImage =
     patch.hero_image_url === undefined ? current.heroImageUrl : trimOrNull(patch.hero_image_url);
@@ -390,6 +513,7 @@ export async function updateBulletin(
         departments: nextDepartments,
         pinned: nextPinned,
         urgent: nextUrgent,
+        ackRequired: nextAck,
         deck: nextDeck,
         heroImageUrl: nextHeroImage,
         heroImageAlt: nextHeroAlt,
