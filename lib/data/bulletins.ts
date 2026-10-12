@@ -11,6 +11,7 @@ import {
   type ReactionSummaryEntry,
 } from "@/lib/bulletin/reactions";
 import { shouldClearAcksForUrgentEdit } from "@/lib/bulletin/lifecycle";
+import { linkStagedAttachments, sweepStagedAttachments } from "@/lib/data/bulletin-attachments";
 import type { Bulletin, Department, KnowledgeArticle } from "@/types/portal";
 
 export { BULLETIN_REACTION_EMOJIS, summarizeReactions };
@@ -80,6 +81,9 @@ export async function getBulletins(filters: BulletinFilters = {}): Promise<Bulle
   const now = filters.now ?? new Date();
 
   await db.bulletin.deleteMany({ where: { expiresAt: { not: null, lte: now } } });
+  // The other silent sweep: attachments staged in a composer that was never
+  // saved. Object first, then the row (see `sweepStagedAttachments`).
+  await sweepStagedAttachments({ now });
 
   const rows = await db.bulletin.findMany({
     where: buildWhere(filters),
@@ -126,6 +130,12 @@ export interface CreateBulletinInput {
   /** Opt-in expiry; `null` (or omitted) means "lives until deleted". */
   expires_at?: Date | null;
   linked_article_id?: string | null;
+  /**
+   * Staged attachments to link to this notice as it is created — the composer's
+   * "attach a file before posting" path. They are linked in the same
+   * transaction, so a bad id fails the whole post rather than half-creating it.
+   */
+  attachment_ids?: readonly string[];
   author_id: string;
 }
 
@@ -156,22 +166,29 @@ export async function createBulletin(input: CreateBulletinInput): Promise<Bullet
 
   const now = new Date();
 
-  const row = await db.bulletin.create({
-    data: {
-      title: input.title,
-      bodyMarkdown: input.body_markdown,
-      departments: input.departments,
-      pinned: input.pinned ?? false,
-      urgent: input.urgent ?? false,
-      deck: trimOrNull(input.deck),
-      heroImageUrl: trimOrNull(input.hero_image_url),
-      heroImageAlt: trimOrNull(input.hero_image_alt),
-      linkedArticleId: input.linked_article_id ?? null,
-      authorId: input.author_id,
-      publishedAt: now,
-      expiresAt: input.expires_at ?? null,
-    },
-    include: { author: AUTHOR_SELECT },
+  const row = await db.$transaction(async (tx) => {
+    const created = await tx.bulletin.create({
+      data: {
+        title: input.title,
+        bodyMarkdown: input.body_markdown,
+        departments: input.departments,
+        pinned: input.pinned ?? false,
+        urgent: input.urgent ?? false,
+        deck: trimOrNull(input.deck),
+        heroImageUrl: trimOrNull(input.hero_image_url),
+        heroImageAlt: trimOrNull(input.hero_image_alt),
+        linkedArticleId: input.linked_article_id ?? null,
+        authorId: input.author_id,
+        publishedAt: now,
+        expiresAt: input.expires_at ?? null,
+      },
+      include: { author: AUTHOR_SELECT },
+    });
+
+    // Files staged while the notice was being written become its attachments.
+    await linkStagedAttachments(created.id, input.attachment_ids ?? [], tx);
+
+    return created;
   });
 
   return toBulletin(row);
@@ -262,6 +279,8 @@ export interface UpdateBulletinInput {
   /** `null` clears the expiry (the post lives until deleted). */
   expires_at?: Date | null;
   linked_article_id?: string | null;
+  /** Staged attachments to link onto this notice (the same field `createBulletin` takes). */
+  attachment_ids?: readonly string[];
 }
 
 function assertBulletinMayBeChanged(
@@ -275,6 +294,26 @@ function assertBulletinMayBeChanged(
     code: "forbidden",
     details: { requiredRole: "clinical_lead", actualRole: actor.role },
   });
+}
+
+/**
+ * The bulletin named by `id`, once the actor is confirmed to be allowed to
+ * change it — its author, or a `clinical_lead`+. 404 for an unknown notice,
+ * 403 for a notice that is someone else's.
+ *
+ * This is the *edit* rule, exposed so the attachment routes (which write to a
+ * notice without going through `updateBulletin`) enforce exactly the same
+ * boundary instead of inventing a looser one: attaching a file to a notice is a
+ * change to that notice.
+ */
+export async function requireEditableBulletin(
+  id: string,
+  actor: { id: string; role: string },
+): Promise<{ id: string }> {
+  const current = await getDb().bulletin.findUnique({ where: { id }, select: { id: true, authorId: true } });
+  if (!current) throw new ApiError(404, `No bulletin with id \`${id}\` exists.`);
+  assertBulletinMayBeChanged(actor, current.authorId, "edit");
+  return { id: current.id };
 }
 
 /**
@@ -343,7 +382,7 @@ export async function updateBulletin(
     if (clearAcks) {
       await tx.bulletinAck.deleteMany({ where: { bulletinId: id } });
     }
-    return tx.bulletin.update({
+    const row = await tx.bulletin.update({
       where: { id },
       data: {
         title: nextTitle,
@@ -359,6 +398,11 @@ export async function updateBulletin(
       },
       include: { author: AUTHOR_SELECT },
     });
+
+    // A staged file can also be linked onto an existing notice.
+    await linkStagedAttachments(id, patch.attachment_ids ?? [], tx);
+
+    return row;
   });
 
   return toBulletin(updated);

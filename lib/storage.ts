@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { ApiError } from "@/lib/api";
 
 /**
@@ -175,6 +175,32 @@ export async function putObjectAtKey(
   }
 
   return { key, url: `${config.publicBaseUrl}/${key}` };
+}
+
+/**
+ * Delete an object. Used by the staged-attachment sweep (`lib/data/bulletin-attachments.ts`):
+ * a file chosen in the composer for a notice that was never posted has to leave
+ * the bucket as well as the database, otherwise it is invisible in the portal
+ * and billed forever.
+ *
+ * S3's `DeleteObject` is idempotent — removing a key that is not there reports
+ * success — so a sweep that runs twice, or that follows a manual delete, is
+ * harmless. A genuine failure (an unreachable endpoint) throws, and the sweep
+ * then keeps the row for the next run rather than dropping the file's only
+ * pointer to it.
+ */
+export async function deleteObjectAtKey(key: string): Promise<void> {
+  const config = readConfig();
+  const client = getClient(config);
+
+  try {
+    await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+  } catch (error) {
+    console.error("[uploads] S3 DeleteObject failed:", error);
+    throw new ApiError(502, "The stored file could not be removed.", {
+      code: "storage_delete_failed",
+    });
+  }
 }
 
 /**

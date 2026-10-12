@@ -278,6 +278,7 @@ export type BulletinWhereInput = {
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
   reactions?: Prisma.BulletinReactionListRelationFilter
+  attachments?: Prisma.BulletinAttachmentListRelationFilter
 }
 
 export type BulletinOrderByWithRelationInput = {
@@ -302,6 +303,7 @@ export type BulletinOrderByWithRelationInput = {
   author?: Prisma.UserOrderByWithRelationInput
   acks?: Prisma.BulletinAckOrderByRelationAggregateInput
   reactions?: Prisma.BulletinReactionOrderByRelationAggregateInput
+  attachments?: Prisma.BulletinAttachmentOrderByRelationAggregateInput
 }
 
 export type BulletinWhereUniqueInput = Prisma.AtLeast<{
@@ -329,6 +331,7 @@ export type BulletinWhereUniqueInput = Prisma.AtLeast<{
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   acks?: Prisma.BulletinAckListRelationFilter
   reactions?: Prisma.BulletinReactionListRelationFilter
+  attachments?: Prisma.BulletinAttachmentListRelationFilter
 }, "id">
 
 export type BulletinOrderByWithAggregationInput = {
@@ -397,6 +400,7 @@ export type BulletinCreateInput = {
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateInput = {
@@ -419,6 +423,7 @@ export type BulletinUncheckedCreateInput = {
   kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUpdateInput = {
@@ -441,6 +446,7 @@ export type BulletinUpdateInput = {
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateInput = {
@@ -463,6 +469,7 @@ export type BulletinUncheckedUpdateInput = {
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinCreateManyInput = {
@@ -594,6 +601,11 @@ export type BulletinMinOrderByAggregateInput = {
 export type BulletinScalarRelationFilter = {
   is?: Prisma.BulletinWhereInput
   isNot?: Prisma.BulletinWhereInput
+}
+
+export type BulletinNullableScalarRelationFilter = {
+  is?: Prisma.BulletinWhereInput | null
+  isNot?: Prisma.BulletinWhereInput | null
 }
 
 export type BulletinCreateNestedManyWithoutAuthorInput = {
@@ -729,6 +741,22 @@ export type BulletinUpdateOneRequiredWithoutReactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.BulletinUpdateToOneWithWhereWithoutReactionsInput, Prisma.BulletinUpdateWithoutReactionsInput>, Prisma.BulletinUncheckedUpdateWithoutReactionsInput>
 }
 
+export type BulletinCreateNestedOneWithoutAttachmentsInput = {
+  create?: Prisma.XOR<Prisma.BulletinCreateWithoutAttachmentsInput, Prisma.BulletinUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.BulletinCreateOrConnectWithoutAttachmentsInput
+  connect?: Prisma.BulletinWhereUniqueInput
+}
+
+export type BulletinUpdateOneWithoutAttachmentsNestedInput = {
+  create?: Prisma.XOR<Prisma.BulletinCreateWithoutAttachmentsInput, Prisma.BulletinUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.BulletinCreateOrConnectWithoutAttachmentsInput
+  upsert?: Prisma.BulletinUpsertWithoutAttachmentsInput
+  disconnect?: Prisma.BulletinWhereInput | boolean
+  delete?: Prisma.BulletinWhereInput | boolean
+  connect?: Prisma.BulletinWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.BulletinUpdateToOneWithWhereWithoutAttachmentsInput, Prisma.BulletinUpdateWithoutAttachmentsInput>, Prisma.BulletinUncheckedUpdateWithoutAttachmentsInput>
+}
+
 export type BulletinCreateWithoutAuthorInput = {
   id?: string
   title: string
@@ -748,6 +776,7 @@ export type BulletinCreateWithoutAuthorInput = {
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutAuthorInput = {
@@ -769,6 +798,7 @@ export type BulletinUncheckedCreateWithoutAuthorInput = {
   kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutAuthorInput = {
@@ -839,6 +869,7 @@ export type BulletinCreateWithoutLinkedArticleInput = {
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
@@ -860,6 +891,7 @@ export type BulletinUncheckedCreateWithoutLinkedArticleInput = {
   kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutLinkedArticleInput = {
@@ -907,6 +939,7 @@ export type BulletinCreateWithoutAcksInput = {
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutAcksInput = {
@@ -928,6 +961,7 @@ export type BulletinUncheckedCreateWithoutAcksInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutAcksInput = {
@@ -965,6 +999,7 @@ export type BulletinUpdateWithoutAcksInput = {
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutAcksInput = {
@@ -986,6 +1021,7 @@ export type BulletinUncheckedUpdateWithoutAcksInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinCreateWithoutReactionsInput = {
@@ -1007,6 +1043,7 @@ export type BulletinCreateWithoutReactionsInput = {
   linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
   author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
   acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinUncheckedCreateWithoutReactionsInput = {
@@ -1028,6 +1065,7 @@ export type BulletinUncheckedCreateWithoutReactionsInput = {
   format?: $Enums.BulletinFormat
   kicker?: string | null
   acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+  attachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutBulletinInput
 }
 
 export type BulletinCreateOrConnectWithoutReactionsInput = {
@@ -1065,6 +1103,7 @@ export type BulletinUpdateWithoutReactionsInput = {
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutReactionsInput = {
@@ -1086,6 +1125,111 @@ export type BulletinUncheckedUpdateWithoutReactionsInput = {
   format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutBulletinNestedInput
+}
+
+export type BulletinCreateWithoutAttachmentsInput = {
+  id?: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.BulletinCreatedepartmentsInput | string[]
+  pinned?: boolean
+  urgent?: boolean
+  deck?: string | null
+  heroImageUrl?: string | null
+  heroImageAlt?: string | null
+  publishedAt: Date | string
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  linkedArticle?: Prisma.ArticleCreateNestedOneWithoutBulletinsInput
+  author: Prisma.UserCreateNestedOneWithoutAuthoredBulletinsInput
+  acks?: Prisma.BulletinAckCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionCreateNestedManyWithoutBulletinInput
+}
+
+export type BulletinUncheckedCreateWithoutAttachmentsInput = {
+  id?: string
+  title: string
+  bodyMarkdown: string
+  departments?: Prisma.BulletinCreatedepartmentsInput | string[]
+  pinned?: boolean
+  urgent?: boolean
+  deck?: string | null
+  heroImageUrl?: string | null
+  heroImageAlt?: string | null
+  linkedArticleId?: string | null
+  authorId: string
+  publishedAt: Date | string
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  priority?: $Enums.BulletinPriority
+  format?: $Enums.BulletinFormat
+  kicker?: string | null
+  acks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutBulletinInput
+  reactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutBulletinInput
+}
+
+export type BulletinCreateOrConnectWithoutAttachmentsInput = {
+  where: Prisma.BulletinWhereUniqueInput
+  create: Prisma.XOR<Prisma.BulletinCreateWithoutAttachmentsInput, Prisma.BulletinUncheckedCreateWithoutAttachmentsInput>
+}
+
+export type BulletinUpsertWithoutAttachmentsInput = {
+  update: Prisma.XOR<Prisma.BulletinUpdateWithoutAttachmentsInput, Prisma.BulletinUncheckedUpdateWithoutAttachmentsInput>
+  create: Prisma.XOR<Prisma.BulletinCreateWithoutAttachmentsInput, Prisma.BulletinUncheckedCreateWithoutAttachmentsInput>
+  where?: Prisma.BulletinWhereInput
+}
+
+export type BulletinUpdateToOneWithWhereWithoutAttachmentsInput = {
+  where?: Prisma.BulletinWhereInput
+  data: Prisma.XOR<Prisma.BulletinUpdateWithoutAttachmentsInput, Prisma.BulletinUncheckedUpdateWithoutAttachmentsInput>
+}
+
+export type BulletinUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
+  author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
+  acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
+}
+
+export type BulletinUncheckedUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
+  departments?: Prisma.BulletinUpdatedepartmentsInput | string[]
+  pinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  urgent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  deck?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  heroImageAlt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  linkedArticleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  authorId?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priority?: Prisma.EnumBulletinPriorityFieldUpdateOperationsInput | $Enums.BulletinPriority
+  format?: Prisma.EnumBulletinFormatFieldUpdateOperationsInput | $Enums.BulletinFormat
+  kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
+  reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinCreateManyAuthorInput = {
@@ -1126,6 +1270,7 @@ export type BulletinUpdateWithoutAuthorInput = {
   linkedArticle?: Prisma.ArticleUpdateOneWithoutBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutAuthorInput = {
@@ -1147,6 +1292,7 @@ export type BulletinUncheckedUpdateWithoutAuthorInput = {
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateManyWithoutAuthorInput = {
@@ -1206,6 +1352,7 @@ export type BulletinUpdateWithoutLinkedArticleInput = {
   author?: Prisma.UserUpdateOneRequiredWithoutAuthoredBulletinsNestedInput
   acks?: Prisma.BulletinAckUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
@@ -1227,6 +1374,7 @@ export type BulletinUncheckedUpdateWithoutLinkedArticleInput = {
   kicker?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   acks?: Prisma.BulletinAckUncheckedUpdateManyWithoutBulletinNestedInput
   reactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutBulletinNestedInput
+  attachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutBulletinNestedInput
 }
 
 export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
@@ -1256,11 +1404,13 @@ export type BulletinUncheckedUpdateManyWithoutLinkedArticleInput = {
 export type BulletinCountOutputType = {
   acks: number
   reactions: number
+  attachments: number
 }
 
 export type BulletinCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   acks?: boolean | BulletinCountOutputTypeCountAcksArgs
   reactions?: boolean | BulletinCountOutputTypeCountReactionsArgs
+  attachments?: boolean | BulletinCountOutputTypeCountAttachmentsArgs
 }
 
 /**
@@ -1287,6 +1437,13 @@ export type BulletinCountOutputTypeCountReactionsArgs<ExtArgs extends runtime.Ty
   where?: Prisma.BulletinReactionWhereInput
 }
 
+/**
+ * BulletinCountOutputType without action
+ */
+export type BulletinCountOutputTypeCountAttachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BulletinAttachmentWhereInput
+}
+
 
 export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1310,6 +1467,7 @@ export type BulletinSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   acks?: boolean | Prisma.Bulletin$acksArgs<ExtArgs>
   reactions?: boolean | Prisma.Bulletin$reactionsArgs<ExtArgs>
+  attachments?: boolean | Prisma.Bulletin$attachmentsArgs<ExtArgs>
   _count?: boolean | Prisma.BulletinCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bulletin"]>
 
@@ -1383,6 +1541,7 @@ export type BulletinInclude<ExtArgs extends runtime.Types.Extensions.InternalArg
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   acks?: boolean | Prisma.Bulletin$acksArgs<ExtArgs>
   reactions?: boolean | Prisma.Bulletin$reactionsArgs<ExtArgs>
+  attachments?: boolean | Prisma.Bulletin$attachmentsArgs<ExtArgs>
   _count?: boolean | Prisma.BulletinCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type BulletinIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1401,6 +1560,10 @@ export type $BulletinPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     author: Prisma.$UserPayload<ExtArgs>
     acks: Prisma.$BulletinAckPayload<ExtArgs>[]
     reactions: Prisma.$BulletinReactionPayload<ExtArgs>[]
+    /**
+     * Files attached to this notice (PDF / DOCX / XLSX / PPTX / TXT / CSV).
+     */
+    attachments: Prisma.$BulletinAttachmentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1853,6 +2016,7 @@ export interface Prisma__BulletinClient<T, Null = never, ExtArgs extends runtime
   author<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   acks<T extends Prisma.Bulletin$acksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$acksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAckPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reactions<T extends Prisma.Bulletin$reactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$reactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinReactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  attachments<T extends Prisma.Bulletin$attachmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bulletin$attachmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAttachmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2364,6 +2528,30 @@ export type Bulletin$reactionsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.BulletinReactionScalarFieldEnum | Prisma.BulletinReactionScalarFieldEnum[]
+}
+
+/**
+ * Bulletin.attachments
+ */
+export type Bulletin$attachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BulletinAttachment
+   */
+  select?: Prisma.BulletinAttachmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BulletinAttachment
+   */
+  omit?: Prisma.BulletinAttachmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BulletinAttachmentInclude<ExtArgs> | null
+  where?: Prisma.BulletinAttachmentWhereInput
+  orderBy?: Prisma.BulletinAttachmentOrderByWithRelationInput | Prisma.BulletinAttachmentOrderByWithRelationInput[]
+  cursor?: Prisma.BulletinAttachmentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BulletinAttachmentScalarFieldEnum | Prisma.BulletinAttachmentScalarFieldEnum[]
 }
 
 /**

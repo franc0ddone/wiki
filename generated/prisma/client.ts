@@ -91,6 +91,28 @@ export type BulletinReaction = Prisma.BulletinReactionModel
  */
 export type ArticleAttachment = Prisma.ArticleAttachmentModel
 /**
+ * Model BulletinAttachment
+ * A file attached to a bulletin (PDF / DOCX / XLSX / PPTX / TXT / CSV).
+ * 
+ * The bulletin counterpart of `ArticleAttachment`, and deliberately identical
+ * in shape and semantics: the file belongs to the bulletin — not to any edit
+ * of it — so it survives every later save, the object key is server-derived
+ * (`attachments/<uuid>/<sanitized-fileName>`) and never crosses the wire (the
+ * reader streams through the API), and the uploader FK is `SetNull` so
+ * removing an account never removes a notice's files.
+ * 
+ * **`bulletinId` is nullable, and that is the staging mechanism.** A composer
+ * writing a *new* notice has no id to attach to yet, so a file chosen before
+ * the first save is stored with `bulletinId = null` ("staged") and linked to
+ * the bulletin when it is created — the same shape as the hero image, which is
+ * uploaded immediately and referenced by URL in the saved payload. A staged
+ * row that is never linked is swept after `STAGED_ATTACHMENT_TTL_MS`
+ * (`lib/bulletin/lifecycle.ts`): its object is deleted from storage and then
+ * the row itself. `Cascade` on the bulletin FK still means a deleted notice
+ * takes its linked attachments with it.
+ */
+export type BulletinAttachment = Prisma.BulletinAttachmentModel
+/**
  * Model RoleRequest
  * A staff member's self-service request for the `author` role.
  * 

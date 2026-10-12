@@ -1,0 +1,138 @@
+"use client";
+
+import { useId, useState } from "react";
+import { FileText, OctagonAlert, Paperclip } from "lucide-react";
+import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
+import { ApiRequestError } from "@/lib/editor/api";
+import { formatBytes } from "@/lib/editor/attachments-api";
+import { ATTACHMENT_ACCEPT, ATTACHMENT_MAX_BYTES } from "@/lib/attachments";
+import { stageBulletinAttachment, uploadBulletinAttachment, type BulletinAttachmentRecord } from "@/lib/bulletin/api";
+import { cx } from "@/lib/utils";
+
+/**
+ * Attach a file to a bulletin (PDF / DOCX / XLSX / PPTX / TXT / CSV, ≤ 25 MB).
+ *
+ * The bulletin twin of `components/editor/AttachmentDialog.tsx`, and
+ * deliberately the same markup, classes, and error reporting: an oversize file
+ * is caught locally before the round trip, and a server refusal (a `.exe`
+ * renamed `.pdf`) appears inline with its status code, exactly as it does when
+ * attaching to a procedure. It is a separate component rather than a prop on the
+ * article one because the two post to different endpoints — the article dialog
+ * is bound to `/api/articles/[slug]/attachments` and its slug.
+ *
+ * The 25 MB cap and the content check are enforced server-side; the local size
+ * test only avoids a pointless round trip.
+ */
+export function BulletinAttachmentDialog({
+  bulletinId,
+  onClose,
+  onUploaded,
+}: {
+  /** The notice's id, or `null` while a new notice is still being written (stage it). */
+  bulletinId: string | null;
+  onClose: () => void;
+  onUploaded: (record: BulletinAttachmentRecord) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ status: number; message: string } | null>(null);
+  const inputId = useId();
+
+  const tooLarge = file !== null && file.size > ATTACHMENT_MAX_BYTES;
+  const canSubmit = file !== null && !tooLarge && !busy;
+
+  const submit = async () => {
+    if (!file || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // A notice that exists takes the file straight onto itself; a notice still
+      // being written stages it, and the composer links it on save.
+      const record = bulletinId
+        ? await uploadBulletinAttachment(bulletinId, file)
+        : await stageBulletinAttachment(file);
+      onUploaded(record);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiRequestError
+          ? { status: caught.status, message: caught.message }
+          : { status: 0, message: "Something went wrong while uploading. Nothing was stored; try again." },
+      );
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Attach a file"
+      description="PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), text (.txt), or CSV (.csv), up to 25 MB. The file's contents are checked, not its name."
+      onClose={onClose}
+      widthClass="max-w-lg"
+      dismissible={!busy}
+    >
+      <div className="space-y-4">
+        <div>
+          <label htmlFor={inputId} className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            File
+          </label>
+          <input
+            id={inputId}
+            data-autofocus
+            type="file"
+            accept={ATTACHMENT_ACCEPT}
+            disabled={busy}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setError(null);
+            }}
+            className="block w-full text-[13px] text-zinc-700 file:mr-3 file:rounded-lg file:border file:border-zinc-300/70 file:bg-white file:px-3 file:py-1.5 file:text-[13px] file:font-medium file:text-zinc-800 hover:file:border-zinc-400"
+          />
+          {file ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-zinc-500">
+              <FileText size={13} strokeWidth={1.75} aria-hidden="true" />
+              {file.name} · {formatBytes(file.size)}
+            </p>
+          ) : null}
+          {tooLarge ? (
+            <p role="alert" className="mt-1.5 text-xs text-red-700">
+              This file is larger than 25 MB.
+            </p>
+          ) : null}
+        </div>
+
+        {error ? (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-900">
+            <p className="flex items-start gap-2 font-medium">
+              <OctagonAlert size={15} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0" />
+              <span>
+                {error.status > 0 ? (
+                  <span className="mr-1.5 rounded bg-red-100 px-1.5 py-px text-xs font-semibold tabular-nums">
+                    {error.status}
+                  </span>
+                ) : null}
+                {error.message}
+              </span>
+            </p>
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" className={secondaryButton} onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={cx(primaryButton, "gap-1.5")}
+            onClick={() => void submit()}
+            disabled={!canSubmit}
+          >
+            <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+            {busy ? "Uploading…" : "Upload"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export default BulletinAttachmentDialog;

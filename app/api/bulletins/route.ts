@@ -5,6 +5,7 @@ import {
   optionalBoolean,
   optionalDate,
   optionalString,
+  optionalStringArray,
   readJsonBody,
   requireString,
   requireStringArray,
@@ -72,6 +73,10 @@ export async function POST(request: NextRequest) {
       // Optional: `null`/omitted means the post lives until it is deleted.
       expires_at: optionalDate(body, "expires_at"),
       linked_article_id: linkedArticleId && linkedArticleId.length > 0 ? linkedArticleId : null,
+      // Files the composer uploaded before the notice existed; linked in the
+      // same transaction, so an unusable id fails the post instead of
+      // half-creating it. Omitted/empty is the ordinary case.
+      attachment_ids: optionalStringArray(body, "attachment_ids") ?? [],
       author_id: actor.id,
     });
 

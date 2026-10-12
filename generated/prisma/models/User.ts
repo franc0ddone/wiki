@@ -205,6 +205,7 @@ export type UserWhereInput = {
   bulletinAcks?: Prisma.BulletinAckListRelationFilter
   bulletinReactions?: Prisma.BulletinReactionListRelationFilter
   uploadedAttachments?: Prisma.ArticleAttachmentListRelationFilter
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentListRelationFilter
   roleRequests?: Prisma.RoleRequestListRelationFilter
   decidedRoleRequests?: Prisma.RoleRequestListRelationFilter
 }
@@ -224,6 +225,7 @@ export type UserOrderByWithRelationInput = {
   bulletinAcks?: Prisma.BulletinAckOrderByRelationAggregateInput
   bulletinReactions?: Prisma.BulletinReactionOrderByRelationAggregateInput
   uploadedAttachments?: Prisma.ArticleAttachmentOrderByRelationAggregateInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentOrderByRelationAggregateInput
   roleRequests?: Prisma.RoleRequestOrderByRelationAggregateInput
   decidedRoleRequests?: Prisma.RoleRequestOrderByRelationAggregateInput
 }
@@ -246,6 +248,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   bulletinAcks?: Prisma.BulletinAckListRelationFilter
   bulletinReactions?: Prisma.BulletinReactionListRelationFilter
   uploadedAttachments?: Prisma.ArticleAttachmentListRelationFilter
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentListRelationFilter
   roleRequests?: Prisma.RoleRequestListRelationFilter
   decidedRoleRequests?: Prisma.RoleRequestListRelationFilter
 }, "id" | "email">
@@ -291,6 +294,7 @@ export type UserCreateInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -310,6 +314,7 @@ export type UserUncheckedCreateInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -329,6 +334,7 @@ export type UserUpdateInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -348,6 +354,7 @@ export type UserUncheckedUpdateInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -540,6 +547,22 @@ export type UserUpdateOneWithoutUploadedAttachmentsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutUploadedAttachmentsInput, Prisma.UserUpdateWithoutUploadedAttachmentsInput>, Prisma.UserUncheckedUpdateWithoutUploadedAttachmentsInput>
 }
 
+export type UserCreateNestedOneWithoutUploadedBulletinAttachmentsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedCreateWithoutUploadedBulletinAttachmentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUploadedBulletinAttachmentsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutUploadedBulletinAttachmentsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedCreateWithoutUploadedBulletinAttachmentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUploadedBulletinAttachmentsInput
+  upsert?: Prisma.UserUpsertWithoutUploadedBulletinAttachmentsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutUploadedBulletinAttachmentsInput, Prisma.UserUpdateWithoutUploadedBulletinAttachmentsInput>, Prisma.UserUncheckedUpdateWithoutUploadedBulletinAttachmentsInput>
+}
+
 export type UserCreateNestedOneWithoutRoleRequestsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutRoleRequestsInput, Prisma.UserUncheckedCreateWithoutRoleRequestsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutRoleRequestsInput
@@ -584,6 +607,7 @@ export type UserCreateWithoutAuthoredArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -602,6 +626,7 @@ export type UserUncheckedCreateWithoutAuthoredArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -625,6 +650,7 @@ export type UserCreateWithoutReviewedArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -643,6 +669,7 @@ export type UserUncheckedCreateWithoutReviewedArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -677,6 +704,7 @@ export type UserUpdateWithoutAuthoredArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -695,6 +723,7 @@ export type UserUncheckedUpdateWithoutAuthoredArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -724,6 +753,7 @@ export type UserUpdateWithoutReviewedArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -742,6 +772,7 @@ export type UserUncheckedUpdateWithoutReviewedArticlesInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -760,6 +791,7 @@ export type UserCreateWithoutArticleVersionsInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -778,6 +810,7 @@ export type UserUncheckedCreateWithoutArticleVersionsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -812,6 +845,7 @@ export type UserUpdateWithoutArticleVersionsInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -830,6 +864,7 @@ export type UserUncheckedUpdateWithoutArticleVersionsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -848,6 +883,7 @@ export type UserCreateWithoutAuthoredBulletinsInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -866,6 +902,7 @@ export type UserUncheckedCreateWithoutAuthoredBulletinsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -900,6 +937,7 @@ export type UserUpdateWithoutAuthoredBulletinsInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -918,6 +956,7 @@ export type UserUncheckedUpdateWithoutAuthoredBulletinsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -936,6 +975,7 @@ export type UserCreateWithoutBulletinAcksInput = {
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -954,6 +994,7 @@ export type UserUncheckedCreateWithoutBulletinAcksInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -988,6 +1029,7 @@ export type UserUpdateWithoutBulletinAcksInput = {
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -1006,6 +1048,7 @@ export type UserUncheckedUpdateWithoutBulletinAcksInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -1024,6 +1067,7 @@ export type UserCreateWithoutBulletinReactionsInput = {
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -1042,6 +1086,7 @@ export type UserUncheckedCreateWithoutBulletinReactionsInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -1076,6 +1121,7 @@ export type UserUpdateWithoutBulletinReactionsInput = {
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -1094,6 +1140,7 @@ export type UserUncheckedUpdateWithoutBulletinReactionsInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -1112,6 +1159,7 @@ export type UserCreateWithoutUploadedAttachmentsInput = {
   articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
@@ -1130,6 +1178,7 @@ export type UserUncheckedCreateWithoutUploadedAttachmentsInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
@@ -1164,6 +1213,7 @@ export type UserUpdateWithoutUploadedAttachmentsInput = {
   articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
@@ -1182,6 +1232,99 @@ export type UserUncheckedUpdateWithoutUploadedAttachmentsInput = {
   articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
+}
+
+export type UserCreateWithoutUploadedBulletinAttachmentsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
+  bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
+  uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
+}
+
+export type UserUncheckedCreateWithoutUploadedBulletinAttachmentsInput = {
+  id?: string
+  email: string
+  name: string
+  title?: string | null
+  role?: $Enums.Role
+  passwordHash?: string | null
+  createdAt?: Date | string
+  authoredArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutAuthorInput
+  reviewedArticles?: Prisma.ArticleUncheckedCreateNestedManyWithoutReviewerInput
+  authoredBulletins?: Prisma.BulletinUncheckedCreateNestedManyWithoutAuthorInput
+  articleVersions?: Prisma.ArticleVersionUncheckedCreateNestedManyWithoutChangedByInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
+  bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
+  uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
+  decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
+}
+
+export type UserCreateOrConnectWithoutUploadedBulletinAttachmentsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedCreateWithoutUploadedBulletinAttachmentsInput>
+}
+
+export type UserUpsertWithoutUploadedBulletinAttachmentsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedUpdateWithoutUploadedBulletinAttachmentsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedCreateWithoutUploadedBulletinAttachmentsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutUploadedBulletinAttachmentsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutUploadedBulletinAttachmentsInput, Prisma.UserUncheckedUpdateWithoutUploadedBulletinAttachmentsInput>
+}
+
+export type UserUpdateWithoutUploadedBulletinAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
+  bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
+  uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
+  decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutUploadedBulletinAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  authoredArticles?: Prisma.ArticleUncheckedUpdateManyWithoutAuthorNestedInput
+  reviewedArticles?: Prisma.ArticleUncheckedUpdateManyWithoutReviewerNestedInput
+  authoredBulletins?: Prisma.BulletinUncheckedUpdateManyWithoutAuthorNestedInput
+  articleVersions?: Prisma.ArticleVersionUncheckedUpdateManyWithoutChangedByNestedInput
+  bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
+  bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
+  uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
@@ -1201,6 +1344,7 @@ export type UserCreateWithoutRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   decidedRoleRequests?: Prisma.RoleRequestCreateNestedManyWithoutDecidedByInput
 }
 
@@ -1219,6 +1363,7 @@ export type UserUncheckedCreateWithoutRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutDecidedByInput
 }
 
@@ -1242,6 +1387,7 @@ export type UserCreateWithoutDecidedRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestCreateNestedManyWithoutUserInput
 }
 
@@ -1260,6 +1406,7 @@ export type UserUncheckedCreateWithoutDecidedRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedCreateNestedManyWithoutUserInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedCreateNestedManyWithoutUserInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedCreateNestedManyWithoutUploadedByInput
   roleRequests?: Prisma.RoleRequestUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -1294,6 +1441,7 @@ export type UserUpdateWithoutRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUpdateManyWithoutDecidedByNestedInput
 }
 
@@ -1312,6 +1460,7 @@ export type UserUncheckedUpdateWithoutRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   decidedRoleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutDecidedByNestedInput
 }
 
@@ -1341,6 +1490,7 @@ export type UserUpdateWithoutDecidedRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUpdateManyWithoutUserNestedInput
 }
 
@@ -1359,6 +1509,7 @@ export type UserUncheckedUpdateWithoutDecidedRoleRequestsInput = {
   bulletinAcks?: Prisma.BulletinAckUncheckedUpdateManyWithoutUserNestedInput
   bulletinReactions?: Prisma.BulletinReactionUncheckedUpdateManyWithoutUserNestedInput
   uploadedAttachments?: Prisma.ArticleAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
+  uploadedBulletinAttachments?: Prisma.BulletinAttachmentUncheckedUpdateManyWithoutUploadedByNestedInput
   roleRequests?: Prisma.RoleRequestUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -1375,6 +1526,7 @@ export type UserCountOutputType = {
   bulletinAcks: number
   bulletinReactions: number
   uploadedAttachments: number
+  uploadedBulletinAttachments: number
   roleRequests: number
   decidedRoleRequests: number
 }
@@ -1387,6 +1539,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   bulletinAcks?: boolean | UserCountOutputTypeCountBulletinAcksArgs
   bulletinReactions?: boolean | UserCountOutputTypeCountBulletinReactionsArgs
   uploadedAttachments?: boolean | UserCountOutputTypeCountUploadedAttachmentsArgs
+  uploadedBulletinAttachments?: boolean | UserCountOutputTypeCountUploadedBulletinAttachmentsArgs
   roleRequests?: boolean | UserCountOutputTypeCountRoleRequestsArgs
   decidedRoleRequests?: boolean | UserCountOutputTypeCountDecidedRoleRequestsArgs
 }
@@ -1453,6 +1606,13 @@ export type UserCountOutputTypeCountUploadedAttachmentsArgs<ExtArgs extends runt
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountUploadedBulletinAttachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BulletinAttachmentWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountRoleRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.RoleRequestWhereInput
 }
@@ -1480,6 +1640,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   bulletinAcks?: boolean | Prisma.User$bulletinAcksArgs<ExtArgs>
   bulletinReactions?: boolean | Prisma.User$bulletinReactionsArgs<ExtArgs>
   uploadedAttachments?: boolean | Prisma.User$uploadedAttachmentsArgs<ExtArgs>
+  uploadedBulletinAttachments?: boolean | Prisma.User$uploadedBulletinAttachmentsArgs<ExtArgs>
   roleRequests?: boolean | Prisma.User$roleRequestsArgs<ExtArgs>
   decidedRoleRequests?: boolean | Prisma.User$decidedRoleRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -1524,6 +1685,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   bulletinAcks?: boolean | Prisma.User$bulletinAcksArgs<ExtArgs>
   bulletinReactions?: boolean | Prisma.User$bulletinReactionsArgs<ExtArgs>
   uploadedAttachments?: boolean | Prisma.User$uploadedAttachmentsArgs<ExtArgs>
+  uploadedBulletinAttachments?: boolean | Prisma.User$uploadedBulletinAttachmentsArgs<ExtArgs>
   roleRequests?: boolean | Prisma.User$roleRequestsArgs<ExtArgs>
   decidedRoleRequests?: boolean | Prisma.User$decidedRoleRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -1547,6 +1709,10 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
      * Files this user attached to articles (`SetNull` when the account is removed).
      */
     uploadedAttachments: Prisma.$ArticleAttachmentPayload<ExtArgs>[]
+    /**
+     * Files this user attached to bulletins (`SetNull` when the account is removed).
+     */
+    uploadedBulletinAttachments: Prisma.$BulletinAttachmentPayload<ExtArgs>[]
     /**
      * Requests this user has raised (the "request author access" flow).
      */
@@ -1978,6 +2144,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   bulletinAcks<T extends Prisma.User$bulletinAcksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$bulletinAcksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAckPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   bulletinReactions<T extends Prisma.User$bulletinReactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$bulletinReactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinReactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   uploadedAttachments<T extends Prisma.User$uploadedAttachmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$uploadedAttachmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArticleAttachmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  uploadedBulletinAttachments<T extends Prisma.User$uploadedBulletinAttachmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$uploadedBulletinAttachmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BulletinAttachmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   roleRequests<T extends Prisma.User$roleRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$roleRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   decidedRoleRequests<T extends Prisma.User$decidedRoleRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$decidedRoleRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -2574,6 +2741,30 @@ export type User$uploadedAttachmentsArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   distinct?: Prisma.ArticleAttachmentScalarFieldEnum | Prisma.ArticleAttachmentScalarFieldEnum[]
+}
+
+/**
+ * User.uploadedBulletinAttachments
+ */
+export type User$uploadedBulletinAttachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BulletinAttachment
+   */
+  select?: Prisma.BulletinAttachmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BulletinAttachment
+   */
+  omit?: Prisma.BulletinAttachmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BulletinAttachmentInclude<ExtArgs> | null
+  where?: Prisma.BulletinAttachmentWhereInput
+  orderBy?: Prisma.BulletinAttachmentOrderByWithRelationInput | Prisma.BulletinAttachmentOrderByWithRelationInput[]
+  cursor?: Prisma.BulletinAttachmentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BulletinAttachmentScalarFieldEnum | Prisma.BulletinAttachmentScalarFieldEnum[]
 }
 
 /**

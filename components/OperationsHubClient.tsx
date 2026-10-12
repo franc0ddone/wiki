@@ -457,6 +457,13 @@ export function OperationsHubClient({
   const [bulletinList, setBulletinList] = useState<readonly Bulletin[]>(bulletins);
   const [composer, setComposer] = useState<{ mode: "create" } | { mode: "edit"; bulletin: Bulletin } | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
+  /**
+   * Bumped whenever a bulletin is written through the composer. The reader pane
+   * is keyed by bulletin *id*, which does not change when the same notice is
+   * saved — so without this, a file the poster removed would linger in the
+   * reader's download list until a manual reload.
+   */
+  const [bulletinRevision, setBulletinRevision] = useState(0);
   // Server-supplied authored ids, plus anything posted this session (the props
   // are read at page load, so a notice posted now would not be in them yet).
   const [authoredIds, setAuthoredIds] = useState<readonly string[]>(authoredBulletinIds);
@@ -476,6 +483,7 @@ export function OperationsHubClient({
       setComposer(null);
       setAuthoredIds((current) => (current.includes(created.id) ? current : [...current, created.id]));
       setSelectedBulletinId(created.id);
+      setBulletinRevision((current) => current + 1);
       await refreshBulletins(created.id);
     },
     [refreshBulletins],
@@ -485,6 +493,7 @@ export function OperationsHubClient({
     async (saved: Bulletin) => {
       setComposer(null);
       setSelectedBulletinId(saved.id);
+      setBulletinRevision((current) => current + 1);
       await refreshBulletins(saved.id);
     },
     [refreshBulletins],
@@ -708,7 +717,7 @@ export function OperationsHubClient({
             detail={
               selectedBulletin ? (
                 <BulletinDetail
-                  key={selectedBulletin.id}
+                  key={`${selectedBulletin.id}:${bulletinRevision}`}
                   bulletin={selectedBulletin}
                   articles={articles}
                   viewerRole={viewerRole ?? "readonly"}

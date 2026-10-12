@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# the throwaway build the verification script's HTTP guard check makes
+/.next-verify/
 
 # production
 /build

@@ -5,14 +5,17 @@ import { FileText, OctagonAlert, Paperclip } from "lucide-react";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import { ApiRequestError } from "@/lib/editor/api";
 import { formatBytes, uploadAttachment } from "@/lib/editor/attachments-api";
-import { ATTACHMENT_MAX_BYTES } from "@/lib/attachments";
+import { ATTACHMENT_ACCEPT, ATTACHMENT_MAX_BYTES } from "@/lib/attachments";
 import { cx } from "@/lib/utils";
 
 /**
- * Attach a file to a procedure (PDF / DOCX / XLSX, ≤ 25 MB).
+ * Attach a file to a procedure (PDF / DOCX / XLSX / PPTX / TXT / CSV, ≤ 25 MB).
  *
  * The 25 MB cap and the magic-byte type check are enforced server-side — the
- * client-side size hint just avoids a pointless round trip.
+ * client-side size hint just avoids a pointless round trip. The `accept` hint
+ * and the copy list the same six types the shared allowlist
+ * (`lib/attachments.ts`) admits, so the picker never hides a file the API would
+ * have taken.
  */
 export function AttachmentDialog({
   slug,
@@ -51,7 +54,7 @@ export function AttachmentDialog({
   return (
     <Modal
       title="Attach a file"
-      description="PDF, Word (.docx), or Excel (.xlsx), up to 25 MB. The file's contents are checked, not its name."
+      description="PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), text (.txt), or CSV (.csv), up to 25 MB. The file's contents are checked, not its name."
       onClose={onClose}
       widthClass="max-w-lg"
       dismissible={!busy}
@@ -65,7 +68,7 @@ export function AttachmentDialog({
             id={inputId}
             data-autofocus
             type="file"
-            accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept={ATTACHMENT_ACCEPT}
             disabled={busy}
             onChange={(event) => {
               setFile(event.target.files?.[0] ?? null);

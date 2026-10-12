@@ -9,6 +9,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // The throwaway build `npm run verify:frontend`'s HTTP guard check makes
+    // (see `NEXT_DIST_DIR` in next.config.ts):
+    ".next-verify/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

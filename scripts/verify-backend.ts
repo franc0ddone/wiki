@@ -36,7 +36,18 @@ import {
   getBacklinks,
   updateArticle,
 } from "@/lib/data/articles";
-import { acknowledgeBulletin, createBulletin, getBulletins } from "@/lib/data/bulletins";
+import { acknowledgeBulletin, createBulletin, getBulletins, requireEditableBulletin } from "@/lib/data/bulletins";
+import {
+  createBulletinAttachment,
+  deleteBulletinAttachment,
+  deleteStagedAttachment,
+  getBulletinAttachmentForDownload,
+  listBulletinAttachments,
+  stageBulletinAttachment,
+  sweepStagedAttachments,
+} from "@/lib/data/bulletin-attachments";
+import { ALLOWED_ATTACHMENT_TYPES, assertAttachmentType } from "@/lib/attachments";
+import { STAGED_ATTACHMENT_TTL_MS } from "@/lib/bulletin/lifecycle";
 import { getStaff } from "@/lib/data/staff";
 import { detectImageType, processImageUpload } from "@/lib/image";
 import { buildLinkRegistry, extractInternalLinks, validateLinks } from "@/lib/links";
@@ -391,6 +402,264 @@ async function main() {
     assertEqual(count, 1, "ack row count");
   });
 
+  /* ------------------------------------------------------ attachments (6d) */
+
+  await test("a bulletin carries attachments, and one bulletin's id never opens another's file", async () => {
+    const bulletin = await createBulletin({
+      title: `${PREFIX} attachment notice`,
+      body_markdown: "Attachment fixture.",
+      departments: ["ER"],
+      author_id: author.id,
+    });
+    const other = await createBulletin({
+      title: `${PREFIX} attachment notice 2`,
+      body_markdown: "Attachment fixture.",
+      departments: ["ER"],
+      author_id: author.id,
+    });
+
+    const bytes = Buffer.from("model,code\nCBC,85025\n", "utf8");
+    const { mime, extension } = assertAttachmentType(bytes, "panels.csv");
+    assertEqual(mime, "text/csv", "a .csv is detected as CSV");
+    assertEqual(extension, "csv", "the storage extension follows the detected type");
+
+    const attachment = await createBulletinAttachment({
+      bulletin_id: bulletin.id,
+      file_name: `panels-${PREFIX}.csv`,
+      file_key: `attachments/${PREFIX}/panels.csv`,
+      mime_type: mime,
+      size_bytes: bytes.length,
+      uploaded_by_id: author.id,
+    });
+    assertEqual(attachment.bulletin_id, bulletin.id, "attachment owner");
+    assertEqual(attachment.size_bytes, bytes.length, "attachment size");
+    assert(
+      !Object.prototype.hasOwnProperty.call(attachment, "file_key"),
+      "the client-facing record must not expose the storage key",
+    );
+
+    const listed = await listBulletinAttachments(bulletin.id);
+    assertEqual(listed.map((entry) => entry.id), [attachment.id], "the bulletin's attachment list");
+
+    const stored = await getBulletinAttachmentForDownload(bulletin.id, attachment.id);
+    assertEqual(stored.file_key, `attachments/${PREFIX}/panels.csv`, "the download key");
+
+    // Reading an attachment through a *different* bulletin must not work.
+    await assertApiError(
+      () => getBulletinAttachmentForDownload(other.id, attachment.id),
+      "not_found",
+      "an attachment id from another bulletin",
+    );
+
+    await deleteBulletinAttachment(bulletin.id, attachment.id);
+    const gone = await db.bulletinAttachment.findUnique({ where: { id: attachment.id } });
+    assertEqual(gone, null, "the row is gone after delete");
+  });
+
+  await test("deleting a bulletin cascades its attachments; deleting the uploader does not", async () => {
+    const bulletin = await createBulletin({
+      title: `${PREFIX} cascade notice`,
+      body_markdown: "Cascade fixture.",
+      departments: ["ER"],
+      author_id: author.id,
+    });
+    const attachment = await createBulletinAttachment({
+      bulletin_id: bulletin.id,
+      file_name: `cascade-${PREFIX}.pdf`,
+      file_key: `attachments/${PREFIX}/cascade.pdf`,
+      mime_type: assertAttachmentType(Buffer.from("%PDF-1.7\n%%EOF\n", "latin1"), "cascade.pdf").mime,
+      size_bytes: 15,
+      uploaded_by_id: author.id,
+    });
+
+    // The uploader going away must leave the file in place (`SetNull`).
+    const temporary = await db.user.create({
+      data: { email: `${PREFIX}-uploader@dovelewis.org`, name: "Verify Uploader", role: "author" },
+    });
+    const kept = await createBulletinAttachment({
+      bulletin_id: bulletin.id,
+      file_name: `kept-${PREFIX}.txt`,
+      file_key: `attachments/${PREFIX}/kept.txt`,
+      mime_type: assertAttachmentType(Buffer.from("Line one\n", "utf8"), "kept.txt").mime,
+      size_bytes: 9,
+      uploaded_by_id: temporary.id,
+    });
+    await db.user.delete({ where: { id: temporary.id } });
+    const keptRow = await db.bulletinAttachment.findUniqueOrThrow({
+      where: { id: kept.id },
+      select: { uploadedById: true, fileName: true },
+    });
+    assertEqual(keptRow.uploadedById, null, "the uploader FK is nulled, not cascaded");
+    assertEqual(keptRow.fileName, `kept-${PREFIX}.txt`, "the file survives its uploader");
+
+    // Deleting the notice takes both attachments with it.
+    await db.bulletin.delete({ where: { id: bulletin.id } });
+    const remaining = await db.bulletinAttachment.count({
+      where: { id: { in: [attachment.id, kept.id] } },
+    });
+    assertEqual(remaining, 0, "attachments cascade with their bulletin");
+  });
+
+  await test("the attachment routes' auth rule is the bulletin edit rule", async () => {
+    const staff = await db.user.findFirstOrThrow({ where: { role: "staff" }, select: { id: true } });
+    const bulletin = await createBulletin({
+      title: `${PREFIX} ownership notice`,
+      body_markdown: "Ownership fixture.",
+      departments: ["ER"],
+      author_id: author.id,
+    });
+
+    // The author may attach to their own notice...
+    const editable = await requireEditableBulletin(bulletin.id, { id: author.id, role: "author" });
+    assertEqual(editable.id, bulletin.id, "the author may change their own notice");
+
+    // ...a clinical lead may attach to anyone's...
+    const asLead = await requireEditableBulletin(bulletin.id, { id: lead.id, role: "clinical_lead" });
+    assertEqual(asLead.id, bulletin.id, "a clinical lead may change any notice");
+
+    // ...and a staff member (or another author) may not.
+    await assertApiError(
+      () => requireEditableBulletin(bulletin.id, { id: staff.id, role: "staff" }),
+      "forbidden",
+      "a staff member attaching to someone else's notice",
+    );
+    await assertApiError(
+      () => requireEditableBulletin(bulletin.id, { id: "00000000-0000-4000-8000-000000000000", role: "author" }),
+      "forbidden",
+      "a different author attaching to this notice",
+    );
+
+    // An unknown notice is a 404, not a 403.
+    await assertApiError(
+      () => requireEditableBulletin("00000000-0000-4000-8000-000000000000", { id: author.id, role: "author" }),
+      "not_found",
+      "an unknown bulletin",
+    );
+
+    // The allowlist the routes validate against, in one place.
+    assertEqual(ALLOWED_ATTACHMENT_TYPES.length, 6, "the shared allowlist admits six types");
+  });
+
+  /* ------------------------------------------- staged attachments (6d follow-up) */
+
+  await test("a file staged before the notice exists is linked when it is posted", async () => {
+    const staged = await stageBulletinAttachment({
+      file_name: `staged-${PREFIX}.pdf`,
+      file_key: `attachments/${PREFIX}/staged.pdf`,
+      mime_type: assertAttachmentType(Buffer.from("%PDF-1.7\n%%EOF\n", "latin1"), "staged.pdf").mime,
+      size_bytes: 15,
+      uploaded_by_id: author.id,
+    });
+    assertEqual(staged.bulletin_id, null, "a staged attachment must carry no bulletin id");
+
+    const bulletin = await createBulletin({
+      title: `${PREFIX} staged notice`,
+      body_markdown: "Staged fixture.",
+      departments: ["ER"],
+      author_id: author.id,
+      attachment_ids: [staged.id],
+    });
+    const listed = await listBulletinAttachments(bulletin.id);
+    assertEqual(listed.map((entry) => entry.id), [staged.id], "the staged file is listed on the notice");
+    assertEqual(listed[0]?.bulletin_id, bulletin.id, "and points at the notice");
+
+    // Re-linking the same id is a refusal, not a silent no-op — and the notice
+    // it was refused for must not exist.
+    await assertApiError(
+      () =>
+        createBulletin({
+          title: `${PREFIX} relinked notice`,
+          body_markdown: "Staged fixture.",
+          departments: ["ER"],
+          author_id: author.id,
+          attachment_ids: [staged.id],
+        }),
+      "attachment_not_staged",
+      "re-linking an already-linked attachment",
+    );
+    const leftover = await db.bulletin.count({ where: { title: `${PREFIX} relinked notice` } });
+    assertEqual(leftover, 0, "a refused link must not leave a notice behind");
+
+    // A still-staged file is unreachable through a bulletin, and is discarded
+    // through the staging path by its uploader only.
+    const orphan = await stageBulletinAttachment({
+      file_name: `orphan-${PREFIX}.txt`,
+      file_key: `attachments/${PREFIX}/orphan.txt`,
+      mime_type: assertAttachmentType(Buffer.from("Line one\n", "utf8"), "orphan.txt").mime,
+      size_bytes: 9,
+      uploaded_by_id: author.id,
+    });
+    await assertApiError(
+      () => getBulletinAttachmentForDownload(bulletin.id, orphan.id),
+      "not_found",
+      "a staged file read through a bulletin",
+    );
+    await assertApiError(
+      () => deleteStagedAttachment(orphan.id, { id: "00000000-0000-4000-8000-000000000000", role: "author" }),
+      "forbidden",
+      "discarding someone else's staged file",
+    );
+    await deleteStagedAttachment(orphan.id, { id: author.id, role: "author" });
+    const discarded = await db.bulletinAttachment.findUnique({ where: { id: orphan.id } });
+    assertEqual(discarded, null, "the stage-discard must remove the row");
+  });
+
+  await test("a staged file nobody linked is swept with its object, and only past the TTL", async () => {
+    const abandoned = await stageBulletinAttachment({
+      file_name: `abandoned-${PREFIX}.pptx`,
+      file_key: `attachments/${PREFIX}/abandoned.pptx`,
+      mime_type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      size_bytes: 2048,
+      uploaded_by_id: author.id,
+    });
+    const keep = await stageBulletinAttachment({
+      file_name: `keep-${PREFIX}.txt`,
+      file_key: `attachments/${PREFIX}/keep.txt`,
+      mime_type: assertAttachmentType(Buffer.from("Line one\n", "utf8"), "keep.txt").mime,
+      size_bytes: 9,
+      uploaded_by_id: author.id,
+    });
+
+    await db.bulletinAttachment.update({
+      where: { id: abandoned.id },
+      data: { createdAt: new Date(Date.now() - STAGED_ATTACHMENT_TTL_MS - 60_000) },
+    });
+
+    const deleted: string[] = [];
+    const result = await sweepStagedAttachments({
+      deleteObject: async (key) => {
+        deleted.push(key);
+      },
+    });
+
+    assert(deleted.includes(`attachments/${PREFIX}/abandoned.pptx`), "the abandoned object was not deleted");
+    assert(result.swept >= 1, "the sweep reported nothing");
+    assertEqual(await db.bulletinAttachment.findUnique({ where: { id: abandoned.id } }), null, "the swept row");
+    assert(
+      await db.bulletinAttachment.findUnique({ where: { id: keep.id } }),
+      "a staged file inside the TTL must survive the sweep",
+    );
+    assert(!deleted.includes(`attachments/${PREFIX}/keep.txt`), "a fresh staged object was deleted");
+
+    // A failing delete keeps the row for the next run rather than orphaning the
+    // file, and never aborts the sweep.
+    await db.bulletinAttachment.update({
+      where: { id: keep.id },
+      data: { createdAt: new Date(Date.now() - STAGED_ATTACHMENT_TTL_MS - 60_000) },
+    });
+    const failing = await sweepStagedAttachments({
+      deleteObject: async () => {
+        throw new Error("storage unreachable");
+      },
+    });
+    assert(failing.deferred >= 1, "the storage failure was not counted");
+    assertEqual(failing.swept, 0, "a row was dropped even though its object survived");
+    assert(
+      await db.bulletinAttachment.findUnique({ where: { id: keep.id } }),
+      "the row must be kept so the next sweep can retry",
+    );
+  });
+
   /* ---------------------------------------------------------------- uploads */
 
   await test("the upload pipeline strips EXIF, including the GPS sub-IFD", async () => {
@@ -657,16 +926,20 @@ async function cleanup(): Promise<void> {
   await db.$executeRawUnsafe("DELETE FROM articles WHERE slug LIKE 'zz-verify%'");
   await db.$executeRawUnsafe("ALTER TABLE article_versions ENABLE TRIGGER USER");
   await db.$executeRawUnsafe("DELETE FROM bulletins WHERE title LIKE 'zz-verify%'");
+  // Attachments staged for a notice that was never posted belong to no bulletin,
+  // so nothing cascades them away.
+  await db.$executeRawUnsafe("DELETE FROM bulletin_attachments WHERE file_key LIKE 'attachments/zz-verify%'");
   await db.$executeRawUnsafe("DELETE FROM search_logs WHERE query LIKE 'zz-verify%'");
 
   // Fixtures that survive a delete are invisible otherwise — the run still
   // reports green while quietly polluting the database. Say so, loudly.
-  const [{ articles }] = await db.$queryRaw<Array<{ articles: number }>>`
+  const [{ leftovers }] = await db.$queryRaw<Array<{ leftovers: number }>>`
     SELECT (SELECT count(*) FROM articles WHERE slug LIKE 'zz-verify%')
-         + (SELECT count(*) FROM bulletins WHERE title LIKE 'zz-verify%') AS articles
+         + (SELECT count(*) FROM bulletins WHERE title LIKE 'zz-verify%')
+         + (SELECT count(*) FROM bulletin_attachments WHERE file_key LIKE 'attachments/zz-verify%') AS leftovers
   `;
-  if (Number(articles) !== 0) {
-    throw new Error(`cleanup left ${articles} verification fixture row(s) behind`);
+  if (Number(leftovers) !== 0) {
+    throw new Error(`cleanup left ${leftovers} verification fixture row(s) behind`);
   }
 }
 

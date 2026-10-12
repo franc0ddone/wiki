@@ -64,6 +64,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patch.linked_article_id = linked && linked.length > 0 ? linked : null;
     }
 
+    // Staged attachments to link onto this notice. On its own this is a valid
+    // save (the composer links files it uploaded before the notice existed).
+    if (body.attachment_ids !== undefined) {
+      patch.attachment_ids = optionalStringArray(body, "attachment_ids") ?? [];
+    }
+
     if (Object.keys(patch).length === 0) {
       throw new ApiError(422, "No updatable fields were supplied.", { code: "empty_update" });
     }

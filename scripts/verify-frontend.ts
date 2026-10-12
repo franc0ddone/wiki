@@ -1,11 +1,14 @@
 /**
  * `npm run verify:frontend` — assertions for the pure (DOM-free) frontend
  * modules: the markdown parser, link validation, the search engine, the editor
- * schema, and the batch-5c features (reactions, attachments, paste, bulletin
- * blocks, merged cells, the drag handle).
+ * schema, and the batch-5c/6d features (reactions, attachments — articles and
+ * bulletins — paste, bulletin blocks, merged cells, the drag handle).
  *
  * Browser behaviour (palette, editor, reader interactions) is verified
- * separately; this script covers everything that can be decided without one.
+ * separately; this script covers everything that can be decided without one,
+ * plus one thing that cannot: a throwaway dev server is booted at the end so an
+ * unauthenticated write can be shown to be refused with a real 401 (see
+ * `runHttpGuardChecks`).
  *
  * The DB-backed checks (reactions, attachments, bulletin formats) run last and
  * require a live PostgreSQL database: the script runs `prisma migrate deploy`
@@ -28,7 +31,11 @@ if (!VERIFY_DATABASE_URL) {
 process.env.DATABASE_URL = VERIFY_DATABASE_URL;
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
+import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EditorState } from "@tiptap/pm/state";
@@ -71,6 +78,8 @@ import {
 } from "@/lib/markdown/footnotes";
 import {
   DECK_MAX_LENGTH,
+  STAGED_ATTACHMENT_TTL_MS,
+  isStagedAttachmentExpired,
   shouldClearAcksForUrgentEdit,
   validateBulletinDraft,
 } from "@/lib/bulletin/lifecycle";
@@ -129,6 +138,7 @@ import {
   getBulletinById,
   getBulletins,
   getReactionSummary,
+  requireEditableBulletin,
   toggleReaction,
   updateBulletin,
 } from "@/lib/data/bulletins";
@@ -142,6 +152,17 @@ import {
   sanitizeAttachmentFileName,
 } from "@/lib/attachments";
 import { createAttachment, getAttachmentForDownload, listAttachments } from "@/lib/data/attachments";
+import {
+  createBulletinAttachment,
+  deleteBulletinAttachment,
+  deleteStagedAttachment,
+  getBulletinAttachmentForDownload,
+  linkStagedAttachments,
+  listBulletinAttachments,
+  stageBulletinAttachment,
+  sweepStagedAttachments,
+} from "@/lib/data/bulletin-attachments";
+import { receiveAttachmentUpload } from "@/lib/bulletin/attachment-upload";
 import { PASTE_ALLOWED_TAGS, htmlIsClean, sanitizePastedHtml } from "@/lib/editor/paste-sanitize";
 import {
   CTA_LINE_PATTERN,
@@ -1351,6 +1372,52 @@ async function runDatabaseChecks(): Promise<void> {
   const bytes = await readAttachmentStream(small);
   check("a small upload is buffered intact", () => assert.equal(bytes.length, 3));
 
+  // The same rules through the upload pipeline the routes actually call, driven
+  // with a plain `Request`: every refusal below happens *before* storage, so
+  // this needs neither a server nor a session.
+  const uploadUrl = "http://127.0.0.1:3000/api/bulletins/attachments";
+  // A fresh `Uint8Array` view, so the body is a `BodyInit` (a `Buffer` is a
+  // `Uint8Array<ArrayBufferLike>`, which the DOM lib does not accept here).
+  const uploadRequest = (body: Uint8Array, headers: Record<string, string>) =>
+    new Request(uploadUrl, { method: "POST", headers, body: new Uint8Array(body) });
+
+  async function uploadStatus(request: Request): Promise<number> {
+    try {
+      await receiveAttachmentUpload(request);
+      return 0;
+    } catch (error) {
+      return error instanceof ApiError ? error.status : -1;
+    }
+  }
+
+  check("the pipeline refuses a .exe renamed .pdf with 422", async () => {
+    const renamed = Buffer.concat([Buffer.from("MZ\x90\x00", "latin1"), Buffer.alloc(256)]);
+    assert.equal(
+      await uploadStatus(
+        uploadRequest(renamed, {
+          "Content-Type": "application/pdf",
+          "x-attachment-filename": encodeURIComponent("totally-a.pdf"),
+        }),
+      ),
+      422,
+    );
+  });
+
+  check("the pipeline refuses a missing filename header with 422", async () => {
+    assert.equal(await uploadStatus(uploadRequest(Buffer.from("%PDF-1.7\n%%EOF\n", "latin1"), {})), 422);
+  });
+
+  check("the pipeline refuses an oversize body with 413", async () => {
+    assert.equal(
+      await uploadStatus(
+        uploadRequest(Buffer.alloc(ATTACHMENT_MAX_BYTES + 1), {
+          "x-attachment-filename": encodeURIComponent("huge.pdf"),
+        }),
+      ),
+      413,
+    );
+  });
+
 
   // Setup: apply migrations to the test database. `deploy` is idempotent.
   execFileSync("npx", ["prisma", "migrate", "deploy"], {
@@ -1572,7 +1639,274 @@ async function runDatabaseChecks(): Promise<void> {
   const orphan = await db.articleAttachment.findUnique({ where: { id: record.id } });
   check("deleting an article cascades its attachments", () => assert.equal(orphan, null));
 
+  /* ---- bulletin attachments (DB) ---- */
+
+  const notice = await createBulletin({
+    title: `Attachment notice ${stamp}`,
+    body_markdown: "Body",
+    departments: [],
+    author_id: author.id,
+  });
+
+  const rosterBytes = Buffer.from("%PDF-1.7\n%%EOF\n", "latin1");
+  const rosterAttachment = await createBulletinAttachment({
+    bulletin_id: notice.id,
+    file_name: `roster-${stamp}.pdf`,
+    file_key: `attachments/${stamp}/roster.pdf`,
+    mime_type: assertAttachmentType(rosterBytes, "roster.pdf").mime,
+    size_bytes: rosterBytes.length,
+    uploaded_by_id: author.id,
+  });
+  check("a bulletin attachment round-trips without exposing its storage key", () => {
+    assert.equal(rosterAttachment.bulletin_id, notice.id);
+    assert.equal(rosterAttachment.mime_type, "application/pdf");
+    assert.ok(!Object.prototype.hasOwnProperty.call(rosterAttachment, "file_key"));
+  });
+
+  const noticeAttachments = await listBulletinAttachments(notice.id);
+  check("listing a bulletin's attachments returns the record", () => {
+    assert.ok(noticeAttachments.some((entry) => entry.id === rosterAttachment.id));
+  });
+
+  const noticeDownload = await getBulletinAttachmentForDownload(notice.id, rosterAttachment.id);
+  check("the bulletin download record carries the server-only storage key", () => {
+    assert.equal(noticeDownload.file_key, `attachments/${stamp}/roster.pdf`);
+  });
+
+  const secondNotice = await createBulletin({
+    title: `Another notice ${stamp}`,
+    body_markdown: "Body",
+    departments: [],
+    author_id: author.id,
+  });
+  let crossBulletinStatus = 0;
+  try {
+    await getBulletinAttachmentForDownload(secondNotice.id, rosterAttachment.id);
+  } catch (error) {
+    crossBulletinStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("an attachment id never opens a file through another bulletin (404)", () => {
+    assert.equal(crossBulletinStatus, 404);
+  });
+
+  let foreignEditStatus = 0;
+  try {
+    await requireEditableBulletin(notice.id, { id: other.id, role: "author" });
+  } catch (error) {
+    foreignEditStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("writing attachments on a notice you may not edit is refused with 403", () => {
+    assert.equal(foreignEditStatus, 403);
+  });
+
+  await deleteBulletinAttachment(notice.id, rosterAttachment.id);
+  const removedRow = await db.bulletinAttachment.findUnique({ where: { id: rosterAttachment.id } });
+  check("removing an attachment deletes its row", () => assert.equal(removedRow, null));
+
+  const cascaded = await createBulletinAttachment({
+    bulletin_id: secondNotice.id,
+    file_name: `policy-${stamp}.csv`,
+    file_key: `attachments/${stamp}/policy.csv`,
+    mime_type: assertAttachmentType(Buffer.from("model,code\nCBC,85025\n", "utf8"), "policy.csv").mime,
+    size_bytes: 20,
+    uploaded_by_id: author.id,
+  });
+  check("a CSV keeps its own mime type (the name picks the text flavour)", () => {
+    assert.equal(cascaded.mime_type, "text/csv");
+  });
+
+  await db.bulletin.delete({ where: { id: secondNotice.id } });
+  const cascadeRow = await db.bulletinAttachment.findUnique({ where: { id: cascaded.id } });
+  check("deleting a bulletin cascades its attachments", () => assert.equal(cascadeRow, null));
+
+  const uploader = await db.user.create({
+    data: { email: `verify-6d-uploader-${stamp}@dovelewis.org`, name: "Verify Uploader", role: "author" },
+  });
+  userIds.push(uploader.id);
+  const keptAttachment = await createBulletinAttachment({
+    bulletin_id: notice.id,
+    file_name: `handbook-${stamp}.txt`,
+    file_key: `attachments/${stamp}/handbook.txt`,
+    mime_type: assertAttachmentType(Buffer.from("Line one\n", "utf8"), "handbook.txt").mime,
+    size_bytes: 9,
+    uploaded_by_id: uploader.id,
+  });
+  await db.user.delete({ where: { id: uploader.id } });
+  const keptRow = await db.bulletinAttachment.findUnique({ where: { id: keptAttachment.id } });
+  check("removing the uploader's account keeps the notice's file (uploaded_by_id → null)", () => {
+    assert.equal(keptRow?.uploadedById ?? null, null);
+    assert.equal(keptRow?.fileName, `handbook-${stamp}.txt`);
+  });
+
+  /* ---- staged attachments: upload while composing, link on save ---- */
+
+  const stagedRow = await stageBulletinAttachment({
+    file_name: `staged-${stamp}.pdf`,
+    file_key: `attachments/${stamp}/staged.pdf`,
+    mime_type: assertAttachmentType(rosterBytes, "staged.pdf").mime,
+    size_bytes: rosterBytes.length,
+    uploaded_by_id: author.id,
+  });
+  check("a staged upload returns an id and no bulletin", () => {
+    assert.equal(stagedRow.bulletin_id, null);
+    assert.ok(!Object.prototype.hasOwnProperty.call(stagedRow, "file_key"));
+  });
+
+  const linkedOnCreate = await createBulletin({
+    title: `Staged link ${stamp}`,
+    body_markdown: "Body",
+    departments: [],
+    author_id: author.id,
+    attachment_ids: [stagedRow.id],
+  });
+  const linkedRows = await listBulletinAttachments(linkedOnCreate.id);
+  check("creating a notice links the staged attachments", () => {
+    assert.deepEqual(linkedRows.map((entry) => entry.id), [stagedRow.id]);
+    assert.equal(linkedRows[0]?.bulletin_id, linkedOnCreate.id);
+  });
+
+  let relinkStatus = 0;
+  try {
+    await createBulletin({
+      title: `Relink ${stamp}`,
+      body_markdown: "Body",
+      departments: [],
+      author_id: author.id,
+      attachment_ids: [stagedRow.id],
+    });
+  } catch (error) {
+    relinkStatus = error instanceof ApiError ? error.status : -1;
+  }
+  const relinkLeftover = await db.bulletin.count({ where: { title: `Relink ${stamp}` } });
+  check("linking an already-linked attachment is refused 422, and the post rolls back whole", () => {
+    assert.equal(relinkStatus, 422);
+    assert.equal(relinkLeftover, 0, "a refused link must not leave the notice behind");
+  });
+
+  let unknownLinkStatus = 0;
+  try {
+    await linkStagedAttachments(linkedOnCreate.id, [randomUUID()]);
+  } catch (error) {
+    unknownLinkStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("linking an id that was never staged is refused 422", () => assert.equal(unknownLinkStatus, 422));
+
+  /* ---- the 24 h sweep for a composer that was never saved ---- */
+
+  const aged = (ms: number) => new Date(Date.now() - ms);
+  const stale = await stageBulletinAttachment({
+    file_name: `stale-${stamp}.pptx`,
+    file_key: `attachments/${stamp}/stale.pptx`,
+    mime_type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    size_bytes: 4096,
+    uploaded_by_id: author.id,
+  });
+  const fresh = await stageBulletinAttachment({
+    file_name: `fresh-${stamp}.txt`,
+    file_key: `attachments/${stamp}/fresh.txt`,
+    mime_type: assertAttachmentType(Buffer.from("Line one\n", "utf8"), "fresh.txt").mime,
+    size_bytes: 9,
+    uploaded_by_id: author.id,
+  });
+  // Age the stale row — and the *linked* one from the create above — past the
+  // TTL, so what is under test is the sweep's "staged only" rule.
+  const past = aged(STAGED_ATTACHMENT_TTL_MS + 60_000);
+  await db.bulletinAttachment.update({ where: { id: stale.id }, data: { createdAt: past } });
+  await db.bulletinAttachment.update({ where: { id: stagedRow.id }, data: { createdAt: past } });
+
+  const sweptKeys: string[] = [];
+  const sweep = await sweepStagedAttachments({
+    deleteObject: async (key) => {
+      sweptKeys.push(key);
+    },
+  });
+  check("a staged attachment older than 24 h is deleted, object first", () => {
+    assert.ok(
+      sweptKeys.includes(`attachments/${stamp}/stale.pptx`),
+      `the stored file was not deleted (${JSON.stringify(sweptKeys)})`,
+    );
+    assert.ok(sweep.swept >= 1, "nothing was swept");
+  });
+
+  const staleRow = await db.bulletinAttachment.findUnique({ where: { id: stale.id } });
+  check("the swept row is gone from the database", () => assert.equal(staleRow, null));
+
+  const freshRow = await db.bulletinAttachment.findUnique({ where: { id: fresh.id } });
+  const linkedSurvivor = await db.bulletinAttachment.findUnique({ where: { id: stagedRow.id } });
+  check("a staged file inside the window survives, and a linked one is never swept", () => {
+    assert.ok(freshRow, "a staged attachment inside the TTL must survive");
+    assert.ok(linkedSurvivor, "a linked attachment must never be swept");
+    assert.ok(!sweptKeys.includes(`attachments/${stamp}/staged.pdf`), "a linked file's object was deleted");
+  });
+
+  const stubborn = await stageBulletinAttachment({
+    file_name: `stubborn-${stamp}.pdf`,
+    file_key: `attachments/${stamp}/stubborn.pdf`,
+    mime_type: "application/pdf",
+    size_bytes: rosterBytes.length,
+    uploaded_by_id: author.id,
+  });
+  await db.bulletinAttachment.update({ where: { id: stubborn.id }, data: { createdAt: past } });
+  const failingSweep = await sweepStagedAttachments({
+    deleteObject: async () => {
+      throw new Error("storage unreachable");
+    },
+  });
+  const stubbornRow = await db.bulletinAttachment.findUnique({ where: { id: stubborn.id } });
+  check("a storage failure defers the row instead of orphaning the file", () => {
+    assert.ok(failingSweep.deferred >= 1, "the failure was not counted");
+    assert.equal(failingSweep.swept, 0, "a row whose object survived was still dropped");
+    assert.ok(stubbornRow, "the row must be kept so the next sweep can retry");
+  });
+
+  /* ---- discarding a staged file ---- */
+
+  const discardable = await stageBulletinAttachment({
+    file_name: `discard-${stamp}.csv`,
+    file_key: `attachments/${stamp}/discard.csv`,
+    mime_type: assertAttachmentType(Buffer.from("a,b\n1,2\n", "utf8"), "discard.csv").mime,
+    size_bytes: 8,
+    uploaded_by_id: author.id,
+  });
+
+  let foreignDiscardStatus = 0;
+  try {
+    await deleteStagedAttachment(discardable.id, { id: other.id, role: "staff" });
+  } catch (error) {
+    foreignDiscardStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("only the uploader (or a lead) may discard a staged file (403)", () => {
+    assert.equal(foreignDiscardStatus, 403);
+  });
+
+  let linkedDiscardStatus = 0;
+  try {
+    await deleteStagedAttachment(stagedRow.id, { id: author.id, role: "author" });
+  } catch (error) {
+    linkedDiscardStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("a linked attachment is not discardable through the staging path (404)", () => {
+    assert.equal(linkedDiscardStatus, 404);
+  });
+
+  await deleteStagedAttachment(discardable.id, { id: author.id, role: "author" });
+  const discarded = await db.bulletinAttachment.findUnique({ where: { id: discardable.id } });
+  check("the uploader may discard a staged file, and the row goes", () => assert.equal(discarded, null));
+
+  let stagedDownloadStatus = 0;
+  try {
+    await getBulletinAttachmentForDownload(linkedOnCreate.id, fresh.id);
+  } catch (error) {
+    stagedDownloadStatus = error instanceof ApiError ? error.status : -1;
+  }
+  check("a staged file is not downloadable through a bulletin (404)", () => {
+    assert.equal(stagedDownloadStatus, 404);
+  });
+
   /* ---- cleanup ---- */
+
+  // Staged rows belong to no bulletin, so nothing cascades them away.
+  await db.bulletinAttachment.deleteMany({ where: { bulletinId: null, uploadedById: { in: userIds } } });
 
   await db.article.deleteMany({ where: { authorId: { in: userIds } } });
   await db.bulletin.deleteMany({ where: { authorId: { in: userIds } } });
@@ -1605,7 +1939,49 @@ check("magic bytes decide the attachment type; a renamed .exe is refused", () =>
     Buffer.from("xl/workbook.xml [Content_Types].xml", "latin1"),
   ]);
   assert.equal(detectAttachmentType(xlsx), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  assert.equal(ALLOWED_ATTACHMENT_TYPES.length, 3);
+
+  const pptx = Buffer.concat([
+    Buffer.from("PK\x03\x04", "latin1"),
+    Buffer.from("ppt/presentation.xml [Content_Types].xml", "latin1"),
+  ]);
+  assert.equal(
+    detectAttachmentType(pptx),
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  );
+  // A zip that is not an OOXML package (no content-types part) is still refused.
+  assert.equal(detectAttachmentType(Buffer.concat([Buffer.from("PK\x03\x04", "latin1"), Buffer.alloc(64)])), null);
+
+  assert.equal(ALLOWED_ATTACHMENT_TYPES.length, 6);
+});
+
+check("plain text is admitted; only the file name picks the text flavour", () => {
+  const csv = Buffer.from("model,code\nCBC,85025\n", "utf8");
+  // The bytes can only ever say "text": csv vs txt is a naming detail.
+  assert.equal(detectAttachmentType(csv), "text/plain");
+  assert.equal(assertAttachmentType(csv, "counts.csv").mime, "text/csv");
+  assert.equal(assertAttachmentType(csv, "counts.csv").extension, "csv");
+  assert.equal(assertAttachmentType(csv, "COUNTS.CSV").mime, "text/csv");
+  assert.equal(assertAttachmentType(csv, "notes.txt").mime, "text/plain");
+  assert.equal(assertAttachmentType(csv, "no-extension").mime, "text/plain");
+
+  // A renamed executable is refused whatever it claims to be: `MZ` carries a
+  // null byte, which disqualifies it as text.
+  const renamedExe = Buffer.concat([Buffer.from("MZ\x90\x00", "latin1"), Buffer.alloc(128)]);
+  assert.equal(detectAttachmentType(renamedExe), null);
+  let exeStatus = 0;
+  try {
+    assertAttachmentType(renamedExe, "totally-a.csv");
+  } catch (error) {
+    exeStatus = error instanceof ApiError ? error.status : -1;
+  }
+  assert.equal(exeStatus, 422, "a renamed .exe must be refused with 422 even with a text extension");
+
+  // A null byte, or a byte sequence that is not valid UTF-8, disqualifies text.
+  assert.equal(detectAttachmentType(Buffer.from("a\u0000b", "latin1")), null);
+  assert.equal(detectAttachmentType(Buffer.from([0xff, 0xfe, 0x01, 0x02])), null);
+  assert.equal(detectAttachmentType(Buffer.alloc(0)), null);
+  // ...and a PNG is neither OOXML (no PK header) nor text (0x89 is invalid UTF-8).
+  assert.equal(detectAttachmentType(Buffer.from("\x89PNG\r\n\x1a\n", "latin1")), null);
 });
 
 check("sanitizeAttachmentFileName keeps a storage-safe basename", () => {
@@ -1614,9 +1990,168 @@ check("sanitizeAttachmentFileName keeps a storage-safe basename", () => {
   assert.equal(sanitizeAttachmentFileName(""), "file");
 });
 
+check("a staged attachment expires after a day, and the edge is inclusive", () => {
+  assert.equal(STAGED_ATTACHMENT_TTL_MS, 24 * 60 * 60 * 1000);
+  const created = new Date("2026-10-11T12:00:00.000Z");
+  const at = (offsetMs: number) => new Date(created.getTime() + offsetMs);
+  assert.equal(isStagedAttachmentExpired(created, at(STAGED_ATTACHMENT_TTL_MS - 1)), false);
+  assert.equal(isStagedAttachmentExpired(created, at(STAGED_ATTACHMENT_TTL_MS)), true);
+  assert.equal(isStagedAttachmentExpired(created, at(STAGED_ATTACHMENT_TTL_MS * 3)), true);
+});
+
 console.log("attachments (async guards)");
 
+/* ================================================= http guard (real server) === */
+
+/** A free TCP port, asked of the OS rather than guessed. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      probe.close(() => {
+        if (port === 0) reject(new Error("could not find a free port for the guard check"));
+        else resolve(port);
+      });
+    });
+  });
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Unauthenticated writes are refused at the request boundary (`proxy.ts`
+ * answers an `/api/*` request with no session with a 401 JSON body, and the
+ * route handler's own `requireRole` refuses again behind it).
+ *
+ * Asserting that needs a real request: Next's request scope does not exist
+ * inside a plain script (`headers()` throws outside one), so this boots a
+ * throwaway dev server on a free port, calls the endpoints with no session
+ * cookie, and shuts it down again. It sets `NEXT_DIST_DIR=.next-verify` so the
+ * throwaway build never contends with a `next dev` you already have running
+ * for the lock on `.next` (see `next.config.ts`, and `/.next-verify/` in
+ * `.gitignore`).
+ */
+async function runHttpGuardChecks(): Promise<void> {
+  console.log("http guard (a session-less write is refused)");
+
+  // Next rewrites `tsconfig.json` to add the `types` includes for whatever
+  // build directory it used (`.next-verify/**`). That is a side effect of a
+  // check, not a change to this repository, so the file is put back byte for
+  // byte afterwards.
+  const tsconfigPath = path.join(process.cwd(), "tsconfig.json");
+  const originalTsconfig = await readFile(tsconfigPath, "utf8");
+
+  const port = await freePort();
+  const server = spawn(
+    path.join(process.cwd(), "node_modules", ".bin", "next"),
+    ["dev", "--port", String(port)],
+    {
+      cwd: process.cwd(),
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        PORT: String(port),
+        NEXT_DIST_DIR: ".next-verify",
+        NEXT_TELEMETRY_DISABLED: "1",
+      },
+    },
+  );
+
+  let exited = false;
+  const diagnostics: string[] = [];
+  const collect = (chunk: Buffer) => {
+    diagnostics.push(chunk.toString("utf8"));
+    if (diagnostics.length > 200) diagnostics.shift();
+  };
+  server.on("exit", () => {
+    exited = true;
+  });
+  server.stdout?.on("data", collect);
+  server.stderr?.on("data", collect);
+
+  const shutdown = () => {
+    if (typeof server.pid !== "number" || exited) return;
+    // The whole process group: the dev server may have spawned workers.
+    try {
+      process.kill(-server.pid, "SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  };
+
+  try {
+    const base = `http://127.0.0.1:${port}`;
+    const deadline = Date.now() + 120_000;
+    let ready = false;
+    while (Date.now() < deadline && !exited) {
+      try {
+        await fetch(base, { redirect: "manual" });
+        ready = true;
+        break;
+      } catch {
+        await wait(500);
+      }
+    }
+    assert.ok(
+      ready,
+      exited
+        ? `the throwaway dev server exited before answering:\n${diagnostics.join("").slice(-2000)}`
+        : `the throwaway dev server never answered on ${base} within 120 s`,
+    );
+
+    const bulletinId = randomUUID();
+    const upload = await fetch(`${base}/api/bulletins/${bulletinId}/attachments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf", "x-attachment-filename": "policy.pdf" },
+      body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 0x0a]),
+    });
+    const uploadBody = (await upload.json().catch(() => null)) as { code?: string } | null;
+    check("an unauthenticated POST to a bulletin's attachments is refused with 401", () => {
+      assert.equal(upload.status, 401);
+      assert.equal(uploadBody?.code, "unauthenticated");
+    });
+
+    const removal = await fetch(
+      `${base}/api/bulletins/${bulletinId}/attachments?attachmentId=${randomUUID()}`,
+      { method: "DELETE" },
+    );
+    check("an unauthenticated DELETE of an attachment is refused with 401", () => {
+      assert.equal(removal.status, 401);
+    });
+
+    const download = await fetch(`${base}/api/bulletins/${bulletinId}/attachments/${randomUUID()}`);
+    check("an unauthenticated download is refused with 401", () => {
+      assert.equal(download.status, 401);
+    });
+
+    const stagedUpload = await fetch(`${base}/api/bulletins/attachments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf", "x-attachment-filename": "policy.pdf" },
+      body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 0x0a]),
+    });
+    check("an unauthenticated staged upload is refused with 401", () => {
+      assert.equal(stagedUpload.status, 401);
+    });
+
+    const stagedDiscard = await fetch(`${base}/api/bulletins/attachments?attachmentId=${randomUUID()}`, {
+      method: "DELETE",
+    });
+    check("an unauthenticated staged discard is refused with 401", () => {
+      assert.equal(stagedDiscard.status, 401);
+    });
+  } finally {
+    shutdown();
+    await wait(250);
+    await writeFile(tsconfigPath, originalTsconfig);
+  }
+}
+
 runDatabaseChecks()
+  .then(runHttpGuardChecks)
   .then(() => {
     console.log(`\n${passed} checks passed.`);
   })

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { ChevronDown, Eye, ImagePlus, OctagonAlert, PenLine, X } from "lucide-react";
+import { ChevronDown, Eye, ImagePlus, OctagonAlert, Paperclip, PenLine, Trash2, X } from "lucide-react";
 import { ArticleSearch } from "@/components/editor/ArticleSearch";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
@@ -14,9 +14,21 @@ import { useImageDrop } from "@/components/editor/useImageDrop";
 import { buildEditorExtensions } from "@/components/editor/extensions";
 import { ImageDialog, type ImageDialogMode } from "@/components/editor/ImageDialog";
 import { LinkDialog } from "@/components/editor/LinkDialog";
+import { BulletinAttachmentDialog } from "@/components/bulletin/BulletinAttachmentDialog";
+import { AttachmentTypeIcon, attachmentTypeLabel } from "@/components/bulletin/AttachmentTypeIcon";
 import { fieldClass, Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import { MarkdownReader } from "@/components/MarkdownReader";
-import { ApiRequestError, createBulletin, patchBulletin, type BulletinPayload } from "@/lib/bulletin/api";
+import {
+  ApiRequestError,
+  createBulletin,
+  deleteBulletinAttachment,
+  deleteStagedBulletinAttachment,
+  formatBytes,
+  listBulletinAttachments,
+  patchBulletin,
+  type BulletinAttachmentRecord,
+  type BulletinPayload,
+} from "@/lib/bulletin/api";
 import { uploadImage } from "@/lib/editor/api";
 import { HERO_ALT_MAX_LENGTH } from "@/lib/bulletin/hero";
 import {
@@ -42,11 +54,21 @@ import {
  * to edit an existing one ("edit mode": prefilled, `Edit bulletin`, Save).
  *
  * Prompt 6c collapsed this to one simple model. In order: headline → deck
- * (optional) → hero image (always available) → body → departments (optional,
- * an enclosed dropdown) → Options (Pinned, which requires an expiry — four
- * preset chips — beneath it, and Urgent) → linked SOP. There are no templates,
- * no priority dropdown, no format selector, no kicker, and no TTL defaults —
- * expiry is opt-in for an ordinary post and required for a pinned one.
+ * (optional) → hero image (always available) → attachments (optional) → body →
+ * departments (optional, an enclosed dropdown) → Options (Pinned, which requires
+ * an expiry — four preset chips — beneath it, and Urgent) → linked SOP. There
+ * are no templates, no priority dropdown, no format selector, no kicker, and no
+ * TTL defaults — expiry is opt-in for an ordinary post and required for a
+ * pinned one.
+ *
+ * Prompt 6d gave it attachments: the files a notice carries (PDF / DOCX / XLSX /
+ * PPTX / TXT / CSV, ≤ 25 MB). A file is uploaded the moment it is chosen — for a
+ * *new* notice too, where the record comes back with no bulletin id (staged) and
+ * is linked by the API as the notice is created. The section therefore behaves
+ * identically in both modes: pick a file, see it listed with its type and size,
+ * save. Discarding a staged file is immediate (there is nothing to save it
+ * against); removing one from a posted notice happens when the notice is saved.
+ * A staged file that is never linked is swept 24 h later.
  *
  * One editor, used twice: the body is the same full Tiptap (and reader) as
  * procedures. A bulletin skips the change-summary, reviewer, and publish
@@ -151,6 +173,21 @@ export default function BulletinComposer({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const heroInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Attachments. A file is stored the moment it is chosen (the API writes the
+  // bytes and returns the record, exactly as the article dialog does); a
+  // removal is only *staged* here and carried out when the bulletin is saved.
+  const [attachments, setAttachments] = useState<BulletinAttachmentRecord[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  // Starts true in edit mode: the effect below fetches the list immediately, so
+  // there is never a frame that claims "no files" before the answer arrives.
+  const [attachmentsLoading, setAttachmentsLoading] = useState(mode === "edit");
+  // A file attaches to a bulletin that exists, so create mode has nothing to
+  // upload against yet (the section says so rather than hiding itself).
+  const bulletinId = mode === "edit" ? initial?.id ?? null : null;
+
   const [extensions] = useState(() =>
     buildEditorExtensions({
       onLink: () => setLinkDialogOpen(true),
@@ -186,6 +223,26 @@ export default function BulletinComposer({
   useEffect(() => {
     if (imagePickerNonce > 0) fileInputRef.current?.click();
   }, [imagePickerNonce]);
+
+  // The bulletin's existing attachments, loaded once when editing. A failure
+  // leaves the list empty and says so; it never blocks the edit.
+  useEffect(() => {
+    if (!bulletinId) return;
+    let active = true;
+    (async () => {
+      try {
+        const records = await listBulletinAttachments(bulletinId);
+        if (active) setAttachments(records);
+      } catch {
+        if (active) setAttachError("Could not load this bulletin's attachments.");
+      } finally {
+        if (active) setAttachmentsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [bulletinId]);
 
   // Ctrl+H opens find/replace while the editor or the find bar has focus.
   const onFindKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -228,6 +285,52 @@ export default function BulletinComposer({
   /** A preset chip: `days` out at 11:45 PM. */
   const applyExpiryPreset = (days: number) => setExpiryDate(expiryPresetDate(days));
 
+  /**
+   * Discard a *staged* file — one uploaded for a notice that does not exist yet.
+   * There is nothing to save it against, so this is immediate: the record goes
+   * now, and the sweep after it is only a safety net for a composer that was
+   * closed without ever saving.
+   */
+  const discardStaged = async (item: BulletinAttachmentRecord) => {
+    setAttachError(null);
+    try {
+      await deleteStagedBulletinAttachment(item.id);
+      setAttachments((current) => current.filter((entry) => entry.id !== item.id));
+    } catch (caught) {
+      setAttachError(
+        caught instanceof ApiRequestError
+          ? `Could not discard ${item.file_name}: ${caught.message}`
+          : `Could not discard ${item.file_name}. Try again.`,
+      );
+    }
+  };
+
+  /**
+   * Carry out the removals the poster staged, after the save has succeeded —
+   * "removing one in the composer deletes it on save". A file that is already
+   * gone (404, from an interrupted earlier run) counts as removed, so a retry
+   * is always safe; anything else is reported by name and the composer stays
+   * open so the poster can try again.
+   */
+  const applyRemovals = async (id: string): Promise<string[]> => {
+    if (removedIds.length === 0) return [];
+    const targets = attachments.filter((item) => removedIds.includes(item.id));
+    const failed: string[] = [];
+    for (const item of targets) {
+      try {
+        await deleteBulletinAttachment(id, item.id);
+      } catch (caught) {
+        if (!(caught instanceof ApiRequestError && caught.status === 404)) {
+          failed.push(item.file_name);
+          continue;
+        }
+      }
+      setAttachments((current) => current.filter((entry) => entry.id !== item.id));
+      setRemovedIds((current) => current.filter((entry) => entry !== item.id));
+    }
+    return failed;
+  };
+
   const submit = async () => {
     if (busy) return;
     const body = editor ? readMarkdown(editor) : markdown;
@@ -261,6 +364,9 @@ export default function BulletinComposer({
       heroImageAlt: heroImageUrl ? heroAlt.trim() : null,
       linked_article_id: linkedId,
       expires_at: expiresAtIso(),
+      // Files picked while writing — before this notice had an id. The API
+      // links them as part of the same save.
+      attachment_ids: attachments.filter((item) => item.bulletin_id === null).map((item) => item.id),
     };
 
     setBusy(true);
@@ -268,8 +374,20 @@ export default function BulletinComposer({
     try {
       const saved =
         mode === "edit" && initial ? await patchBulletin(initial.id, payload) : await createBulletin(payload);
-      if (mode === "edit") onSaved(saved);
-      else onPosted(saved);
+      if (mode === "edit") {
+        const failed = await applyRemovals(saved.id);
+        if (failed.length > 0) {
+          setServerError({
+            status: 0,
+            message: `The bulletin was saved, but ${failed.length === 1 ? "this file" : "these files"} could not be removed: ${failed.join(", ")}. Save again to retry.`,
+          });
+          setBusy(false);
+          return;
+        }
+        onSaved(saved);
+      } else {
+        onPosted(saved);
+      }
     } catch (caught) {
       setServerError(
         caught instanceof ApiRequestError
@@ -461,6 +579,130 @@ export default function BulletinComposer({
               if (file) void uploadHeroImage(file);
             }}
           />
+        </div>
+
+        {/* Attachments — reference files the notice carries, listed below the body. */}
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-zinc-800">
+            Attachments <span className="font-normal text-zinc-500">(optional)</span>
+          </span>
+
+          <div className="space-y-2">
+            {attachments.length > 0 ? (
+              <ul className="space-y-1.5" data-testid="bulletin-attachment-list">
+                {attachments.map((item) => {
+                  // A staged file belongs to no notice yet: it is discarded on the
+                  // spot, because there is nothing to save it against.
+                  const staged = item.bulletin_id === null;
+                  const marked = removedIds.includes(item.id);
+                  return (
+                    <li
+                      key={item.id}
+                      className={cx(
+                        "flex items-center gap-2.5 rounded-lg border px-3 py-2",
+                        marked ? "border-zinc-200 bg-zinc-50" : "border-zinc-300/70 bg-white",
+                      )}
+                    >
+                      <AttachmentTypeIcon
+                        mimeType={item.mime_type}
+                        className={cx("shrink-0", marked ? "text-zinc-300" : "text-zinc-500")}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cx(
+                            "block truncate text-[13px] font-medium",
+                            marked ? "text-zinc-400 line-through" : "text-zinc-800",
+                          )}
+                        >
+                          {item.file_name}
+                        </span>
+                        <span className={cx("block text-xs", marked ? "text-zinc-400" : "text-zinc-500")}>
+                          {attachmentTypeLabel(item.mime_type, item.file_name)} · {formatBytes(item.size_bytes)}
+                          {staged ? <span className="text-zinc-400"> · attaches on save</span> : null}
+                        </span>
+                      </span>
+
+                      {marked ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <span className="text-xs text-zinc-400">Removed on save</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setRemovedIds((current) => current.filter((entry) => entry !== item.id))}
+                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Undo
+                          </button>
+                        </span>
+                      ) : confirmRemoveId === item.id ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <span className="text-xs text-zinc-500">
+                            {staged ? "Discard this file?" : "Remove on save?"}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              const target = item;
+                              setConfirmRemoveId(null);
+                              if (staged) void discardStaged(target);
+                              else setRemovedIds((current) => (current.includes(target.id) ? current : [...current, target.id]));
+                            }}
+                            className="flex h-7 items-center rounded-lg border border-red-200 bg-white px-2 text-[12.5px] font-medium text-red-700 transition-colors hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {staged ? "Discard" : "Remove"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setConfirmRemoveId(null)}
+                            className="flex h-7 items-center rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Keep
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={`${staged ? "Discard" : "Remove"} ${item.file_name}`}
+                          onClick={() => setConfirmRemoveId(item.id)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-zinc-300/70 bg-white text-zinc-500 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-[13px] text-zinc-500" role="status">
+                {attachmentsLoading ? "Loading attachments…" : "No files attached yet."}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setAttachOpen(true)}
+              disabled={busy}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-zinc-300/70 bg-white px-3 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+              Attach file
+            </button>
+          </div>
+
+          {attachError ? (
+            <p role="alert" className="mt-1.5 text-xs text-red-700">
+              {attachError}
+            </p>
+          ) : null}
+          <p className="mt-1.5 text-xs leading-5 text-zinc-500">
+            PDF, Word, Excel, PowerPoint, text, or CSV — up to 25 MB each. A file uploads as soon as you pick it and lands
+            on the notice when you save; it is listed below the post as a download, never rendered inline. Discarding a file
+            before you post deletes it straight away — on a posted notice, removing one deletes it when you save.
+          </p>
         </div>
 
         {/* Body: write / preview */}
@@ -825,6 +1067,18 @@ export default function BulletinComposer({
           onUpdateAlt={({ alt, title }) => {
             editor.chain().focus().updateAttributes("image", { alt, title: title.length > 0 ? title : null }).run();
             setImageDialog(null);
+          }}
+        />
+      ) : null}
+
+      {attachOpen ? (
+        <BulletinAttachmentDialog
+          bulletinId={bulletinId}
+          onClose={() => setAttachOpen(false)}
+          onUploaded={(record) => {
+            setAttachments((current) => [...current, record]);
+            setAttachError(null);
+            setAttachOpen(false);
           }}
         />
       ) : null}

@@ -14,6 +14,7 @@ import { MarkdownReader } from "@/components/MarkdownReader";
 import { AcknowledgedPill, ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
+import { BulletinAttachments } from "@/components/bulletin/BulletinAttachments";
 import { Modal, primaryButton, secondaryButton } from "@/components/editor/Modal";
 import {
   acknowledgeBulletin,
@@ -324,6 +325,9 @@ export function BulletinDetail({
         }
         footer={
           <div className="space-y-6">
+            {/* Anything the notice carries as a file, directly under the body. */}
+            <BulletinAttachments bulletinId={bulletin.id} />
+
             {reactionsRow}
 
             <div className="rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">

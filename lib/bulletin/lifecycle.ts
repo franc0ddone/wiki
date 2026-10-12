@@ -16,6 +16,32 @@ export const BULLETIN_TITLE_MAX_LENGTH = 300;
 export const DECK_MAX_LENGTH = 200;
 
 /**
+ * How long a **staged** attachment lives.
+ *
+ * A staged attachment is a file chosen in the composer for a notice that has not
+ * been posted yet: it is uploaded immediately (exactly like the hero image) and
+ * held with `bulletinId = null` until the bulletin is created. If the poster
+ * never saves, nothing else would ever point at it, so it is swept — object
+ * first, then the row — once it is a day old. Long enough for someone who is
+ * interrupted mid-notice to come back to it; short enough that an abandoned
+ * composer does not leave files in the bucket indefinitely.
+ */
+export const STAGED_ATTACHMENT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Is a staged attachment created at `createdAt` past its TTL? Pure, so the
+ * sweep's boundary is testable without waiting a day, and the edge is
+ * inclusive: exactly 24 h old is already swept.
+ */
+export function isStagedAttachmentExpired(
+  createdAt: Date,
+  now: Date,
+  ttlMs: number = STAGED_ATTACHMENT_TTL_MS,
+): boolean {
+  return now.getTime() - createdAt.getTime() >= ttlMs;
+}
+
+/**
  * Editing an `urgent` bulletin with changed content clears its acknowledgements:
  * a critical alert that has been rewritten must be re-acknowledged by the people
  * who relied on the old text. Edits to a non-urgent post keep theirs, and a
