@@ -23,6 +23,12 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     updated_at: "2026-09-12T16:40:00.000Z",
     author_name: "Trevor Lindqvist, ICU Technician II",
     last_reviewed_at: "2026-09-12T16:40:00.000Z",
+    // Curated Essential SOP — pinned above the Knowledge Home feed.
+    is_essential: true,
+    audience: "ALL",
+    latest_published_version: 1,
+    previous_published_version: null,
+    latest_published_by: "Trevor Lindqvist, ICU Technician II",
     body_markdown: [
       "**Owner:** Infectious Disease Control Committee · **Review cycle:** Every 6 months · **Applies to:** All clinical staff entering the isolation ward",
       "",
@@ -76,6 +82,12 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     updated_at: "2026-08-29T19:15:00.000Z",
     author_name: "Dr. Maya Okonkwo, Lead Emergency Clinician",
     last_reviewed_at: "2026-08-29T19:15:00.000Z",
+    // Curated Essential SOP, written for clinical staff.
+    is_essential: true,
+    audience: "MEDICAL",
+    latest_published_version: 1,
+    previous_published_version: null,
+    latest_published_by: "Dr. Maya Okonkwo, Lead Emergency Clinician",
     body_markdown: [
       "**Owner:** Emergency & Critical Care · **Reference:** RECOVER 2012 CPR guidelines, hospital-internal adaptation",
       "",
@@ -125,6 +137,11 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     updated_at: "2026-09-08T11:25:00.000Z",
     author_name: "Dr. Sofia Almeida, Medical Oncologist",
     last_reviewed_at: "2026-09-08T11:25:00.000Z",
+    is_essential: false,
+    audience: "ALL",
+    latest_published_version: 1,
+    previous_published_version: null,
+    latest_published_by: "Dr. Sofia Almeida, Medical Oncologist",
     body_markdown: [
       "**Owner:** Oncology Service · **Applies to:** Anyone administering or assisting with vesicant chemotherapy",
       "",
@@ -168,6 +185,12 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     updated_at: "2026-09-20T17:30:00.000Z",
     author_name: "Priya Raghunathan, Client Experience Coordinator",
     last_reviewed_at: "2026-09-20T17:30:00.000Z",
+    // Written for the front desk and finance, not for clinicians.
+    is_essential: false,
+    audience: "NON_MEDICAL",
+    latest_published_version: 1,
+    previous_published_version: null,
+    latest_published_by: "Priya Raghunathan, Client Experience Coordinator",
     body_markdown: [
       "**Owner:** Client Experience · **Revision:** September 2026 — deposit thresholds updated",
       "",
@@ -218,6 +241,11 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     author_name: "Dana Whitfield, Facilities & Safety Officer",
     // Draft: never published, so it has no review date yet.
     last_reviewed_at: null,
+    is_essential: false,
+    audience: "ALL",
+    latest_published_version: null,
+    previous_published_version: null,
+    latest_published_by: null,
     body_markdown: [
       "**Owner:** Safety Committee · **Status:** DRAFT — pending review by the clinical leads. Not yet in force.",
       "",

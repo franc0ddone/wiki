@@ -69,6 +69,15 @@ export function ArticleSearch({
           updated_at: "",
           author_name: "",
           last_reviewed_at: null,
+          // Prompt 7c added five fields to the portal article shape. None of
+          // them is indexed or read here — this object only feeds
+          // `buildSearchIndex` over slug + title + body — so they carry the
+          // "nothing known" values for a throwaway document.
+          is_essential: false,
+          audience: "ALL",
+          latest_published_version: null,
+          previous_published_version: null,
+          latest_published_by: null,
         })),
         [],
         [],

@@ -66,14 +66,44 @@ export type DepartmentCounts = Partial<Record<Department, number>>;
 /**
  * Article lifecycle.
  *
- * `in_review` is the optional human-review step between writing and publishing
- * (added with the backend phase; the phase-1 union was `draft | published`).
- * Mirrors the Prisma `ArticleStatus` enum — keep the two in step.
+ * Prompt 7c removed the review gate: a procedure is a draft until its author
+ * publishes it, and publishing is immediate — so the union is the phase-1
+ * `draft | published` pair again. Mirrors the Prisma `ArticleStatus` enum —
+ * keep the two in step.
  */
-export type KnowledgeArticleStatus = "draft" | "in_review" | "published";
+export type KnowledgeArticleStatus = "draft" | "published";
 
+/**
+ * Who a procedure is written for (prompt 7c). Steers the Knowledge Home
+ * audience switcher only — it is **not** a permission or access-control
+ * boundary, so no reader is ever blocked from a procedure by this value.
+ */
+export type ArticleAudience = "MEDICAL" | "NON_MEDICAL" | "ALL";
 
-/** A standard operating procedure / reference document in the knowledge base. */
+/** Every audience value. The API validates against exactly this list. */
+export const AUDIENCES: readonly ArticleAudience[] = ["MEDICAL", "NON_MEDICAL", "ALL"];
+
+/** The audience switcher's positions, left to right. */
+export const FEED_AUDIENCES: readonly ArticleAudience[] = AUDIENCES;
+
+/** Is this raw value an audience? A type guard, so callers narrow rather than cast. */
+export function isAudience(value: unknown): value is ArticleAudience {
+  return typeof value === "string" && (AUDIENCES as readonly string[]).includes(value);
+}
+
+/** Compact labels for the switcher and the row pill. */
+export const AUDIENCE_LABELS: Record<ArticleAudience, string> = {
+  MEDICAL: "Medical",
+  NON_MEDICAL: "Non-medical",
+  ALL: "All",
+};
+
+/** A person's staff type. Mirrors the Prisma `StaffType` enum. */
+export type StaffType = "MEDICAL" | "NON_MEDICAL";
+
+/**
+ * A standard operating procedure / reference document in the knowledge base.
+ */
 export interface KnowledgeArticle {
   id: string;
   title: string;
@@ -92,6 +122,32 @@ export interface KnowledgeArticle {
    * from this (see `lib/reader/freshness.ts`); publishing *is* the review act.
    */
   last_reviewed_at: string | null;
+  /**
+   * Curated by a clinical lead: an Essential SOP renders in its own section
+   * above the Knowledge Home feed (prompt 7c). Metadata only — toggling it
+   * never publishes, versions, or reorders anything.
+   */
+  is_essential: boolean;
+  /** Who this procedure is written for. See `ArticleAudience`. */
+  audience: ArticleAudience;
+  /**
+   * The newest published version number, or `null` for a procedure that has
+   * never been published. `ArticleVersion` rows are append-only, so this is
+   * also the count of publishes.
+   */
+  latest_published_version: number | null;
+  /**
+   * The published version before the newest one, or `null` on an initial
+   * publish. The feed's version-jump badge is `v{previous} → v{latest}` when
+   * this is set, and plain `v{latest}` when it is not (prompt 7c).
+   */
+  previous_published_version: number | null;
+  /**
+   * Who published the newest version, formatted as `author_name` is
+   * ("Name, Title"). `null` when the article has no published version. Falls
+   * back to the article's author when a legacy row has no version author.
+   */
+  latest_published_by: string | null;
 }
 
 /**

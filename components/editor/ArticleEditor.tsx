@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, History, OctagonAlert, Paperclip } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, History, OctagonAlert, Paperclip, Star } from "lucide-react";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorBubbleMenu } from "@/components/editor/EditorBubbleMenu";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
@@ -25,7 +25,7 @@ import {
   patchArticle,
   type PatchArticleBody,
 } from "@/lib/editor/api";
-import type { EditorViewer, ReviewerOption } from "@/lib/editor/types";
+import type { EditorViewer } from "@/lib/editor/types";
 import {
   CHANGE_SUMMARY_MAX_LENGTH,
   TITLE_MAX_LENGTH,
@@ -38,8 +38,10 @@ import { buildLinkRegistry, extractHeadingIds, type LinkRegistry } from "@/lib/l
 import { ROLE_LABELS, roleAtLeast } from "@/lib/roles";
 import { cx } from "@/lib/utils";
 import {
+  AUDIENCE_LABELS,
   CLINICAL_DEPARTMENTS,
   DEPARTMENT_LABELS,
+  type ArticleAudience,
   type ClinicalDepartment,
   type KnowledgeArticleStatus,
 } from "@/types/portal";
@@ -50,21 +52,25 @@ import {
  * Workflow — the only transitions the UI offers, matching `ArticleStatus` and
  * the PATCH rules:
  *
- *   (new) ──create──▶ draft ──submit for review──▶ in_review ──publish──▶ published
- *                       ▲                              │                      │
- *                       └──────── return to draft ─────┘        save & republish
+ *   (new) ──save draft──▶ draft ──publish──▶ published ──save──▶ published
+ *                                                              (new version)
  *
- * There is no draft → published shortcut: publishing is only offered from
- * `in_review`, needs a reviewer drawn from the clinical-lead pool, and the API
- * additionally refuses anyone below `clinical_lead` (that refusal is shown
- * verbatim, not hidden behind a disabled button).
+ * **Publishing is direct (prompt 7c).** Anyone who can write a procedure can
+ * publish it — there is no submit-for-review step, no reviewer to pick, and no
+ * approval gate. Publishing writes a new immutable version and the procedure is
+ * live immediately.
  *
- * **Editing a live procedure.** An `author` may open and edit a published
- * procedure. Their save is a *plain* save — it omits `status` — so the API keeps
- * the procedure published and snapshots a new immutable version (a
- * republication). Only a `clinical_lead`+ sees "Save & republish", which sends
- * the explicit `status: "published"`. Both leave the procedure live; neither
- * lets an author publish a *draft*, which remains a clinical act.
+ * **Editing a live procedure.** A save on a published procedure omits `status`,
+ * so the API keeps it published and — when the title or body actually changed —
+ * snapshots a new immutable version. The version history is unaffected by the
+ * removed review step: versions, diffs, and freshness signals all still work,
+ * they just no longer wait on a reviewer.
+ *
+ * **Two publish-section controls (prompt 7c).** The audience selector says who
+ * the procedure is written for (metadata; it only steers the Knowledge Home
+ * feed's default view). The Essential toggle, offered to clinical leads for a
+ * live procedure, pins it to the top of the Knowledge Home — a metadata-only
+ * write that never versions the procedure and never moves its publish time.
  *
  * Every save that changes the title or body needs a change summary; it becomes
  * the version's changelog when the procedure is published. Versions are
@@ -77,7 +83,10 @@ export interface EditableArticle {
   body_markdown: string;
   departments: ClinicalDepartment[];
   status: KnowledgeArticleStatus;
-  reviewerId: string | null;
+  /** Who the procedure is written for (prompt 7c). */
+  audience: ArticleAudience;
+  /** Curated Essential SOP (prompt 7c). */
+  isEssential: boolean;
 }
 
 export interface ArticleEditorProps {
@@ -86,7 +95,6 @@ export interface ArticleEditorProps {
   article: EditableArticle | null;
   /** Every article, for the link picker and `validateLinks` (built into a registry client-side). */
   registrySource: ReadonlyArray<{ slug: string; title: string; body_markdown: string }>;
-  reviewers: readonly ReviewerOption[];
 }
 
 type Feedback =
@@ -95,15 +103,23 @@ type Feedback =
 
 const STATUS_LABEL: Record<KnowledgeArticleStatus, string> = {
   draft: "Draft",
-  in_review: "In review",
   published: "Published",
 };
 
 const STATUS_STYLE: Record<KnowledgeArticleStatus, string> = {
   draft: "border-amber-200 bg-amber-50 text-amber-800",
-  in_review: "border-sky-200 bg-sky-50 text-sky-800",
-  published: "border-teal-200 bg-teal-50 text-teal-800",
+  published: "border-[#5F6E00]/25 bg-[#AFBE23]/15 text-[#3F4A00]",
 };
+
+/** The audience selector's options, default first — the order the spec names. */
+const AUDIENCE_CHOICES: readonly ArticleAudience[] = ["ALL", "MEDICAL", "NON_MEDICAL"];
+
+/**
+ * Who may curate an Essential SOP — the same role check that used to gate
+ * publishing (clinical leads, and admins above them). It no longer gates
+ * publishing, only curation (prompt 7c, item 3).
+ */
+const CURATION_FLOOR = "clinical_lead" as const;
 
 function readMarkdown(editor: Editor): string {
   return (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown
@@ -115,7 +131,7 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
 }
 
-export default function ArticleEditor({ viewer, article, registrySource, reviewers }: ArticleEditorProps) {
+export default function ArticleEditor({ viewer, article, registrySource }: ArticleEditorProps) {
   const router = useRouter();
   const initialMarkdown = article?.body_markdown ?? "";
 
@@ -123,7 +139,10 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const [departments, setDepartments] = useState<ClinicalDepartment[]>(article?.departments ?? []);
   const [status, setStatus] = useState<KnowledgeArticleStatus>(article?.status ?? "draft");
   const slug = article?.slug ?? null;
-  const [reviewerId, setReviewerId] = useState<string>(article?.reviewerId ?? "");
+  // Prompt 7c publish-section state: who the procedure is written for, and
+  // whether it is curated as Essential (clinical leads only).
+  const [audience, setAudience] = useState<ArticleAudience>(article?.audience ?? "ALL");
+  const [essential, setEssential] = useState<boolean>(article?.isEssential ?? false);
   const [changeSummary, setChangeSummary] = useState("");
 
   const [markdown, setMarkdown] = useState(initialMarkdown);
@@ -150,8 +169,12 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const feedbackRef = useRef<HTMLDivElement | null>(null);
 
-  const canPublish = roleAtLeast(viewer.role, "clinical_lead");
   const isNew = slug === null;
+  /**
+   * Essential SOP curation is a clinical lead's call (prompt 7c, item 3) — the
+   * same role check that used to gate publishing. It gates *curation* only.
+   */
+  const canCurate = roleAtLeast(viewer.role, CURATION_FLOOR);
 
   /* ----------------------------------------------------------- the editor */
   const [extensions] = useState(() =>
@@ -234,14 +257,13 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
           markdown: body,
           departments,
           intent,
-          reviewerId: reviewerId || null,
           changeSummary: summary,
           contentChanged: !isNew && (title.trim() !== baseline.title.trim() || body !== baseline.markdown),
         },
         registry,
       );
     },
-    [slug, baseRegistry, title, departments, reviewerId, changeSummary, isNew, baseline],
+    [slug, baseRegistry, title, departments, changeSummary, isNew, baseline],
   );
 
   const live = useMemo(
@@ -269,12 +291,12 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
   };
 
   const run = useCallback(
-    async (action: "create" | "save" | "submit_review" | "return_to_draft" | "publish") => {
+    async (action: "create" | "save" | "publish") => {
       if (!editor || busy) return;
       setFeedback(null);
 
-      const intent: EditorIntent = action === "return_to_draft" ? "save" : action;
       const body = readMarkdown(editor);
+      const intent: EditorIntent = action;
       setLastIntent(intent);
 
       const result = validationFor(intent, body);
@@ -291,54 +313,61 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
       const payload: PatchArticleBody = {
         title: trimmedTitle,
         departments,
+        audience,
         ...(body !== baseline.markdown || isNew ? { body_markdown: body } : {}),
         ...(changeSummary.trim() ? { change_summary: changeSummary.trim() } : {}),
       };
 
       setBusy(action);
       try {
-        if (action === "create") {
+        if (isNew) {
+          // A new procedure is created as a draft. Choosing Publish publishes it
+          // in the same action — the whole loop is write → publish → read
+          // (prompt 7c: no review step in between).
           const created = await createArticle({
             title: trimmedTitle,
             body_markdown: body,
             departments,
+            audience,
           });
           setBaseline({ title: created.title, markdown: body, departments: created.departments });
+          setAudience(created.audience);
+
+          if (action === "publish") {
+            const published = await patchArticle(created.slug, {
+              status: "published",
+              change_summary: changeSummary.trim() || "Initial publication.",
+            });
+            setStatus(published.status);
+            router.push(`/portal?article=${encodeURIComponent(published.slug)}`);
+            return;
+          }
+
           router.replace(`/articles/${encodeURIComponent(created.slug)}/edit`);
           return;
         }
 
         if (!slug) return;
+        // A published procedure's save omits `status`: it stays live and the API
+        // snapshots a new version when the content actually changed.
         const next: PatchArticleBody = { ...payload };
-        if (action === "submit_review") {
-          next.status = "in_review";
-          next.reviewer_id = reviewerId;
-        } else if (action === "return_to_draft") {
-          next.status = "draft";
-        } else if (action === "publish") {
-          next.status = "published";
-          next.reviewer_id = reviewerId;
-        }
+        if (action === "publish") next.status = "published";
 
         const saved = await patchArticle(slug, next);
         setStatus(saved.status);
+        setAudience(saved.audience);
+        setEssential(saved.is_essential);
         setBaseline({ title: saved.title, markdown: body, departments: saved.departments });
         setChangeSummary("");
         setLastIntent(null);
 
         if (action === "publish") {
+          // Straight to the reader: the new procedure is live and at the top of
+          // the Knowledge Home feed.
           router.push(`/portal?article=${encodeURIComponent(saved.slug)}`);
           return;
         }
-        showFeedback({
-          kind: "success",
-          message:
-            action === "submit_review"
-              ? "Submitted for review. A clinical lead can now review and publish it."
-              : action === "return_to_draft"
-                ? "Returned to draft."
-                : "Saved.",
-        });
+        showFeedback({ kind: "success", message: "Saved." });
       } catch (caught) {
         if (caught instanceof ApiRequestError) {
           showFeedback({
@@ -354,8 +383,37 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
         setBusy(null);
       }
     },
-    [editor, busy, validationFor, title, departments, baseline, changeSummary, isNew, slug, reviewerId, router],
+    [editor, busy, validationFor, title, departments, audience, baseline, changeSummary, isNew, slug, router],
   );
+
+  /**
+   * Essential SOP curation (prompt 7c, item 3). A metadata-only PATCH: the API
+   * writes the flag, records no version, and leaves the procedure's publish
+   * timestamp — and therefore its place in the Knowledge Home feed — alone.
+   */
+  const toggleEssential = useCallback(async () => {
+    if (!slug || busy) return;
+    setFeedback(null);
+    setBusy("essential");
+    try {
+      const saved = await patchArticle(slug, { is_essential: !essential });
+      setEssential(saved.is_essential);
+      showFeedback({
+        kind: "success",
+        message: saved.is_essential
+          ? "Pinned to the top of the Knowledge Home as an Essential SOP."
+          : "Removed from the Essential SOPs.",
+      });
+    } catch (caught) {
+      if (caught instanceof ApiRequestError) {
+        showFeedback({ kind: "error", status: caught.status, message: caught.message, details: caught.details });
+      } else {
+        showFeedback({ kind: "error", status: 0, message: "Could not change the Essential flag. Try again." });
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [slug, busy, essential]);
 
   // Ctrl/Cmd+S saves (as a draft / in place — never publishes).
   useEffect(() => {
@@ -395,13 +453,11 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
     [registrySource],
   );
 
-  const selectedReviewer = reviewers.find((reviewer) => reviewer.id === reviewerId) ?? null;
-
   /* ---------------------------------------------------------------- render */
-  const needsReviewer = status === "draft" || status === "in_review" || status === "published";
   const summaryRequired = !isNew && contentChanged;
   const summaryErrors = errorsFor("summary");
-  const reviewerErrors = errorsFor("reviewer");
+  /** The Essential toggle is offered on a procedure that is already live. */
+  const essentialToggleVisible = !isNew && status === "published" && canCurate;
 
   return (
     <div className="flex h-dvh flex-col bg-[#F4F4F5] text-zinc-900">
@@ -429,6 +485,41 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />
               Unsaved changes
             </span>
+          ) : null}
+          {essentialToggleVisible ? (
+            /*
+             * Essential SOP curation (prompt 7c, item 3). Sits in the composer
+             * header for a live procedure so a clinical lead can pin it without
+             * opening a draft — the write is metadata-only, so it neither
+             * versions the procedure nor moves its publish time.
+             */
+            <button
+              type="button"
+              onClick={() => void toggleEssential()}
+              disabled={busy !== null}
+              aria-pressed={essential}
+              title={
+                essential
+                  ? "Essential SOP — pinned to the top of the Knowledge Home"
+                  : "Pin this procedure to the top of the Knowledge Home"
+              }
+              className={cx(
+                "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/45 focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-60",
+                essential
+                  ? "border-[#5F6E00]/30 bg-[#AFBE23]/20 text-[#3F4A00]"
+                  : "border-zinc-300/60 bg-white text-zinc-700 hover:border-[#5F6E00]/40 hover:text-[#3F4A00]",
+              )}
+            >
+              <Star
+                size={14}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                fill={essential ? "#AFBE23" : "none"}
+              />
+              {busy === "essential" ? "Saving…" : "Essential SOP"}
+            </button>
           ) : null}
           {slug ? (
             <button type="button" className={cx(secondaryButton, "h-8 px-2.5 text-[13px]")} onClick={() => setHistoryOpen(true)}>
@@ -637,11 +728,10 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
                 id="change-summary"
                 value={changeSummary}
                 onChange={(event) => setChangeSummary(event.target.value)}
-                disabled={isNew}
-                placeholder={isNew ? "Not needed for a new draft" : "What changed, and why? Becomes this version’s changelog."}
+                placeholder="What changed, and why? Becomes this version’s changelog."
                 aria-invalid={summaryErrors.length > 0 ? true : undefined}
                 aria-describedby={summaryErrors.length > 0 ? "change-summary-error" : undefined}
-                className={cx(fieldClass, summaryErrors.length > 0 && "border-red-300", isNew && "bg-zinc-50")}
+                className={cx(fieldClass, summaryErrors.length > 0 && "border-red-300")}
               />
               {summaryErrors.map((issue) => (
                 <p key={issue.code} id="change-summary-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -650,60 +740,49 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
               ))}
             </div>
 
-            {!isNew && needsReviewer ? (
-              <div className="w-full sm:w-64">
-                <label htmlFor="reviewer" className="mb-1 block text-xs font-semibold text-zinc-600">
-                  Reviewer (clinical lead)
-                </label>
-                <select
-                  id="reviewer"
-                  value={reviewerId}
-                  onChange={(event) => setReviewerId(event.target.value)}
-                  aria-invalid={reviewerErrors.length > 0 ? true : undefined}
-                  aria-describedby={reviewerErrors.length > 0 ? "reviewer-error" : undefined}
-                  className={cx(fieldClass, reviewerErrors.length > 0 && "border-red-300")}
-                >
-                  <option value="">Choose a reviewer…</option>
-                  {reviewers.map((reviewer) => (
-                    <option key={reviewer.id} value={reviewer.id}>
-                      {reviewer.name}
-                      {reviewer.title ? ` — ${reviewer.title}` : ""}
-                    </option>
-                  ))}
-                </select>
-                {reviewerErrors.map((issue) => (
-                  <p key={issue.code} id="reviewer-error" role="alert" className="mt-1 text-xs text-red-700">
-                    {issue.message}
-                  </p>
+            {/*
+              * Audience selector (prompt 7c, item 6). Content metadata, not a
+              * permission: it steers the Knowledge Home feed's default view.
+              * Default first, then the two narrower choices.
+              */}
+            <div className="w-full sm:w-56">
+              <label htmlFor="audience" className="mb-1 block text-xs font-semibold text-zinc-600">
+                Audience
+              </label>
+              <select
+                id="audience"
+                value={audience}
+                onChange={(event) => setAudience(event.target.value as ArticleAudience)}
+                className={fieldClass}
+              >
+                {AUDIENCE_CHOICES.map((choice) => (
+                  <option key={choice} value={choice}>
+                    {choice === "ALL" ? "All staff" : AUDIENCE_LABELS[choice]}
+                  </option>
                 ))}
-              </div>
-            ) : null}
+              </select>
+              <p className="mt-1 text-[11.5px] leading-4 text-zinc-500">
+                Everyone can still read this procedure; the selector only sets which feed it
+                appears in by default.
+              </p>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {isNew ? (
-                <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("create")}>
-                  {busy === "create" ? "Creating…" : "Create draft"}
-                </button>
+                <>
+                  <button type="button" className={secondaryButton} disabled={!editor || busy !== null} onClick={() => void run("create")}>
+                    {busy === "create" ? "Saving…" : "Save draft"}
+                  </button>
+                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("publish")}>
+                    {busy === "publish" ? "Publishing…" : "Publish"}
+                  </button>
+                </>
               ) : null}
 
               {!isNew && status === "draft" ? (
                 <>
                   <button type="button" className={secondaryButton} disabled={!editor || busy !== null} onClick={() => void run("save")}>
                     {busy === "save" ? "Saving…" : "Save draft"}
-                  </button>
-                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("submit_review")}>
-                    {busy === "submit_review" ? "Submitting…" : "Submit for review"}
-                  </button>
-                </>
-              ) : null}
-
-              {!isNew && status === "in_review" ? (
-                <>
-                  <button type="button" className={secondaryButton} disabled={!editor || busy !== null} onClick={() => void run("return_to_draft")}>
-                    {busy === "return_to_draft" ? "Returning…" : "Return to draft"}
-                  </button>
-                  <button type="button" className={secondaryButton} disabled={!editor || busy !== null} onClick={() => void run("save")}>
-                    {busy === "save" ? "Saving…" : "Save changes"}
                   </button>
                   <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("publish")}>
                     {busy === "publish" ? "Publishing…" : "Publish"}
@@ -712,32 +791,24 @@ export default function ArticleEditor({ viewer, article, registrySource, reviewe
               ) : null}
 
               {!isNew && status === "published" ? (
-                canPublish ? (
-                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("publish")}>
-                    {busy === "publish" ? "Republishing…" : "Save & republish"}
-                  </button>
-                ) : (
-                  // An author's save omits `status`, so the procedure stays
-                  // published and a new version is recorded — republication
-                  // without the clinical-lead-only explicit publish.
-                  <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("save")}>
-                    {busy === "save" ? "Saving…" : "Save changes"}
-                  </button>
-                )
+                <button type="button" className={primaryButton} disabled={!editor || busy !== null} onClick={() => void run("save")}>
+                  {busy === "save" ? "Saving…" : contentChanged ? "Save & republish" : "Save changes"}
+                </button>
               ) : null}
             </div>
           </div>
 
-          {!isNew && status === "in_review" && !canPublish ? (
+          {status === "draft" ? (
             <p className="text-xs leading-5 text-zinc-500">
-              Publishing needs the clinical lead role (you are signed in as {ROLE_LABELS[viewer.role].toLowerCase()}). You can edit and save;
-              a clinical lead publishes.
+              Publishing makes this procedure live immediately and records version 1. There is no
+              review step — you can edit and publish again at any time.
             </p>
           ) : null}
           {!isNew && status === "published" ? (
             <p className="text-xs leading-5 text-zinc-500">
-              This procedure is live. Saving republishes it immediately and records a new version
-              {selectedReviewer ? ` reviewed by ${selectedReviewer.name}` : ""}.
+              This procedure is live. Saving records a new immutable version when the title or body
+              changed; the Essential toggle in the header pins it to the top of the Knowledge Home
+              without versioning it.
             </p>
           ) : null}
         </div>

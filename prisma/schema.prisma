@@ -31,12 +31,30 @@ enum Role {
   readonly
 }
 
-/// Article lifecycle. Extends the phase-1 `draft | published` union with the
-/// optional review step; `types/portal.ts` mirrors this.
+/// Article lifecycle. **Prompt 7c removed the review step**: a procedure is a
+/// draft until its author publishes it, and publishing is immediate. The
+/// `in_review` state is gone from the enum (existing rows were migrated to
+/// `draft`), so the type is the phase-1 `draft | published` union again.
+/// `types/portal.ts` mirrors this.
 enum ArticleStatus {
   draft
-  in_review
   published
+}
+
+/// A person's staff type, used for the Knowledge Home feed's default audience
+/// (prompt 7c). Nullable — an account nobody has classified yet lands on the
+/// "All" switcher, and it is deliberately **not** a permission boundary.
+enum StaffType {
+  MEDICAL
+  NON_MEDICAL
+}
+
+/// Who a procedure is written for. Drives the Knowledge Home audience switcher;
+/// `ALL` is the default so existing content stays visible to everyone.
+enum ArticleAudience {
+  MEDICAL
+  NON_MEDICAL
+  ALL
 }
 
 /// **Unused since prompt 6c.** Superseded by the `pinned` / `urgent` booleans on
@@ -95,6 +113,12 @@ model User {
 
   role Role @default(staff)
 
+  /// Medical or non-medical staff (prompt 7c). Set by an approver when an
+  /// access request is approved, or by an administrator afterwards. Nullable =
+  /// "unassigned", and the Knowledge Home feed then defaults its audience
+  /// switcher to "All".
+  staffType StaffType? @map("staff_type")
+
   /// bcrypt hash for the dev Credentials provider. Nullable because
   /// IdP-authenticated accounts (OIDC/SAML) never get a local password.
   passwordHash String? @map("password_hash")
@@ -138,10 +162,23 @@ model Article {
 
   status ArticleStatus @default(draft)
 
+  /// Curated by a clinical lead (prompt 7c): an Essential SOP sits in its own
+  /// section above the Knowledge Home feed. Toggling it is metadata-only — it
+  /// never publishes, never versions, and never touches `updated_at`.
+  isEssential Boolean @default(false) @map("is_essential")
+
+  /// Who this procedure is written for (prompt 7c). Not a permission boundary:
+  /// it only steers the Knowledge Home audience switcher's default view.
+  audience ArticleAudience @default(ALL)
+
   authorId   String  @map("author_id") @db.Uuid
+  /// **Legacy since prompt 7c.** Publishing no longer needs a reviewer, so
+  /// nothing writes this column any more; it survives so the recorded history of
+  /// who used to sign off is not thrown away. No application code gates on it.
   reviewerId String? @map("reviewer_id") @db.Uuid
 
-  /// Required to publish (enforced in the API, not just the UI).
+  /// Set automatically to the moment of publication. Required to publish
+  /// (enforced in the API, not just the UI).
   effectiveDate DateTime? @map("effective_date")
 
   /// Import provenance (see scripts/import-mediawiki). Populated only by the

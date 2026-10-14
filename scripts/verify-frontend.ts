@@ -33,6 +33,7 @@ process.env.DATABASE_URL = VERIFY_DATABASE_URL;
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -204,8 +205,23 @@ import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { BulletinActionsMenu } from "@/components/bulletin/PinnedStrip";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
+import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
+import { SopFeedList } from "@/components/knowledge/SopFeedList";
+import {
+  RESULTS_BANNER_TEXT,
+  defaultAudience,
+  departmentCounts,
+  departmentOptions,
+  essentialArticles,
+  feedArticles,
+  lastPublishedAt,
+  searchFeedArticles,
+  versionJumpLabel,
+} from "@/lib/knowledge/feed";
+import { relativeTime } from "@/lib/knowledge/relative-time";
+import { parseStaffType, staffTypeForDepartments, staffTypeLabel } from "@/lib/staff-type";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
-import type { Bulletin } from "@/types/portal";
+import type { Bulletin, KnowledgeArticle } from "@/types/portal";
 import { dragWrappersAsUnit, excludeFootnotesAndTables } from "@/components/editor/dragHandle";
 
 let passed = 0;
@@ -368,7 +384,7 @@ check("zero-result query returns recovery data, never nothing", () => {
 
 console.log("editor validation");
 const registry = buildLinkRegistry(KNOWLEDGE_ARTICLES.map((a) => ({ slug: a.slug, bodyMarkdown: a.body_markdown })));
-const base = { title: "T", markdown: "## A\n\ntext", departments: ["ER"], intent: "save" as const, reviewerId: null, changeSummary: "x", contentChanged: true };
+const base = { title: "T", markdown: "## A\n\ntext", departments: ["ER"], intent: "save" as const, changeSummary: "x", contentChanged: true };
 check("clean article has no errors", () => assert.deepEqual(validateArticle(base, registry).errors, []));
 check("blocks empty title, long title, empty body, no departments", () => {
   const codes = (o: object) => validateArticle({ ...base, ...o }, registry).errors.map((e) => e.code);
@@ -377,9 +393,16 @@ check("blocks empty title, long title, empty body, no departments", () => {
   assert.deepEqual(codes({ markdown: "" }), ["body_empty"]);
   assert.deepEqual(codes({ departments: [] }), ["no_departments"]);
 });
-check("submit needs a reviewer; edits need a change summary", () => {
-  assert.deepEqual(validateArticle({ ...base, intent: "submit_review" }, registry).errors.map((e) => e.code), ["reviewer_required"]);
+check("publishing is direct — the reviewer requirement is gone; edits need a change summary", () => {
+  // Prompt 7c removed the review gate, so a publish validates exactly like a
+  // save: no `reviewer_required` code exists any more.
+  assert.deepEqual(validateArticle({ ...base, intent: "publish" }, registry).errors.map((e) => e.code), []);
   assert.deepEqual(validateArticle({ ...base, changeSummary: "" }, registry).errors.map((e) => e.code), ["summary_required"]);
+  // A brand-new procedure is exempt from the summary rule (nothing has changed).
+  assert.deepEqual(
+    validateArticle({ ...base, intent: "create", contentChanged: false, changeSummary: "" }, registry).errors.map((e) => e.code),
+    [],
+  );
 });
 check("broken slug and broken anchor block; skipped heading level only warns", () => {
   const r = validateArticle({ ...base, markdown: "### Jump\n\n[a](/procedures/nope) [b](#nowhere)" }, registry);
@@ -2382,6 +2405,441 @@ check("a staged attachment expires after a day, and the edge is inclusive", () =
 });
 
 console.log("attachments (async guards)");
+
+console.log("knowledge home (prompt 7c)");
+
+/* ------------------------------------------------------- face fixtures */
+
+/** A published procedure, built to order. */
+function sop(overrides: Partial<KnowledgeArticle> = {}): KnowledgeArticle {
+  return {
+    id: overrides.slug ?? "sop-1",
+    slug: "sop-1",
+    title: "Procedure",
+    departments: ["ER"],
+    status: "published",
+    body_markdown: "## Body\n\nText.",
+    updated_at: "2026-09-01T00:00:00.000Z",
+    author_name: "Trevor Lindqvist, ICU Technician II",
+    last_reviewed_at: "2026-09-01T00:00:00.000Z",
+    is_essential: false,
+    audience: "ALL",
+    latest_published_version: 1,
+    previous_published_version: null,
+    latest_published_by: "Trevor Lindqvist, ICU Technician II",
+    ...overrides,
+  };
+}
+
+check("the feed orders strictly by publish time, and drafts never appear in it", () => {
+  const older = sop({ slug: "older", title: "Older", last_reviewed_at: "2026-08-01T00:00:00.000Z" });
+  const newer = sop({ slug: "newer", title: "Newer", last_reviewed_at: "2026-09-20T00:00:00.000Z" });
+  /** A draft whose `updated_at` is the newest of all — it must not surface. */
+  const draft = sop({
+    slug: "draft",
+    title: "Draft",
+    status: "draft",
+    last_reviewed_at: null,
+    updated_at: "2026-10-01T00:00:00.000Z",
+  });
+  const feed = feedArticles([older, draft, newer], { audience: "ALL" });
+  assert.deepEqual(feed.map((article) => article.slug), ["newer", "older"]);
+
+  // Saving a draft must not move it into the feed — drafts have no publish time
+  // at all, and `lastPublishedAt` falls back to `updated_at` only for a legacy
+  // *published* row with no version history.
+  assert.equal(feed.some((article) => article.status !== "published"), false);
+});
+
+check("a published row with no version history falls back to its own timestamp", () => {
+  const legacy = sop({
+    slug: "legacy",
+    last_reviewed_at: null,
+    updated_at: "2026-07-04T09:00:00.000Z",
+  });
+  assert.equal(lastPublishedAt(legacy), "2026-07-04T09:00:00.000Z");
+  assert.deepEqual(feedArticles([legacy], { audience: "ALL" }).map((article) => article.slug), ["legacy"]);
+});
+
+check("the version jump badge is `v8 → v9` after a republication and plain `v1` at first publish", () => {
+  assert.equal(versionJumpLabel(sop({ latest_published_version: 1, previous_published_version: null })), "v1");
+  assert.equal(versionJumpLabel(sop({ latest_published_version: 9, previous_published_version: 8 })), "v8 \u2192 v9");
+  // A never-published draft has no badge at all.
+  assert.equal(versionJumpLabel(sop({ status: "draft", latest_published_version: null, previous_published_version: null })), null);
+  // The arrow is the typographic one, never ASCII.
+  const jump = versionJumpLabel(sop({ latest_published_version: 2, previous_published_version: 1 }));
+  assert.equal(jump, "v1 \u2192 v2");
+  assert.equal(jump?.includes("->"), false);
+});
+
+check("the audience switcher starts on the viewer's staff type, and admits ALL-documents from every position", () => {
+  assert.equal(defaultAudience("MEDICAL"), "MEDICAL");
+  assert.equal(defaultAudience("NON_MEDICAL"), "NON_MEDICAL");
+  assert.equal(defaultAudience(null), "ALL");
+  assert.equal(defaultAudience(undefined), "ALL");
+
+  const medicalOnly = sop({ slug: "med", audience: "MEDICAL" });
+  const nonMedicalOnly = sop({ slug: "nonmed", audience: "NON_MEDICAL" });
+  const everyone = sop({ slug: "all", audience: "ALL" });
+
+  const asMedical = feedArticles([medicalOnly, nonMedicalOnly, everyone], { audience: "MEDICAL" }).map((a) => a.slug);
+  assert.deepEqual(asMedical.sort(), ["all", "med"]);
+  const asNonMedical = feedArticles([medicalOnly, nonMedicalOnly, everyone], { audience: "NON_MEDICAL" }).map((a) => a.slug);
+  assert.deepEqual(asNonMedical.sort(), ["all", "nonmed"]);
+  const asAll = feedArticles([medicalOnly, nonMedicalOnly, everyone], { audience: "ALL" }).map((a) => a.slug);
+  assert.deepEqual(asAll.sort(), ["all", "med", "nonmed"]);
+});
+
+check("the department chip and the switcher compose as a logical AND", () => {
+  const icu = sop({ slug: "icu", departments: ["ICU"], audience: "MEDICAL" });
+  const er = sop({ slug: "er", departments: ["ER"], audience: "MEDICAL" });
+  const both = feedArticles([icu, er], { audience: "MEDICAL", department: "ICU" });
+  assert.deepEqual(both.map((a) => a.slug), ["icu"]);
+  assert.deepEqual(feedArticles([icu, er], { audience: "NON_MEDICAL", department: "ICU" }), []);
+});
+
+check("the Essential section is title-sorted, published-only, and audience-filtered", () => {
+  const zeta = sop({ slug: "zeta", title: "Zeta", is_essential: true });
+  const alpha = sop({ slug: "alpha", title: "Alpha", is_essential: true });
+  const hidden = sop({ slug: "hidden", title: "Aardvark", is_essential: true, audience: "NON_MEDICAL" });
+  const plain = sop({ slug: "plain", title: "Beta" });
+  const draftEssential = sop({ slug: "draft-essential", title: "Aaa", status: "draft", is_essential: true });
+
+  const essential = essentialArticles([zeta, alpha, hidden, plain, draftEssential], "MEDICAL");
+  assert.deepEqual(essential.map((a) => a.slug), ["alpha", "zeta"]);
+  assert.deepEqual(essentialArticles([plain], "ALL"), []);
+});
+
+check("the department chips are derived from the corpus, sorted by label, with All Departments first", () => {
+  const options = departmentOptions(
+    [sop({ slug: "a", departments: ["ICU", "ER"] }), sop({ slug: "b", departments: ["Cardiology"] })],
+    "ALL",
+  );
+  assert.equal(options[0], "All");
+  assert.deepEqual(options, ["All", "Cardiology", "ER", "ICU"]);
+  // A draft's departments are not part of the chip taxonomy.
+  assert.deepEqual(departmentOptions([sop({ slug: "d", departments: ["Exotics"], status: "draft" })], "ALL"), ["All"]);
+  const counts = departmentCounts([sop({ slug: "a", departments: ["ICU"] })], "ALL");
+  assert.equal(counts.All, 1);
+  assert.equal(counts.ICU, 1);
+});
+
+check("Results Mode searches the whole published corpus, whatever the filters are", () => {
+  const index = buildSearchIndex(KNOWLEDGE_ARTICLES, [], []);
+
+  // "parvo" finds the isolation protocol (audience ALL) and "scruff" appears only
+  // in the draft fixture's body — a draft is never a search result.
+  const parvo = searchFeedArticles(KNOWLEDGE_ARTICLES, index, "parvo");
+  assert.ok(parvo.length >= 1, "the published parvovirus SOP must be findable");
+  assert.equal(parvo.every((article) => article.status === "published"), true);
+  assert.deepEqual(searchFeedArticles(KNOWLEDGE_ARTICLES, index, "scruff"), []);
+  // An empty query is not a search: Results Mode is entered on non-whitespace.
+  assert.deepEqual(searchFeedArticles(KNOWLEDGE_ARTICLES, index, "   "), []);
+});
+
+check("relative publish time is Intl.RelativeTimeFormat's, with 'just now' at the low end", () => {
+  const now = Date.parse("2026-10-14T19:00:00.000Z");
+  assert.equal(relativeTime("2026-10-14T18:59:50.000Z", now), "just now");
+  assert.equal(relativeTime("2026-10-14T18:40:00.000Z", now), "20 minutes ago");
+  assert.equal(relativeTime("2026-10-14T16:00:00.000Z", now), "3 hours ago");
+  assert.equal(relativeTime("2026-10-13T18:00:00.000Z", now), "yesterday");
+  assert.equal(relativeTime("2026-09-30T19:00:00.000Z", now), "2 weeks ago");
+  assert.equal(relativeTime("not a date", now), null);
+});
+
+check("staff-type parsing accepts the two types and treats blank as unassigned", () => {
+  assert.deepEqual(parseStaffType("MEDICAL"), { ok: true, staffType: "MEDICAL" });
+  assert.deepEqual(parseStaffType("NON_MEDICAL"), { ok: true, staffType: "NON_MEDICAL" });
+  assert.deepEqual(parseStaffType(""), { ok: true, staffType: null });
+  assert.deepEqual(parseStaffType(null), { ok: true, staffType: null });
+  assert.deepEqual(parseStaffType(undefined), { ok: true, staffType: null });
+  assert.equal(parseStaffType("VETERINARY").ok, false);
+  assert.equal(parseStaffType(7).ok, false);
+  assert.equal(staffTypeLabel(null), "Unassigned");
+  assert.equal(staffTypeLabel("NON_MEDICAL"), "Non-medical");
+});
+
+check("the fixture roster's staff types are derived from its own departments", () => {
+  const trevor = STAFF_DIRECTORY.find((member) => member.system_id === "EH-1188");
+  const nadia = STAFF_DIRECTORY.find((member) => member.system_id === "EH-0855");
+  assert.equal(staffTypeForDepartments(trevor?.departments ?? []), "MEDICAL");
+  assert.equal(staffTypeForDepartments(nadia?.departments ?? []), "NON_MEDICAL");
+});
+
+/* ------------------------------------------------- rendered surface */
+
+const KNOWLEDGE_INDEX = buildSearchIndex(KNOWLEDGE_ARTICLES, [], []);
+const KNOWLEDGE_NOW = Date.parse("2026-10-14T19:00:00.000Z");
+
+function renderKnowledgeHome(overrides: Partial<Parameters<typeof KnowledgeHome>[0]> = {}): string {
+  return renderToStaticMarkup(
+    createElement(KnowledgeHome, {
+      articles: KNOWLEDGE_ARTICLES,
+      index: KNOWLEDGE_INDEX,
+      staffType: null,
+      query: "",
+      onQueryChange: () => {},
+      selectedId: null,
+      onSelect: () => {},
+      detail: null,
+      now: KNOWLEDGE_NOW,
+      ...overrides,
+    }),
+  );
+}
+
+check("Feed Mode shows the Essential SOPs section, the switcher, and the publish-time feed", () => {
+  const html = renderKnowledgeHome();
+  assert.ok(html.includes("Essential SOPs"), "the Essential SOPs section is missing");
+  // The two curated fixtures, title-sorted: Canine Parvovirus… before Code Blue…
+  assert.ok(
+    html.indexOf("Canine Parvovirus Isolation Protocol") < html.indexOf("Code Blue: RECOVER Resuscitation Team Roles"),
+    "the Essential section must be sorted by title",
+  );
+  assert.ok(html.includes("Dove Hub"), "the brand lockup is missing");
+  assert.ok(html.includes("Search all published SOPs"), "the search hero is missing");
+  assert.ok(html.includes("Ctrl Space"), "the shortcut affordance is missing");
+  // Recency: the most recently published fixture leads the feed. (The Essential
+  // section sits above it, so the comparison is between two uncurated titles.)
+  assert.ok(
+    html.indexOf("Client Estimates, Deposits &amp; Payment Plans") <
+      html.indexOf("Chemotherapy Extravasation Response"),
+    "the feed must lead with the most recently published procedure",
+  );
+});
+
+check("the audience switcher's default position follows the viewer's staff type", () => {
+  const asMedical = renderKnowledgeHome({ staffType: "MEDICAL" });
+  assert.match(asMedical, /aria-pressed="true"[^>]*>Medical</);
+  const asNonMedical = renderKnowledgeHome({ staffType: "NON_MEDICAL" });
+  assert.match(asNonMedical, /aria-pressed="true"[^>]*>Non-medical</);
+  const unassigned = renderKnowledgeHome({ staffType: null });
+  assert.match(unassigned, /aria-pressed="true"[^>]*>All</);
+});
+
+check("an unassigned viewer sees the non-medical-only procedure, a medical viewer does not", () => {
+  // "Client Estimates…" is written for non-medical staff.
+  assert.ok(renderKnowledgeHome({ staffType: null }).includes("Client Estimates"));
+  assert.equal(renderKnowledgeHome({ staffType: "MEDICAL" }).includes("Client Estimates"), false);
+  // …and it is still in the Essential-section-free corpus, so Results Mode finds it.
+  assert.ok(renderKnowledgeHome({ staffType: "MEDICAL", query: "estimates" }).includes("Client Estimates"));
+});
+
+check("Results Mode collapses the Essential section and bypasses the switches", () => {
+  const html = renderKnowledgeHome({ query: "parvovirus" });
+  assert.equal(html.includes("Essential SOPs"), false, "the Essential section must collapse");
+  assert.ok(html.includes(RESULTS_BANNER_TEXT), "the results banner is missing");
+  assert.ok(html.includes("Clear search"), "the results banner must offer the way back");
+  assert.ok(html.includes("Search all published SOPs (Ctrl Space)"), "the hero stays in Results Mode");
+  assert.ok(html.includes("Canine Parvovirus Isolation Protocol"), "the matching procedure is missing");
+  assert.equal(html.includes("Cardiology"), false, "the department chips must be bypassed in Results Mode");
+});
+
+check("a zero-result search says so without pretending the filters are at fault", () => {
+  const html = renderKnowledgeHome({ query: "zzzznothing" });
+  assert.ok(html.includes("No published SOPs match this search."));
+  assert.equal(html.includes("No published SOPs match these filters."), false);
+});
+
+check("the combined-filter empty state offers a reset, and no Essential placeholder box", () => {
+  const html = renderStaticMarkupWithNoEssential();
+  assert.ok(html.includes("No published SOPs match these filters."));
+  assert.ok(html.includes("Reset filters"));
+  assert.equal(html.includes("Essential SOPs"), false, "zero Essential SOPs must hide the section entirely");
+});
+
+/** The rail with nothing but drafts — the combined empty state, and no Essential section. */
+function renderStaticMarkupWithNoEssential(): string {
+  const draftsOnly = KNOWLEDGE_ARTICLES.filter((article) => article.status === "draft");
+  return renderToStaticMarkup(
+    createElement(KnowledgeHome, {
+      articles: draftsOnly,
+      index: buildSearchIndex(draftsOnly, [], []),
+      staffType: null,
+      query: "",
+      onQueryChange: () => {},
+      selectedId: null,
+      onSelect: () => {},
+      detail: null,
+      now: KNOWLEDGE_NOW,
+    }),
+  );
+}
+
+check("the feed row renders the author, the version jump, the departments and the relative time", () => {
+  const html = renderToStaticMarkup(
+    createElement(SopFeedList, {
+      article: sop({
+        title: "Row procedure",
+        departments: ["ICU"],
+        latest_published_version: 2,
+        previous_published_version: 1,
+        audience: "MEDICAL",
+        last_reviewed_at: "2026-10-14T16:00:00.000Z",
+      }),
+      isSelected: false,
+      now: KNOWLEDGE_NOW,
+    }),
+  );
+  assert.ok(html.includes("Row procedure"));
+  assert.ok(html.includes("v1 \u2192 v2"), "the version jump is missing");
+  assert.ok(html.includes("ICU"));
+  assert.ok(html.includes("3 hours ago"), "the relative publish time is missing");
+  assert.ok(html.includes("Medical"), "the audience pill is missing");
+  assert.equal(html.includes("Essential"), false, "a standard row carries no Essential chip");
+
+  const essentialRow = renderToStaticMarkup(
+    createElement(SopFeedList, { article: sop({ is_essential: true }), isSelected: false, now: KNOWLEDGE_NOW, variant: "essential" }),
+  );
+  assert.ok(essentialRow.includes("Essential"));
+
+  const firstPublish = renderToStaticMarkup(
+    createElement(SopFeedList, {
+      article: sop({ latest_published_version: 1, previous_published_version: null }),
+      isSelected: false,
+      now: KNOWLEDGE_NOW,
+    }),
+  );
+  assert.ok(firstPublish.includes(">v1<"), "an initial publish shows plain v1");
+});
+
+/* ------------------------------------------------------- byte-level rules */
+
+/**
+ * The files this batch owns end to end (new in prompt 7c, or rewritten by it):
+ * every one of them is scanned whole. Files the batch merely *edits* are checked
+ * through the working-tree diff instead, because they carry pre-existing teal
+ * chrome from the earlier colourway that later prompts own.
+ */
+const KNOWLEDGE_FILES = [
+  "components/knowledge/BrandLockup.tsx",
+  "components/knowledge/KnowledgeHome.tsx",
+  "components/knowledge/SopSearchHero.tsx",
+  "components/knowledge/AudienceSwitcher.tsx",
+  "components/knowledge/DepartmentChips.tsx",
+  "components/knowledge/SopFeedList.tsx",
+  "lib/knowledge/feed.ts",
+  "lib/knowledge/relative-time.ts",
+  "lib/staff-type.ts",
+  "lib/data/users.ts",
+];
+
+/** Class prefixes and hexes that are banned outright (locked 2026-10-10). */
+const TEAL = /(teal|cyan)[-_]|#0f766e|#14b8a6|#0d9488|#06b6d4/i;
+/**
+ * Emoji, in the ranges that matter: pictographs, symbols, dingbats. Deliberately
+ * excludes U+2190–U+21FF, so the typographic arrow (`→`, U+2192) the version
+ * badge uses stays legal.
+ */
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}\u{1F000}-\u{1F2FF}]/u;
+
+function addedLinesFor(paths: readonly string[]): string[] {
+  // `-U0` gives context-free hunks, so every line starting with "+" (and not
+  // "+++") is a line this batch introduced. Untracked files do not appear in a
+  // diff at all, which is why the batch's own new files are scanned whole above.
+  try {
+    const diff = execFileSync("git", ["diff", "-U0", "--", ...paths], { encoding: "utf8" });
+    return diff
+      .split("\n")
+      .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+      .map((line) => line.slice(1));
+  } catch {
+    // No git, or no repository: nothing to attribute to this batch.
+    return [];
+  }
+}
+
+/**
+ * Every path the working tree has touched. Two exclusions:
+ *
+ *  - `prisma/migrations/**` is history: the first migration created
+ *    `ArticleStatus` with `in_review` in it, and that is what it did at the time.
+ *  - `generated/prisma/**` is Prisma's own output (checked in, but regenerated by
+ *    `prisma generate`), and `scripts/**` is where these checks live, so it
+ *    necessarily *names* the tokens being banned (the teal pattern, the removed
+ *    state). Scanning either would flag the scanner rather than the surface.
+ */
+function modifiedPaths(): string[] {
+  try {
+    return execFileSync("git", ["diff", "--name-only"], { encoding: "utf8" })
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(
+        (line) =>
+          line.length > 0 &&
+          !line.startsWith("prisma/migrations/") &&
+          !line.startsWith("generated/") &&
+          !line.startsWith("scripts/"),
+      );
+  } catch {
+    return [];
+  }
+}
+
+check("the Knowledge Home files carry no teal and no emoji", () => {
+  for (const file of KNOWLEDGE_FILES) {
+    const source = readFileSync(path.join(process.cwd(), file), "utf8");
+    assert.equal(TEAL.test(source), false, `${file} contains teal/cyan`);
+    assert.equal(EMOJI.test(source), false, `${file} contains an emoji`);
+  }
+});
+
+check("nothing this batch added carries teal or an emoji", () => {
+  // Attribution is line-level: the files the batch only edits still carry the
+  // earlier colourway's teal elsewhere, and that migration belongs to its own
+  // prompt. What this asserts is that *no line prompt 7c introduced* adds teal,
+  // cyan, or an emoji anywhere. Post-commit the diff is empty and the check is
+  // vacuous — the whole-file scan above is the standing guard.
+  for (const line of addedLinesFor(modifiedPaths())) {
+    assert.equal(TEAL.test(line), false, `an added line carries teal: ${line.trim()}`);
+    assert.equal(EMOJI.test(line), false, `an added line carries an emoji: ${line.trim()}`);
+  }
+});
+
+check("no wiki-link syntax reaches a modified, added, or owned file", () => {
+  const sources = [
+    ...addedLinesFor(modifiedPaths()),
+    ...KNOWLEDGE_FILES.map((file) => readFileSync(path.join(process.cwd(), file), "utf8")),
+  ];
+  for (const source of sources) {
+    assert.equal(source.includes("[["), false, "wiki-link syntax found");
+  }
+});
+
+check("no `in_review` state is reachable anywhere in the application", () => {
+  /**
+   * Comment lines are stripped before searching: the assertion is about
+   * *reachable state*, and both the schema's doc comment and the migration
+   * history explain in prose which state was removed. The migration history
+   * (`prisma/migrations/**`) and `generated/prisma/**` (regenerated output) are
+   * skipped wholesale, as is `scripts/`, which names the state in order to
+   * assert its absence.
+   */
+  const stripComments = (source: string) =>
+    source
+      .split("\n")
+      .filter((line) => {
+        const trimmed = line.trim();
+        return !(trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*"));
+      })
+      .join("\n");
+
+  const roots = ["app", "components", "lib", "types"];
+  const offenders: string[] = [];
+  const visit = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (/\.(ts|tsx|css)$/.test(entry.name)) {
+        if (stripComments(readFileSync(full, "utf8")).includes("in_review")) offenders.push(full);
+      }
+    }
+  };
+  for (const root of roots) visit(path.join(process.cwd(), root));
+  const schema = readFileSync(path.join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+  if (stripComments(schema).includes("in_review")) offenders.push("prisma/schema.prisma");
+  assert.deepEqual(offenders, [], "the review state is still referenced");
+});
 
 /* ================================================= http guard (real server) === */
 

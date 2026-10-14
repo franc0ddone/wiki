@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { ApiError } from "@/lib/api";
 import { slugify } from "@/lib/slug";
 import { toKnowledgeArticle, type AuthorRow } from "@/lib/data/mappers";
-import type { Department, KnowledgeArticle } from "@/types/portal";
+import type { Department, ArticleAudience, KnowledgeArticle } from "@/types/portal";
 
 /**
  * Article (SOP) access — the drop-in replacement for the `KNOWLEDGE_ARTICLES`
@@ -21,34 +21,40 @@ import type { Department, KnowledgeArticle } from "@/types/portal";
 const AUTHOR_SELECT = { select: { name: true, title: true } } as const;
 
 /**
- * The latest published version, selected alongside every article read so the
- * reader's freshness badge needs no second round-trip. Publishing is the review
- * act, so the newest version's `created_at` *is* `last_reviewed_at`; `null`
+ * The two newest published versions, selected alongside every article read.
+ *
+ * Two, because the feed's version-jump badge is `v{previous} → v{latest}` and
+ * the newest version's `created_at` *is* `last_reviewed_at` (publishing is the
+ * review act; prompt 7c removed the separate reviewer gate). An empty array
  * means the procedure has never been published.
  */
-const LATEST_VERSION_SELECT = {
-  orderBy: { createdAt: "desc" },
-  take: 1,
-  select: { createdAt: true },
+const VERSIONS_SELECT = {
+  orderBy: { version: "desc" },
+  take: 2,
+  select: {
+    version: true,
+    createdAt: true,
+    changedBy: { select: { name: true, title: true } },
+  },
 } as const;
 
-const ARTICLE_INCLUDE = { author: AUTHOR_SELECT, versions: LATEST_VERSION_SELECT } as const;
+const ARTICLE_INCLUDE = { author: AUTHOR_SELECT, versions: VERSIONS_SELECT } as const;
 
 type ArticleWithAuthor = Prisma.ArticleGetPayload<{
   include: { author: typeof AUTHOR_SELECT };
 }>;
 
-type ArticleWithAuthorAndVersion = Prisma.ArticleGetPayload<{
-  include: { author: typeof AUTHOR_SELECT; versions: typeof LATEST_VERSION_SELECT };
+type ArticleWithRelations = Prisma.ArticleGetPayload<{
+  include: typeof ARTICLE_INCLUDE;
 }>;
 
-/** Row + author + latest-version timestamps → portal shape (resolves `last_reviewed_at`). */
-function toPortalArticle(row: ArticleWithAuthorAndVersion): KnowledgeArticle {
-  return toKnowledgeArticle({ ...row, lastReviewedAt: row.versions[0]?.createdAt ?? null });
+/** Row + author + publish history → portal shape. */
+function toPortalArticle(row: ArticleWithRelations): KnowledgeArticle {
+  return toKnowledgeArticle(row);
 }
 
 export interface ArticleFilters {
-  /** One status, or several (`?status=draft&status=in_review`). */
+  /** One status, or several (`?status=draft&status=published`). */
   status?: ArticleStatus | ArticleStatus[];
   /** `"All"` (or omitted) does not filter. */
   department?: Department;
@@ -233,9 +239,14 @@ export interface CreateArticleInput {
   body_markdown: string;
   departments: string[];
   author_id: string;
+  /** Who the procedure is written for. Defaults to `ALL`. */
+  audience?: ArticleAudience;
 }
 
-/** Create a new article. Always lands as `draft` — publishing is a separate step. */
+/**
+ * Create a new article. Always lands as `draft` — publishing is the author's
+ * next, single step (prompt 7c: there is no review gate in between).
+ */
 export async function createArticle(input: CreateArticleInput): Promise<KnowledgeArticle> {
   const db = getDb();
 
@@ -248,14 +259,16 @@ export async function createArticle(input: CreateArticleInput): Promise<Knowledg
       bodyMarkdown: input.body_markdown,
       departments: input.departments,
       status: "draft",
+      ...(input.audience ? { audience: input.audience } : {}),
       authorId: input.author_id,
       updatedAt: new Date(),
     },
-    include: { author: AUTHOR_SELECT },
+    include: ARTICLE_INCLUDE,
   });
 
-  // A brand-new draft has no published version yet.
-  return toKnowledgeArticle({ ...row, lastReviewedAt: null });
+  // A brand-new draft has no published version yet, so `versions` is empty and
+  // every derived field (`last_reviewed_at`, the version numbers) is null.
+  return toPortalArticle(row);
 }
 
 export interface UpdateArticleInput {
@@ -263,8 +276,11 @@ export interface UpdateArticleInput {
   body_markdown?: string;
   departments?: string[];
   status?: ArticleStatus;
-  reviewer_id?: string | null;
   effective_date?: Date | null;
+  /** Essential SOP curation (prompt 7c). Metadata only — never versions. */
+  is_essential?: boolean;
+  /** Who the procedure is written for (prompt 7c). */
+  audience?: ArticleAudience;
   /** Human note stored on the version row this publish creates. */
   change_summary?: string;
 }
@@ -272,9 +288,11 @@ export interface UpdateArticleInput {
 /**
  * Update an article, applying the publishing rules.
  *
- * **Publishing** (`status: "published"`) requires a reviewer who is
- * `clinical_lead` or higher — checked here, not in the UI, so the rule holds
- * for any client. On publish the content that is about to go live is written to
+ * **Publishing is direct (prompt 7c).** An `author` writes it and publishes it;
+ * there is no reviewer to name and no approval step. The route floors the call
+ * at `author` — that is the only gate left.
+ *
+ * On publish the content that is about to go live is written to
  * `article_versions` *before* the article row is updated, in the same
  * transaction: the version is the record of what was live, so it must describe
  * the published state, and it must exist even if the update half were ever
@@ -283,7 +301,10 @@ export interface UpdateArticleInput {
  *
  * A version is written when the article *becomes* published, or when an
  * already-published article's title or body changes (a republication). A patch
- * that touches neither does not manufacture a version.
+ * that touches neither does not manufacture a version — which is what makes
+ * **metadata-only** edits (curating `is_essential`, re-scoping `audience`) free:
+ * they neither version the procedure nor move `updated_at`, so the Knowledge
+ * Home feed's publish-time ordering cannot be disturbed by curation.
  */
 export async function updateArticle(
   slug: string,
@@ -300,7 +321,8 @@ export async function updateArticle(
     bodyMarkdown: patch.body_markdown ?? current.bodyMarkdown,
     departments: patch.departments ?? current.departments,
     status: patch.status ?? current.status,
-    reviewerId: patch.reviewer_id === undefined ? current.reviewerId : patch.reviewer_id,
+    isEssential: patch.is_essential === undefined ? current.isEssential : patch.is_essential,
+    audience: patch.audience ?? current.audience,
     effectiveDate:
       patch.effective_date === undefined ? current.effectiveDate : patch.effective_date,
   };
@@ -311,38 +333,22 @@ export async function updateArticle(
   const republication = next.status === "published" && current.status === "published" && contentChanged;
   const shouldSnapshot = becomingPublished || republication;
 
-  if (next.status === "published") {
-    // Publishing requires a reviewer, and that reviewer must be a clinical
-    // lead or an admin — regardless of whether this publish is a first
-    // publication or a later edit to something already live.
-    if (!next.reviewerId) {
-      throw new ApiError(422, "Publishing requires a reviewer. Set `reviewer_id` to a clinical lead.", {
-        code: "reviewer_required",
-        details: { field: "reviewer_id" },
-      });
-    }
+  /**
+   * A patch that only curates or re-scopes the article: no content, no status,
+   * nothing a reader would see as a new release. It must not restamp
+   * `updated_at` (the feed's last-resort ordering key) or write a version.
+   */
+  const metadataOnly =
+    !shouldSnapshot &&
+    patch.status === undefined &&
+    patch.effective_date === undefined &&
+    !contentChanged &&
+    !departmentsChanged(next.departments, current.departments);
 
-    const reviewer = await db.user.findUnique({
-      where: { id: next.reviewerId },
-      select: { id: true, role: true, name: true },
-    });
-    if (!reviewer) {
-      throw new ApiError(422, "The reviewer named in `reviewer_id` does not exist.", {
-        code: "reviewer_not_found",
-        details: { field: "reviewer_id" },
-      });
-    }
-    if (reviewer.role !== "clinical_lead" && reviewer.role !== "admin") {
-      throw new ApiError(
-        422,
-        "The reviewer must hold the clinical lead role (or admin). Record who is accountable for this procedure.",
-        { code: "reviewer_not_clinical_lead", details: { field: "reviewer_id" } },
-      );
-    }
-
+  if (next.status === "published" && !next.effectiveDate) {
     // A procedure taking effect the moment it is published is the normal case;
     // an explicit date is how a future-dated protocol is staged.
-    if (!next.effectiveDate) next.effectiveDate = new Date();
+    next.effectiveDate = new Date();
   }
 
   const updated = await db.$transaction(async (tx) => {
@@ -372,15 +378,21 @@ export async function updateArticle(
         bodyMarkdown: next.bodyMarkdown,
         departments: next.departments,
         status: next.status,
-        reviewerId: next.reviewerId,
+        isEssential: next.isEssential,
+        audience: next.audience,
         effectiveDate: next.effectiveDate,
-        updatedAt: new Date(),
+        ...(metadataOnly ? {} : { updatedAt: new Date() }),
       },
       include: ARTICLE_INCLUDE,
     });
   });
 
   return toPortalArticle(updated);
+}
+
+/** Multi-tag departments compare as sets — order is not a change. */
+function departmentsChanged(a: readonly string[], b: readonly string[]): boolean {
+  return a.length !== b.length || [...a].sort().join("|") !== [...b].sort().join("|");
 }
 
 /** `"My Title"` → `"my-title"`, then `-2`, `-3`, ... until it is free. */

@@ -30,6 +30,8 @@ export type ArticleMinAggregateOutputType = {
   title: string | null
   bodyMarkdown: string | null
   status: $Enums.ArticleStatus | null
+  isEssential: boolean | null
+  audience: $Enums.ArticleAudience | null
   authorId: string | null
   reviewerId: string | null
   effectiveDate: Date | null
@@ -45,6 +47,8 @@ export type ArticleMaxAggregateOutputType = {
   title: string | null
   bodyMarkdown: string | null
   status: $Enums.ArticleStatus | null
+  isEssential: boolean | null
+  audience: $Enums.ArticleAudience | null
   authorId: string | null
   reviewerId: string | null
   effectiveDate: Date | null
@@ -61,6 +65,8 @@ export type ArticleCountAggregateOutputType = {
   bodyMarkdown: number
   departments: number
   status: number
+  isEssential: number
+  audience: number
   authorId: number
   reviewerId: number
   effectiveDate: number
@@ -78,6 +84,8 @@ export type ArticleMinAggregateInputType = {
   title?: true
   bodyMarkdown?: true
   status?: true
+  isEssential?: true
+  audience?: true
   authorId?: true
   reviewerId?: true
   effectiveDate?: true
@@ -93,6 +101,8 @@ export type ArticleMaxAggregateInputType = {
   title?: true
   bodyMarkdown?: true
   status?: true
+  isEssential?: true
+  audience?: true
   authorId?: true
   reviewerId?: true
   effectiveDate?: true
@@ -109,6 +119,8 @@ export type ArticleCountAggregateInputType = {
   bodyMarkdown?: true
   departments?: true
   status?: true
+  isEssential?: true
+  audience?: true
   authorId?: true
   reviewerId?: true
   effectiveDate?: true
@@ -198,6 +210,8 @@ export type ArticleGroupByOutputType = {
   bodyMarkdown: string
   departments: string[]
   status: $Enums.ArticleStatus
+  isEssential: boolean
+  audience: $Enums.ArticleAudience
   authorId: string
   reviewerId: string | null
   effectiveDate: Date | null
@@ -235,6 +249,8 @@ export type ArticleWhereInput = {
   bodyMarkdown?: Prisma.StringFilter<"Article"> | string
   departments?: Prisma.StringNullableListFilter<"Article">
   status?: Prisma.EnumArticleStatusFilter<"Article"> | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFilter<"Article"> | boolean
+  audience?: Prisma.EnumArticleAudienceFilter<"Article"> | $Enums.ArticleAudience
   authorId?: Prisma.UuidFilter<"Article"> | string
   reviewerId?: Prisma.UuidNullableFilter<"Article"> | string | null
   effectiveDate?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
@@ -257,6 +273,8 @@ export type ArticleOrderByWithRelationInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  isEssential?: Prisma.SortOrder
+  audience?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   reviewerId?: Prisma.SortOrderInput | Prisma.SortOrder
   effectiveDate?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -282,6 +300,8 @@ export type ArticleWhereUniqueInput = Prisma.AtLeast<{
   bodyMarkdown?: Prisma.StringFilter<"Article"> | string
   departments?: Prisma.StringNullableListFilter<"Article">
   status?: Prisma.EnumArticleStatusFilter<"Article"> | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFilter<"Article"> | boolean
+  audience?: Prisma.EnumArticleAudienceFilter<"Article"> | $Enums.ArticleAudience
   authorId?: Prisma.UuidFilter<"Article"> | string
   reviewerId?: Prisma.UuidNullableFilter<"Article"> | string | null
   effectiveDate?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
@@ -304,6 +324,8 @@ export type ArticleOrderByWithAggregationInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  isEssential?: Prisma.SortOrder
+  audience?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   reviewerId?: Prisma.SortOrderInput | Prisma.SortOrder
   effectiveDate?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -326,6 +348,8 @@ export type ArticleScalarWhereWithAggregatesInput = {
   bodyMarkdown?: Prisma.StringWithAggregatesFilter<"Article"> | string
   departments?: Prisma.StringNullableListFilter<"Article">
   status?: Prisma.EnumArticleStatusWithAggregatesFilter<"Article"> | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
+  audience?: Prisma.EnumArticleAudienceWithAggregatesFilter<"Article"> | $Enums.ArticleAudience
   authorId?: Prisma.UuidWithAggregatesFilter<"Article"> | string
   reviewerId?: Prisma.UuidNullableWithAggregatesFilter<"Article"> | string | null
   effectiveDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Article"> | Date | string | null
@@ -342,6 +366,8 @@ export type ArticleCreateInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -362,6 +388,8 @@ export type ArticleUncheckedCreateInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -382,6 +410,8 @@ export type ArticleUpdateInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -402,6 +432,8 @@ export type ArticleUncheckedUpdateInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -422,6 +454,8 @@ export type ArticleCreateManyInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -438,6 +472,8 @@ export type ArticleUpdateManyMutationInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -452,6 +488,8 @@ export type ArticleUncheckedUpdateManyInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -486,6 +524,8 @@ export type ArticleCountOrderByAggregateInput = {
   bodyMarkdown?: Prisma.SortOrder
   departments?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  isEssential?: Prisma.SortOrder
+  audience?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   reviewerId?: Prisma.SortOrder
   effectiveDate?: Prisma.SortOrder
@@ -501,6 +541,8 @@ export type ArticleMaxOrderByAggregateInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  isEssential?: Prisma.SortOrder
+  audience?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   reviewerId?: Prisma.SortOrder
   effectiveDate?: Prisma.SortOrder
@@ -516,6 +558,8 @@ export type ArticleMinOrderByAggregateInput = {
   title?: Prisma.SortOrder
   bodyMarkdown?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  isEssential?: Prisma.SortOrder
+  audience?: Prisma.SortOrder
   authorId?: Prisma.SortOrder
   reviewerId?: Prisma.SortOrder
   effectiveDate?: Prisma.SortOrder
@@ -632,6 +676,14 @@ export type EnumArticleStatusFieldUpdateOperationsInput = {
   set?: $Enums.ArticleStatus
 }
 
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
+export type EnumArticleAudienceFieldUpdateOperationsInput = {
+  set?: $Enums.ArticleAudience
+}
+
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
@@ -701,6 +753,8 @@ export type ArticleCreateWithoutAuthorInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -720,6 +774,8 @@ export type ArticleUncheckedCreateWithoutAuthorInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   reviewerId?: string | null
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
@@ -749,6 +805,8 @@ export type ArticleCreateWithoutReviewerInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -768,6 +826,8 @@ export type ArticleUncheckedCreateWithoutReviewerInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
@@ -816,6 +876,8 @@ export type ArticleScalarWhereInput = {
   bodyMarkdown?: Prisma.StringFilter<"Article"> | string
   departments?: Prisma.StringNullableListFilter<"Article">
   status?: Prisma.EnumArticleStatusFilter<"Article"> | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFilter<"Article"> | boolean
+  audience?: Prisma.EnumArticleAudienceFilter<"Article"> | $Enums.ArticleAudience
   authorId?: Prisma.UuidFilter<"Article"> | string
   reviewerId?: Prisma.UuidNullableFilter<"Article"> | string | null
   effectiveDate?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
@@ -848,6 +910,8 @@ export type ArticleCreateWithoutVersionsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -867,6 +931,8 @@ export type ArticleUncheckedCreateWithoutVersionsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -902,6 +968,8 @@ export type ArticleUpdateWithoutVersionsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -921,6 +989,8 @@ export type ArticleUncheckedUpdateWithoutVersionsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -940,6 +1010,8 @@ export type ArticleCreateWithoutReadsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -959,6 +1031,8 @@ export type ArticleUncheckedCreateWithoutReadsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -994,6 +1068,8 @@ export type ArticleUpdateWithoutReadsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1013,6 +1089,8 @@ export type ArticleUncheckedUpdateWithoutReadsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1032,6 +1110,8 @@ export type ArticleCreateWithoutBulletinsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -1051,6 +1131,8 @@ export type ArticleUncheckedCreateWithoutBulletinsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -1086,6 +1168,8 @@ export type ArticleUpdateWithoutBulletinsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1105,6 +1189,8 @@ export type ArticleUncheckedUpdateWithoutBulletinsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1124,6 +1210,8 @@ export type ArticleCreateWithoutAttachmentsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
   importedAt?: Date | string | null
@@ -1143,6 +1231,8 @@ export type ArticleUncheckedCreateWithoutAttachmentsInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   reviewerId?: string | null
   effectiveDate?: Date | string | null
@@ -1178,6 +1268,8 @@ export type ArticleUpdateWithoutAttachmentsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1197,6 +1289,8 @@ export type ArticleUncheckedUpdateWithoutAttachmentsInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1216,6 +1310,8 @@ export type ArticleCreateManyAuthorInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   reviewerId?: string | null
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
@@ -1231,6 +1327,8 @@ export type ArticleCreateManyReviewerInput = {
   bodyMarkdown: string
   departments?: Prisma.ArticleCreatedepartmentsInput | string[]
   status?: $Enums.ArticleStatus
+  isEssential?: boolean
+  audience?: $Enums.ArticleAudience
   authorId: string
   effectiveDate?: Date | string | null
   sourceTitle?: string | null
@@ -1246,6 +1344,8 @@ export type ArticleUpdateWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1265,6 +1365,8 @@ export type ArticleUncheckedUpdateWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1284,6 +1386,8 @@ export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   reviewerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1299,6 +1403,8 @@ export type ArticleUpdateWithoutReviewerInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   importedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1318,6 +1424,8 @@ export type ArticleUncheckedUpdateWithoutReviewerInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1337,6 +1445,8 @@ export type ArticleUncheckedUpdateManyWithoutReviewerInput = {
   bodyMarkdown?: Prisma.StringFieldUpdateOperationsInput | string
   departments?: Prisma.ArticleUpdatedepartmentsInput | string[]
   status?: Prisma.EnumArticleStatusFieldUpdateOperationsInput | $Enums.ArticleStatus
+  isEssential?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  audience?: Prisma.EnumArticleAudienceFieldUpdateOperationsInput | $Enums.ArticleAudience
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   effectiveDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sourceTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1410,6 +1520,8 @@ export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   bodyMarkdown?: boolean
   departments?: boolean
   status?: boolean
+  isEssential?: boolean
+  audience?: boolean
   authorId?: boolean
   reviewerId?: boolean
   effectiveDate?: boolean
@@ -1433,6 +1545,8 @@ export type ArticleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   bodyMarkdown?: boolean
   departments?: boolean
   status?: boolean
+  isEssential?: boolean
+  audience?: boolean
   authorId?: boolean
   reviewerId?: boolean
   effectiveDate?: boolean
@@ -1451,6 +1565,8 @@ export type ArticleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   bodyMarkdown?: boolean
   departments?: boolean
   status?: boolean
+  isEssential?: boolean
+  audience?: boolean
   authorId?: boolean
   reviewerId?: boolean
   effectiveDate?: boolean
@@ -1469,6 +1585,8 @@ export type ArticleSelectScalar = {
   bodyMarkdown?: boolean
   departments?: boolean
   status?: boolean
+  isEssential?: boolean
+  audience?: boolean
   authorId?: boolean
   reviewerId?: boolean
   effectiveDate?: boolean
@@ -1478,7 +1596,7 @@ export type ArticleSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "slug" | "title" | "bodyMarkdown" | "departments" | "status" | "authorId" | "reviewerId" | "effectiveDate" | "sourceTitle" | "importedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["article"]>
+export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "slug" | "title" | "bodyMarkdown" | "departments" | "status" | "isEssential" | "audience" | "authorId" | "reviewerId" | "effectiveDate" | "sourceTitle" | "importedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["article"]>
 export type ArticleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   reviewer?: boolean | Prisma.Article$reviewerArgs<ExtArgs>
@@ -1521,10 +1639,27 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
      */
     departments: string[]
     status: $Enums.ArticleStatus
+    /**
+     * Curated by a clinical lead (prompt 7c): an Essential SOP sits in its own
+     * section above the Knowledge Home feed. Toggling it is metadata-only — it
+     * never publishes, never versions, and never touches `updated_at`.
+     */
+    isEssential: boolean
+    /**
+     * Who this procedure is written for (prompt 7c). Not a permission boundary:
+     * it only steers the Knowledge Home audience switcher's default view.
+     */
+    audience: $Enums.ArticleAudience
     authorId: string
+    /**
+     * **Legacy since prompt 7c.** Publishing no longer needs a reviewer, so
+     * nothing writes this column any more; it survives so the recorded history of
+     * who used to sign off is not thrown away. No application code gates on it.
+     */
     reviewerId: string | null
     /**
-     * Required to publish (enforced in the API, not just the UI).
+     * Set automatically to the moment of publication. Required to publish
+     * (enforced in the API, not just the UI).
      */
     effectiveDate: Date | null
     /**
@@ -1975,6 +2110,8 @@ export interface ArticleFieldRefs {
   readonly bodyMarkdown: Prisma.FieldRef<"Article", 'String'>
   readonly departments: Prisma.FieldRef<"Article", 'String[]'>
   readonly status: Prisma.FieldRef<"Article", 'ArticleStatus'>
+  readonly isEssential: Prisma.FieldRef<"Article", 'Boolean'>
+  readonly audience: Prisma.FieldRef<"Article", 'ArticleAudience'>
   readonly authorId: Prisma.FieldRef<"Article", 'String'>
   readonly reviewerId: Prisma.FieldRef<"Article", 'String'>
   readonly effectiveDate: Prisma.FieldRef<"Article", 'DateTime'>

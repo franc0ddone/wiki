@@ -2,7 +2,7 @@
  * Client-side calls to the (frozen) article API, with the API's own error
  * reasons carried through verbatim so the editor can show them honestly.
  */
-import type { ClinicalDepartment, KnowledgeArticle, KnowledgeArticleStatus } from "@/types/portal";
+import type { ArticleAudience, ClinicalDepartment, KnowledgeArticle, KnowledgeArticleStatus } from "@/types/portal";
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -46,6 +46,7 @@ export interface CreateArticleBody {
   title: string;
   body_markdown: string;
   departments: ClinicalDepartment[];
+  audience?: ArticleAudience;
 }
 
 export function createArticle(body: CreateArticleBody): Promise<KnowledgeArticle> {
@@ -61,7 +62,10 @@ export interface PatchArticleBody {
   body_markdown?: string;
   departments?: ClinicalDepartment[];
   status?: KnowledgeArticleStatus;
-  reviewer_id?: string | null;
+  /** Essential SOP curation (prompt 7c) — metadata only, never a new version. */
+  is_essential?: boolean;
+  /** Who the procedure is written for (prompt 7c). */
+  audience?: ArticleAudience;
   change_summary?: string;
 }
 

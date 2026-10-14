@@ -22,11 +22,27 @@ export type Role = (typeof Role)[keyof typeof Role]
 
 export const ArticleStatus = {
   draft: 'draft',
-  in_review: 'in_review',
   published: 'published'
 } as const
 
 export type ArticleStatus = (typeof ArticleStatus)[keyof typeof ArticleStatus]
+
+
+export const StaffType = {
+  MEDICAL: 'MEDICAL',
+  NON_MEDICAL: 'NON_MEDICAL'
+} as const
+
+export type StaffType = (typeof StaffType)[keyof typeof StaffType]
+
+
+export const ArticleAudience = {
+  MEDICAL: 'MEDICAL',
+  NON_MEDICAL: 'NON_MEDICAL',
+  ALL: 'ALL'
+} as const
+
+export type ArticleAudience = (typeof ArticleAudience)[keyof typeof ArticleAudience]
 
 
 export const BulletinPriority = {

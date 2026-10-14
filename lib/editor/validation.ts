@@ -13,9 +13,9 @@ import { collectHeadings, parseMarkdown } from "@/lib/markdown/parser";
 export const TITLE_MAX_LENGTH = 300;
 export const CHANGE_SUMMARY_MAX_LENGTH = 2000;
 
-export type EditorIntent = "create" | "save" | "submit_review" | "publish";
+export type EditorIntent = "create" | "save" | "publish";
 
-export type IssueField = "title" | "body" | "departments" | "reviewer" | "summary";
+export type IssueField = "title" | "body" | "departments" | "summary";
 
 export interface EditorIssue {
   field: IssueField;
@@ -31,7 +31,6 @@ export interface ValidationInput {
   markdown: string;
   departments: readonly string[];
   intent: EditorIntent;
-  reviewerId: string | null;
   changeSummary: string;
   /** True when title or body differs from what was loaded (existing articles only). */
   contentChanged: boolean;
@@ -71,17 +70,6 @@ export function validateArticle(input: ValidationInput, registry: LinkRegistry):
       field: "departments",
       code: "no_departments",
       message: "Choose at least one department so the right team finds this procedure.",
-    });
-  }
-
-  if ((input.intent === "submit_review" || input.intent === "publish") && !input.reviewerId) {
-    errors.push({
-      field: "reviewer",
-      code: "reviewer_required",
-      message:
-        input.intent === "publish"
-          ? "Choose the clinical lead who reviewed this procedure before publishing."
-          : "Assign a reviewer before submitting for review.",
     });
   }
 

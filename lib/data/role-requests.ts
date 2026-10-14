@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { roleAfterApproval, type RoleRequestStatus, type RoleRequestSummary } from "@/lib/role-requests";
 import type { Role } from "@/lib/roles";
+import type { StaffType } from "@/types/portal";
 
 /**
  * Author-access requests — the database half.
@@ -21,7 +22,7 @@ import type { Role } from "@/lib/roles";
 
 const REQUEST_SELECT = {
   include: {
-    user: { select: { name: true, email: true } },
+    user: { select: { name: true, email: true, staffType: true } },
     decidedBy: { select: { name: true } },
   },
 } as const;
@@ -34,6 +35,7 @@ function toSummary(row: RoleRequestRow): RoleRequestSummary {
     user_id: row.userId,
     user_name: row.user.name,
     user_email: row.user.email,
+    user_staff_type: (row.user.staffType as StaffType | null) ?? null,
     requested_role: row.requestedRole as Role,
     status: row.status as RoleRequestStatus,
     note: row.note,
@@ -99,15 +101,22 @@ export async function listRoleRequests(
 export interface DecideRoleRequestInput {
   status: Exclude<RoleRequestStatus, "pending">;
   note?: string;
+  /**
+   * The staff type to record on the requester (prompt 7c). `undefined` leaves
+   * whatever is on file alone; `null` clears it (unassigned). Applied on
+   * **approval** — a declined request changes nothing about the account.
+   */
+  staff_type?: StaffType | null;
 }
 
 /**
  * Approve or decline a request.
  *
  * Approving promotes the requester to the requested role — but only upward, via
- * `roleAfterApproval` — and records who decided and when, in one transaction
- * with the request's own status change. A request that is already decided is a
- * 409 rather than a silent second promotion.
+ * `roleAfterApproval` — records who decided and when, and (prompt 7c) stores the
+ * staff type the approver chose, all in one transaction with the request's own
+ * status change. A request that is already decided is a 409 rather than a
+ * silent second promotion.
  */
 export async function decideRoleRequest(
   id: string,
@@ -136,8 +145,14 @@ export async function decideRoleRequest(
       });
       if (user) {
         const nextRole = roleAfterApproval(user.role as Role, current.requestedRole as Role);
-        if (nextRole !== user.role) {
-          await tx.user.update({ where: { id: current.userId }, data: { role: nextRole } });
+        const data: { role?: Role; staffType?: StaffType | null } = {};
+        if (nextRole !== user.role) data.role = nextRole;
+        // Staff type rides along with the promotion: it is part of granting
+        // someone access, and leaving it out entirely would mean every approved
+        // account starts unassigned.
+        if (input.staff_type !== undefined) data.staffType = input.staff_type;
+        if (Object.keys(data).length > 0) {
+          await tx.user.update({ where: { id: current.userId }, data });
         }
       }
     }

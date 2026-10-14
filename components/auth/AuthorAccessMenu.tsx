@@ -11,7 +11,14 @@ import {
   canReviewRoleRequests,
   type RoleRequestSummary,
 } from "@/lib/role-requests";
+import {
+  STAFF_TYPES,
+  STAFF_TYPE_LABELS,
+  UNASSIGNED_STAFF_TYPE_LABEL,
+  staffTypeLabel,
+} from "@/lib/staff-type";
 import { cx, formatDate, initials } from "@/lib/utils";
+import type { StaffType } from "@/types/portal";
 
 /**
  * Account menu — the portal's profile area.
@@ -22,7 +29,9 @@ import { cx, formatDate, initials } from "@/lib/utils";
  *  - a `staff` member sees "Request author access" (or the state of the request
  *    they already have);
  *  - a `clinical_lead` or `admin` sees the pending queue with approve/decline
- *    controls.
+ *    controls, and — with each approval — a staff type to record on the account
+ *    (prompt 7c: it selects that person's default Knowledge Home audience, and
+ *    is not a permission).
  *
  * A `readonly` session sees neither — the menu is just identity and sign-out,
  * which is the whole point of the role.
@@ -48,6 +57,13 @@ export function AuthorAccessMenu({ viewerRole, viewer, authorRequest, roleReques
   const [error, setError] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [declineNote, setDeclineNote] = useState("");
+  /**
+   * The staff type each pending request will be approved with (prompt 7c),
+   * keyed by request id. `""` is "unassigned", which is also what an untouched
+   * dropdown sends — so approving never silently invents a classification, and
+   * the approver can clear one that is wrong.
+   */
+  const [staffTypeDraft, setStaffTypeDraft] = useState<Record<string, string>>({});
 
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -114,17 +130,25 @@ export function AuthorAccessMenu({ viewerRole, viewer, authorRequest, roleReques
 
   const decide = useCallback(
     async (id: string, status: "approved" | "declined", note?: string) => {
+      // The staff type is only ever sent with an approval, where it is written
+      // in the same transaction as the promotion. A decline leaves the account
+      // exactly as it was.
+      const staffType = staffTypeDraft[id] ?? "";
       const ok = await call(`decide:${id}`, `/api/role-requests/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, ...(note && note.trim() ? { note: note.trim() } : {}) }),
+        body: JSON.stringify({
+          status,
+          ...(note && note.trim() ? { note: note.trim() } : {}),
+          ...(status === "approved" ? { staff_type: staffType } : {}),
+        }),
       });
       if (ok) {
         setDecliningId(null);
         setDeclineNote("");
       }
     },
-    [call],
+    [call, staffTypeDraft],
   );
 
   return (
@@ -238,6 +262,40 @@ export function AuthorAccessMenu({ viewerRole, viewer, authorRequest, roleReques
                       <p className="mt-0.5 text-[11.5px] text-zinc-500">
                         Requests {ROLE_LABELS[request.requested_role].toLowerCase()} · {formatDate(request.created_at)}
                       </p>
+                      <p className="mt-0.5 text-[11.5px] text-zinc-500">
+                        Staff type on file: {staffTypeLabel(request.user_staff_type as StaffType | null)}
+                      </p>
+
+                      {/*
+                        * Staff type (prompt 7c): the approver classifies the
+                        * person as they grant access. It steers the Knowledge
+                        * Home feed's default audience for that account — it is
+                        * not a permission, so "Unassigned" is a valid answer.
+                        */}
+                      <div className="mt-2">
+                        <label
+                          htmlFor={`staff-type-${request.id}`}
+                          className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500"
+                        >
+                          Staff type on approval
+                        </label>
+                        <select
+                          id={`staff-type-${request.id}`}
+                          value={staffTypeDraft[request.id] ?? (request.user_staff_type ?? "")}
+                          onChange={(event) =>
+                            setStaffTypeDraft((current) => ({ ...current, [request.id]: event.target.value }))
+                          }
+                          disabled={busy !== null}
+                          className="h-8 w-full rounded-lg border border-zinc-300/70 bg-white px-2 text-[12.5px] text-zinc-900 focus:border-[#5F6E00]/45 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/20"
+                        >
+                          <option value="">{UNASSIGNED_STAFF_TYPE_LABEL}</option>
+                          {STAFF_TYPES.map((staffType) => (
+                            <option key={staffType} value={staffType}>
+                              {STAFF_TYPE_LABELS[staffType]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
                       {decliningId === request.id ? (
                         <div className="mt-2 space-y-2">

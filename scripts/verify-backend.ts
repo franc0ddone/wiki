@@ -10,9 +10,14 @@
  *
  * It asserts the things a reviewer would otherwise have to take on trust:
  *  - every `lib/data/*` read returns exactly the shape `lib/mock-data.ts` does
- *  - publishing without a clinical-lead reviewer is refused
+ *  - publishing is direct: an `author` publishes with no reviewer to name
+ *    (prompt 7c removed the review gate), and `in_review` is gone from the
+ *    database's own enum
  *  - publishing writes an `ArticleVersion`, and that row cannot be changed or
  *    deleted afterwards
+ *  - the newest two versions surface as the feed's version jump, and curating an
+ *    Essential SOP or re-scoping its audience writes neither a version nor a
+ *    timestamp
  *  - the upload pipeline drops EXIF (including GPS) and refuses a file whose
  *    bytes are not really an image
  *  - the MediaWiki import's slug rule is what makes a second run a no-op
@@ -48,6 +53,8 @@ import {
 } from "@/lib/data/bulletin-attachments";
 import { ALLOWED_ATTACHMENT_TYPES, assertAttachmentType } from "@/lib/attachments";
 import { STAGED_ATTACHMENT_TTL_MS } from "@/lib/bulletin/lifecycle";
+import { decideRoleRequest, requestAuthorAccess } from "@/lib/data/role-requests";
+import { staffTypeLabel } from "@/lib/staff-type";
 import { getStaff } from "@/lib/data/staff";
 import { detectImageType, processImageUpload } from "@/lib/image";
 import { buildLinkRegistry, extractInternalLinks, validateLinks } from "@/lib/links";
@@ -202,7 +209,20 @@ async function main() {
 
   /* ------------------------------------------------- publishing + versions */
 
-  await test("publishing is refused without a reviewer", async () => {
+  await test("publishing is direct: no reviewer to name, and `in_review` is gone", async () => {
+    // The gate is gone from the database's own enum, not just from the UI.
+    const enumValues = await db.$queryRaw<Array<{ enumlabel: string }>>`
+      SELECT enumlabel FROM pg_enum
+      JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+      WHERE pg_type.typname = 'ArticleStatus'
+      ORDER BY enumsortorder
+    `;
+    assertEqual(
+      enumValues.map((row) => row.enumlabel),
+      ["draft", "published"],
+      "ArticleStatus values",
+    );
+
     const article = await createArticle({
       title: `${PREFIX} publish without reviewer`,
       body_markdown: "## Test\n\nBody.",
@@ -210,35 +230,23 @@ async function main() {
       author_id: author.id,
     });
 
-    await assertApiError(
-      () => updateArticle(article.slug, { status: "published" }, { id: lead.id, role: "clinical_lead" }),
-      "reviewer_required",
-      "publish with no reviewer_id",
+    // An `author` — not a clinical lead — publishes their own draft in one call.
+    const published = await updateArticle(
+      article.slug,
+      { status: "published", change_summary: "First publication." },
+      { id: author.id, role: "author" },
     );
-  });
-
-  await test("publishing is refused when the reviewer is not a clinical lead", async () => {
-    const article = await createArticle({
-      title: `${PREFIX} publish with author reviewer`,
-      body_markdown: "## Test\n\nBody.",
-      departments: ["ER"],
-      author_id: author.id,
+    assertEqual(published.status, "published", "status after a direct publish");
+    assertEqual(published.latest_published_version, 1, "a publish writes version 1");
+    assertEqual(published.previous_published_version, null, "there is no previous version yet");
+    assertEqual(published.latest_published_by?.includes(","), true, "the publisher is credited");
+    // The reviewer column is legacy: nothing writes it any more.
+    const row = await db.article.findUniqueOrThrow({
+      where: { slug: article.slug },
+      select: { reviewerId: true, effectiveDate: true },
     });
-
-    await assertApiError(
-      () =>
-        updateArticle(
-          article.slug,
-          { status: "published", reviewer_id: author.id },
-          { id: lead.id, role: "clinical_lead" },
-        ),
-      "reviewer_not_clinical_lead",
-      "publish with an author as reviewer",
-    );
-
-    // And the article is still a draft — a refused publish must not half-apply.
-    const after = await getArticleBySlug(article.slug);
-    assertEqual(after?.status, "draft", "status after refused publish");
+    assertEqual(row.reviewerId, null, "reviewer_id is not written by a publish");
+    assert(row.effectiveDate, "a publish must stamp an effective date");
   });
 
   await test("publishing writes an immutable version, and a republication writes the next one", async () => {
@@ -251,7 +259,7 @@ async function main() {
 
     const published = await updateArticle(
       article.slug,
-      { status: "published", reviewer_id: lead.id, change_summary: "First publication." },
+      { status: "published", change_summary: "First publication." },
       { id: lead.id, role: "clinical_lead" },
     );
     assertEqual(published.status, "published", "status after publish");
@@ -284,6 +292,12 @@ async function main() {
     assertEqual(versions[1].body_markdown, "## First\n\nOriginal body.", "version 1 stayed frozen");
     assertEqual(versions[0].changed_by_name.includes(","), true, "changed_by_name carries the role");
 
+    // The portal shape carries the two newest versions, which is what the feed's
+    // version-jump badge needs (prompt 7c): v1 → v2.
+    const afterRepublication = await getArticleBySlug(article.slug);
+    assertEqual(afterRepublication?.latest_published_version, 2, "latest published version");
+    assertEqual(afterRepublication?.previous_published_version, 1, "previous published version");
+
     // The database itself refuses to rewrite history.
     const target = versions[0].id;
     let updateRefused = false;
@@ -304,6 +318,114 @@ async function main() {
 
     const stillThere = await getArticleVersions(article.slug);
     assertEqual(stillThere.length, 2, "version count after refused tampering");
+  });
+
+  await test("curating an Essential SOP is metadata-only: no version, no timestamp move", async () => {
+    const article = await createArticle({
+      title: `${PREFIX} curatable procedure`,
+      body_markdown: "## Curated\n\nBody.",
+      departments: ["ER"],
+      author_id: author.id,
+    });
+    const published = await updateArticle(
+      article.slug,
+      { status: "published", change_summary: "First publication." },
+      { id: author.id, role: "author" },
+    );
+
+    // Pin it, and re-scope it, exactly as the composer's controls do.
+    const curated = await updateArticle(
+      article.slug,
+      { is_essential: true },
+      { id: lead.id, role: "clinical_lead" },
+    );
+    assertEqual(curated.is_essential, true, "the Essential flag was not stored");
+    assertEqual(
+      curated.updated_at,
+      published.updated_at,
+      "curation moved updated_at (it must not: the feed orders on the publish time)",
+    );
+    assertEqual(
+      curated.last_reviewed_at,
+      published.last_reviewed_at,
+      "curation moved the publish timestamp",
+    );
+
+    const rescoped = await updateArticle(
+      article.slug,
+      { audience: "NON_MEDICAL" },
+      { id: author.id, role: "author" },
+    );
+    assertEqual(rescoped.audience, "NON_MEDICAL", "the audience was not stored");
+    assertEqual(rescoped.updated_at, published.updated_at, "re-scoping moved updated_at");
+
+    // A draft stays a draft, whatever its metadata says.
+    const draft = await createArticle({
+      title: `${PREFIX} curated draft`,
+      body_markdown: "## Draft\n\nBody.",
+      departments: ["ER"],
+      author_id: author.id,
+      audience: "MEDICAL",
+    });
+    assertEqual(draft.status, "draft", "a new procedure must land as a draft");
+    assertEqual(draft.audience, "MEDICAL", "the create-time audience was not stored");
+    assertEqual(draft.is_essential, false, "a new procedure must not be Essential by default");
+    assertEqual(draft.latest_published_version, null, "a draft has no published version");
+
+    const versions = await getArticleVersions(article.slug);
+    assertEqual(versions.length, 1, "metadata-only writes must not add a version");
+  });
+
+  await test("the approval flow records the staff type it was approved with", async () => {
+    const applicant = await db.user.create({
+      data: {
+        email: `${PREFIX}-applicant@dovelewis.org`,
+        name: "Verify Applicant",
+        role: "staff",
+      },
+      select: { id: true, staffType: true },
+    });
+    assertEqual(applicant.staffType, null, "a fresh account is unassigned");
+
+    const raised = await requestAuthorAccess(applicant.id);
+    assertEqual(raised.created, true, "the request was not created");
+
+    const declined = await decideRoleRequest(
+      raised.request.id,
+      // A decline must not touch the account, even when a type rides along.
+      { status: "declined", staff_type: "MEDICAL" },
+      { id: lead.id },
+    );
+    assertEqual(declined.status, "declined", "the request was not declined");
+    const untouched = await db.user.findUniqueOrThrow({
+      where: { id: applicant.id },
+      select: { role: true, staffType: true },
+    });
+    assertEqual(untouched.role, "staff", "a decline must not promote anybody");
+    assertEqual(untouched.staffType, null, "a decline must not classify anybody");
+
+    const again = await requestAuthorAccess(applicant.id);
+    const approved = await decideRoleRequest(
+      again.request.id,
+      { status: "approved", staff_type: "MEDICAL" },
+      { id: lead.id },
+    );
+    assertEqual(approved.status, "approved", "the request was not approved");
+    assertEqual(
+      approved.user_staff_type,
+      "MEDICAL",
+      "the summary should carry the new staff type back to the queue",
+    );
+
+    const promoted = await db.user.findUniqueOrThrow({
+      where: { id: applicant.id },
+      select: { role: true, staffType: true },
+    });
+    assertEqual(promoted.role, "author", "approval did not promote the requester");
+    assertEqual(promoted.staffType, "MEDICAL", "approval did not record the staff type");
+    assertEqual(staffTypeLabel(promoted.staffType), "Medical", "the label disagrees with the value");
+
+    await db.user.delete({ where: { id: applicant.id } });
   });
 
   await test("backlinks find the articles and bulletins that link to a slug", async () => {

@@ -87,6 +87,7 @@ export const UserScalarFieldEnum = {
   name: 'name',
   title: 'title',
   role: 'role',
+  staffType: 'staffType',
   passwordHash: 'passwordHash',
   createdAt: 'createdAt'
 } as const
@@ -101,6 +102,8 @@ export const ArticleScalarFieldEnum = {
   bodyMarkdown: 'bodyMarkdown',
   departments: 'departments',
   status: 'status',
+  isEssential: 'isEssential',
+  audience: 'audience',
   authorId: 'authorId',
   reviewerId: 'reviewerId',
   effectiveDate: 'effectiveDate',

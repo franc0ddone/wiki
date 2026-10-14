@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  BookOpen,
   CalendarDays,
   History,
   Megaphone,
@@ -19,6 +18,7 @@ import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { FeedLoader } from "@/components/bulletin/FeedLoader";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
+import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { PortalHeader } from "@/components/PortalHeader";
@@ -36,6 +36,7 @@ import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
 import { deleteBulletin, listBulletins, patchBulletin } from "@/lib/bulletin/api";
 import { matchesDepartment } from "@/lib/data/filters";
+import { searchFeedArticles } from "@/lib/knowledge/feed";
 import { useDebouncedValue, useSettledSearchLog } from "@/lib/hooks";
 import { roleAtLeast, type Role } from "@/lib/roles";
 import type { RoleRequestSummary } from "@/lib/role-requests";
@@ -52,6 +53,7 @@ import {
   type KnowledgeArticle,
   type PortalView,
   type StaffMember,
+  type StaffType,
 } from "@/types/portal";
 
 /** Code-split so Tiptap loads only when the composer is opened, never on read. */
@@ -71,6 +73,11 @@ const BulletinComposer = dynamic(() => import("@/components/bulletin/BulletinCom
  * command palette (`Ctrl/Cmd+K`) share it, so they agree on typo tolerance
  * and clinical synonyms. Department filtering (`matchesDepartment`) is
  * unchanged.
+ *
+ * The knowledge view is the **Knowledge Home** surface (prompt 7c), a
+ * component of its own: `KnowledgeHome` owns the feed, the audience switcher,
+ * the Essential SOPs section, and both of its modes. This shell supplies the
+ * datasets, the index, the selection, and the reader pane.
  */
 
 export interface BulletinBoardProps {
@@ -91,6 +98,12 @@ export interface OperationsHubClientProps {
   viewerRole?: Role | null;
   /** The signed-in user's id, for "have I acknowledged this?" and own-notice affordances. */
   viewerId?: string | null;
+  /**
+   * The viewer's staff type (prompt 7c), read server-side from their account.
+   * It only picks the Knowledge Home feed's default audience — never a
+   * permission — so `null` (unassigned) is a perfectly good value.
+   */
+  viewerStaffType?: StaffType | null;
   /** Signed-in identity, for the account menu. */
   viewer?: { name: string; email: string } | null;
   /** Ids of bulletins this viewer authored (so edit/delete show only where they may act). */
@@ -178,21 +191,15 @@ function StatusBadge({ status }: { status: KnowledgeArticle["status"] }) {
   if (status === "published") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-px text-xs font-semibold text-zinc-600">
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#0F766E]" />
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#5F6E00]" />
         Published
       </span>
     );
   }
-  const isDraft = status === "draft";
   return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2 py-px text-xs font-semibold",
-        isDraft ? "border-amber-200 bg-amber-50 text-amber-800" : "border-sky-200 bg-sky-50 text-sky-800",
-      )}
-    >
-      <span aria-hidden="true" className={cx("h-1.5 w-1.5 rounded-full", isDraft ? "bg-amber-500" : "bg-sky-500")} />
-      {isDraft ? "Draft" : "In review"}
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+      Draft
     </span>
   );
 }
@@ -300,34 +307,6 @@ function BulletinRow({
         {excerpt(bulletin.body_markdown)}
       </span>
       <BulletinRowBadges bulletin={bulletin} now={now} variant={variant} />
-    </span>
-  );
-}
-
-function ArticleRow({ article, isSelected }: { article: KnowledgeArticle; isSelected: boolean }) {
-  return (
-    <span className="block">
-      <span className="flex items-center justify-between gap-3">
-        <span className="truncate text-xs font-medium text-zinc-500">
-          {authorName(article.author_name)}
-        </span>
-        <RowTimestamp iso={article.updated_at} withTime={false} />
-      </span>
-      <span
-        className={cx(
-          "mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em]",
-          isSelected ? "text-zinc-900" : "text-zinc-800",
-        )}
-      >
-        {article.title}
-      </span>
-      <span className="mt-1 line-clamp-2 block text-[12.5px] leading-[1.45] text-zinc-500">
-        {excerpt(article.body_markdown)}
-      </span>
-      <span className="mt-2 flex flex-wrap items-center gap-1">
-        {article.status !== "published" ? <StatusBadge status={article.status} /> : null}
-        <DepartmentTags departments={article.departments} />
-      </span>
     </span>
   );
 }
@@ -491,8 +470,8 @@ function ArticleDetail({
                   className="mt-[3px] shrink-0 text-amber-700"
                 />
                 {article.status === "draft"
-                  ? "This procedure is a draft and is not in force. Do not follow it for patient care until the clinical leads publish it."
-                  : "This procedure is awaiting clinical review and is not in force. Do not follow it for patient care until a clinical lead publishes it."}
+                  ? "This procedure is a draft and is not in force. Do not follow it for patient care until it is published."
+                  : null}
               </aside>
             ) : null}
             <div className="border-t border-zinc-200 pt-6">
@@ -543,6 +522,7 @@ export function OperationsHubClient({
   staff,
   viewerRole = null,
   viewerId = null,
+  viewerStaffType = null,
   viewer = null,
   authoredBulletinIds = [],
   initialArticleSlug = null,
@@ -838,19 +818,22 @@ export function OperationsHubClient({
   /** Another page exists only while browsing — a filter has already loaded them all. */
   const feedHasMore = !isFiltered && feedCursor !== null;
 
-  /* Knowledge base */
-  const searchedArticles = useMemo(
-    () => rankBy(articles, searchSurface(searchIndex, "articles", effectiveQuery)),
+  /* Knowledge Home (prompt 7c) */
+  /**
+   * The Knowledge Home surface builds its own feed from the whole `articles`
+   * prop — it owns the audience switcher, the corpus-derived department chips,
+   * the Essential section, and both modes — so the shell no longer pre-filters
+   * articles. What the shell still needs from the shared index is the count the
+   * dead-search log records, and the result count the surface actually shows:
+   * published procedures only, exactly as the feed does.
+   */
+  const knowledgeResultCount = useMemo(
+    () => (effectiveQuery.trim().length > 0 ? searchFeedArticles(articles, searchIndex, effectiveQuery).length : 0),
     [articles, searchIndex, effectiveQuery],
   );
-  const filteredArticles = useMemo(
-    () => searchedArticles.filter((article) => matchesDepartment(article.departments, activeDepartment)),
-    [searchedArticles, activeDepartment],
-  );
-  const articleCounts = useMemo(() => buildCounts(searchedArticles), [searchedArticles]);
   const selectedArticle = useMemo(
-    () => filteredArticles.find((article) => article.id === selectedArticleId) ?? null,
-    [filteredArticles, selectedArticleId],
+    () => articles.find((article) => article.id === selectedArticleId) ?? null,
+    [articles, selectedArticleId],
   );
 
   /* Staff directory */
@@ -871,7 +854,7 @@ export function OperationsHubClient({
     activeView === "bulletins"
       ? searchedBulletins.length
       : activeView === "knowledge"
-        ? searchedArticles.length
+        ? knowledgeResultCount
         : searchedStaff.length;
   useSettledSearchLog(effectiveQuery, activeResultCount, activeSurface);
 
@@ -981,34 +964,34 @@ export function OperationsHubClient({
         ) : null}
 
         {activeView === "knowledge" ? (
-          <MasterDetailShell
-            items={filteredArticles}
-            getId={(article) => article.id}
-            selectedId={selectedArticle?.id ?? null}
-            onSelect={setSelectedArticleId}
-            listTitle="Knowledge Base"
-            listSubtitle={`${filteredArticles.length} of ${articles.length}`}
+          /*
+           * The Knowledge Home surface (prompt 7c) owns everything about the
+           * knowledge view's rail — brand lockup, search hero, Essential SOPs,
+           * audience switcher, corpus-derived department chips, and both modes.
+           * The shell hands it the datasets, the shared Fuse index, the
+           * selection, and the reader pane; the reader itself (prompt 7a) is
+           * unchanged.
+           */
+          <KnowledgeHome
+            articles={articles}
+            index={searchIndex}
+            staffType={viewerStaffType}
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
             listActions={
               isAuthor ? (
                 <Link
                   href="/articles/new"
-                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-[#5F6E00]/40 hover:text-[#3F4A00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/45"
                 >
                   <Plus size={13} strokeWidth={2} aria-hidden="true" />
                   New procedure
                 </Link>
               ) : null
             }
-            renderListItem={(article, isSelected) => (
-              <ArticleRow article={article} isSelected={isSelected} />
-            )}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder="Search procedures"
-            searchLabel="Search standard operating procedures"
-            activeDepartment={activeDepartment}
-            onDepartmentChange={setActiveDepartment}
-            counts={articleCounts}
+            selectedId={selectedArticle?.id ?? null}
+            onSelect={setSelectedArticleId}
+            now={now}
             detail={
               selectedArticle ? (
                 <ArticleDetail
@@ -1021,21 +1004,6 @@ export function OperationsHubClient({
                   previewFor={previewFor}
                 />
               ) : null
-            }
-            detailLabel="Procedure reader"
-            emptyListState={
-              <EmptyState
-                icon={<BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />}
-                title={noMatchTitle}
-                message={noMatchMessage}
-              />
-            }
-            emptyDetailState={
-              <EmptyState
-                icon={<BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />}
-                title="No procedure selected"
-                message="Choose a procedure from the list to read it here."
-              />
             }
           />
         ) : null}

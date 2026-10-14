@@ -13,6 +13,7 @@
  * flow.
  */
 import { ROLE_RANK, roleAtLeast, type Role } from "@/lib/roles";
+import type { StaffType } from "@/types/portal";
 
 export const ROLE_REQUEST_STATUSES = ["pending", "approved", "declined"] as const;
 
@@ -27,6 +28,12 @@ export interface RoleRequestSummary {
   user_id: string;
   user_name: string;
   user_email: string;
+  /**
+   * The requester's current staff type (prompt 7c), or `null` for unassigned.
+   * Shown in the approval queue so the approver can see what is on file before
+   * (re)setting it.
+   */
+  user_staff_type: StaffType | null;
   requested_role: Role;
   status: RoleRequestStatus;
   /** Decision note (decline reason, or an approval remark). */

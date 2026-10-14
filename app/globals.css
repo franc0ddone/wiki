@@ -95,6 +95,22 @@ body {
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
 }
 
+/*
+ * The Knowledge Home surface (prompt 7c): body copy, controls, chips, badges,
+ * and metadata in Palanquin; headlines and the brand lockup title in Domine.
+ * Scoped to `.dw-knowledge` (the surface's own wrapper) so the rest of the app
+ * keeps the system stack — the same pattern `.dw-reader` uses for the reader.
+ */
+.dw-knowledge {
+  font-family: var(--font-reader), var(--font-sans);
+}
+
+.dw-knowledge h1,
+.dw-knowledge h2,
+.dw-knowledge h3 {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+}
+
 h1,
 h2,
 h3 {

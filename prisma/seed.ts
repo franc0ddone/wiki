@@ -32,6 +32,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import type { Prisma } from "@/generated/prisma/client";
 import { PrismaClient } from "@/generated/prisma/client";
 import { BULLETINS, KNOWLEDGE_ARTICLES, STAFF_DIRECTORY } from "@/lib/mock-data";
+import { staffTypeForDepartments } from "@/lib/staff-type";
 import type { Role } from "@/lib/roles";
 
 /** JSON columns take an opaque value; the fixture rotations are plain objects. */
@@ -61,6 +62,18 @@ const ROLE_BY_SYSTEM_ID: Record<string, Role> = {
   "EH-1188": "staff", // Trevor Lindqvist — ICU Technician II
 };
 
+/**
+ * Staff type (prompt 7c) — derived from each fixture member's own departments:
+ * administrative departments (`CSR`, `Finance`) are non-medical, everything else
+ * is medical (`lib/staff-type.ts#staffTypeForDepartments`). A real account gets
+ * its type from an approver or an administrator; only the fixture roster is
+ * seeded from a rule, and only so the Knowledge Home audience switcher has
+ * something to personalize against on a fresh database.
+ */
+function seededStaffType(member: (typeof STAFF_DIRECTORY)[number]) {
+  return staffTypeForDepartments(member.departments);
+}
+
 const DEV_FALLBACK_PASSWORD = "dove-hub-dev-password";
 
 async function main() {
@@ -80,6 +93,7 @@ async function main() {
 
   for (const member of STAFF_DIRECTORY) {
     const role = ROLE_BY_SYSTEM_ID[member.system_id] ?? "staff";
+    const staffType = seededStaffType(member);
 
     const user = await prisma.user.upsert({
       where: { email: member.email },
@@ -87,6 +101,7 @@ async function main() {
         name: member.full_name,
         title: member.title,
         role,
+        staffType,
         passwordHash,
       },
       create: {
@@ -94,6 +109,7 @@ async function main() {
         name: member.full_name,
         title: member.title,
         role,
+        staffType,
         passwordHash,
       },
     });
@@ -133,16 +149,6 @@ async function main() {
     });
   }
 
-  // The first clinical lead on file reviews anything whose author cannot
-  // self-review. Derived from the role map, not hard-coded, so reordering the
-  // directory is safe.
-  const clinicalLeadIds = STAFF_DIRECTORY.filter(
-    (member) => ROLE_BY_SYSTEM_ID[member.system_id] === "clinical_lead",
-  ).map((member) => userByAuthorName.get(`${member.full_name}, ${member.title}`) as string);
-
-  const reviewerFor = (authorId: string): string =>
-    clinicalLeadIds.includes(authorId) ? authorId : (clinicalLeadIds[0] ?? authorId);
-
   /* ---------------------------------------------------------------- articles */
 
   let versionCount = 0;
@@ -161,8 +167,13 @@ async function main() {
       bodyMarkdown: article.body_markdown,
       departments: [...article.departments],
       status: article.status,
+      // Curated from the fixture, so a fresh database has an Essential section
+      // and one procedure written for each audience (prompt 7c).
+      isEssential: article.is_essential,
+      audience: article.audience,
       authorId,
-      reviewerId: published ? reviewerFor(authorId) : null,
+      // `reviewerId` is deliberately not written any more: prompt 7c removed
+      // the review gate, so the column is legacy history and stays as-is.
       effectiveDate: published ? new Date(article.updated_at) : null,
       // Explicit, not Prisma's @updatedAt: re-running the seed restores the
       // fixture timestamps instead of stamping "now" on every article.

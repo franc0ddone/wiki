@@ -242,6 +242,31 @@ export interface MasterDetailShellProps<T> {
   /** Rendered below the list inside the same scroll container (e.g. an expired tray). */
   listFooter?: ReactNode;
 
+  /**
+   * Optional content at the very top of the rail's header, above the title row
+   * — the Knowledge Home's brand lockup (prompt 7c). Omitted renders nothing.
+   */
+  railTop?: ReactNode;
+  /**
+   * Replaces the rail's default search field. The Knowledge Home supplies its
+   * own hero field (with the Ctrl+Space affordance); every other surface keeps
+   * the default `SearchField`. Pass `null` to render no search control at all
+   * (Results Mode in the Knowledge Home hides nothing here, but the pattern is
+   * available).
+   */
+  searchField?: ReactNode | null;
+  /**
+   * Extra controls between the search field and the department chips — the
+   * Knowledge Home's audience switcher, or its results-mode banner.
+   */
+  headerExtras?: ReactNode;
+  /**
+   * Replaces the default department chip track. The Knowledge Home derives its
+   * chips from the corpus, so it renders its own component here. Pass `null` to
+   * hide the chips — which is how Results Mode bypasses the department filter.
+   */
+  departmentChips?: ReactNode | null;
+
   searchQuery: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder: string;
@@ -269,6 +294,10 @@ export function MasterDetailShell<T>({
   listActions,
   leadingGroup,
   listFooter,
+  railTop,
+  searchField,
+  headerExtras,
+  departmentChips,
   searchQuery,
   onSearchChange,
   searchPlaceholder,
@@ -340,6 +369,7 @@ export function MasterDetailShell<T>({
         )}
       >
         <div className="shrink-0 space-y-3 px-4 pb-3 pt-4">
+          {railTop}
           <div className="flex items-baseline justify-between gap-3 px-0.5">
             <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">{listTitle}</h2>
             <div className="flex items-center gap-2.5">
@@ -351,17 +381,27 @@ export function MasterDetailShell<T>({
               ) : null}
             </div>
           </div>
-          <SearchField
-            value={searchQuery}
-            onChange={onSearchChange}
-            placeholder={searchPlaceholder}
-            label={searchLabel}
-          />
-          <DepartmentChipTrack
-            active={activeDepartment}
-            onChange={onDepartmentChange}
-            counts={counts}
-          />
+          {/* `undefined` = the default control; `null` = render nothing. */}
+          {searchField === undefined ? (
+            <SearchField
+              value={searchQuery}
+              onChange={onSearchChange}
+              placeholder={searchPlaceholder}
+              label={searchLabel}
+            />
+          ) : (
+            searchField
+          )}
+          {headerExtras}
+          {departmentChips === undefined ? (
+            <DepartmentChipTrack
+              active={activeDepartment}
+              onChange={onDepartmentChange}
+              counts={counts}
+            />
+          ) : (
+            departmentChips
+          )}
         </div>
 
         <div className="h-px shrink-0 bg-zinc-200/80" />

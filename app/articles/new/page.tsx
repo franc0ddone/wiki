@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArticleEditorLoader } from "@/components/editor/ArticleEditorLoader";
 import { EditorUnavailable } from "@/components/editor/EditorUnavailable";
 import { getArticles } from "@/lib/data";
-import { getReviewerOptions, requireEditorViewer } from "@/lib/editor/server";
+import { requireEditorViewer } from "@/lib/editor/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "New procedure · Dove Hub" };
@@ -11,6 +11,9 @@ export const metadata: Metadata = { title: "New procedure · Dove Hub" };
  * `/articles/new` — a blank draft. Full-page editor, outside the master/detail
  * shell. Requires `author`+ (the API enforces it too); anyone below that sees a
  * plain notice instead of an editor they could not use.
+ *
+ * Prompt 7c: no reviewer list is fetched any more — the author writes it and
+ * publishes it in the same session.
  */
 export default async function NewArticlePage() {
   const viewer = await requireEditorViewer("/articles/new");
@@ -23,7 +26,7 @@ export default async function NewArticlePage() {
     );
   }
 
-  const [articles, reviewers] = await Promise.all([getArticles(), getReviewerOptions()]);
+  const articles = await getArticles();
 
   return (
     <ArticleEditorLoader
@@ -31,7 +34,6 @@ export default async function NewArticlePage() {
       viewer={viewer}
       article={null}
       registrySource={articles.map((a) => ({ slug: a.slug, title: a.title, body_markdown: a.body_markdown }))}
-      reviewers={reviewers}
     />
   );
 }

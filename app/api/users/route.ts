@@ -3,6 +3,7 @@ import { errorResponse } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { ROLE_LABELS } from "@/lib/roles";
+import { staffTypeLabel } from "@/lib/staff-type";
 
 /**
  * `GET /api/users` — the account roster.
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
         name: true,
         title: true,
         role: true,
+        staffType: true,
         createdAt: true,
         _count: { select: { authoredArticles: true, authoredBulletins: true } },
       },
@@ -48,6 +50,11 @@ export async function GET(request: NextRequest) {
         title: user.title,
         role: user.role,
         role_label: ROLE_LABELS[user.role],
+        // Staff type (prompt 7c) — editable here, and set by an approver when an
+        // access request is approved. It steers the Knowledge Home feed's
+        // default audience and nothing else.
+        staff_type: user.staffType,
+        staff_type_label: staffTypeLabel(user.staffType as "MEDICAL" | "NON_MEDICAL" | null),
         created_at: user.createdAt.toISOString(),
         authored_articles: user._count.authoredArticles,
         authored_bulletins: user._count.authoredBulletins,

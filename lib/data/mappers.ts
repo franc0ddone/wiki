@@ -1,5 +1,6 @@
 import type { ArticleStatus, ShiftPreference } from "@/generated/prisma/enums";
 import type {
+  ArticleAudience,
   Bulletin,
   ClinicalDepartment,
   KnowledgeArticle,
@@ -46,15 +47,31 @@ export interface ArticleRowInput {
   status: ArticleStatus;
   updatedAt: Date;
   author: AuthorRow | null;
+  /** Curated Essential SOP (prompt 7c). */
+  isEssential: boolean;
+  /** Who the procedure is written for (prompt 7c). */
+  audience: ArticleAudience;
   /**
-   * `created_at` of the article's latest published version, or `null` when it
-   * has never been published. The data layer resolves it from the immutable
-   * `article_versions` history (see `lib/data/articles.ts`).
+   * The **two newest** immutable published versions, newest first — `[]` when
+   * the article has never been published. Two, not one, because the feed's
+   * version-jump badge needs the previous number as well as the current one
+   * (prompt 7c).
    */
-  lastReviewedAt: Date | null;
+  versions: readonly ArticleVersionRowInput[];
+}
+
+/** One row of the append-only publish history, as the portal needs it. */
+export interface ArticleVersionRowInput {
+  version: number;
+  createdAt: Date;
+  /** Who published it. Nullable only for a row whose account was removed. */
+  changedBy: AuthorRow | null;
 }
 
 export function toKnowledgeArticle(row: ArticleRowInput): KnowledgeArticle {
+  const latest = row.versions[0] ?? null;
+  const previous = row.versions[1] ?? null;
+
   return {
     id: row.id,
     title: row.title,
@@ -66,7 +83,21 @@ export function toKnowledgeArticle(row: ArticleRowInput): KnowledgeArticle {
     // FACILITY_TIME_ZONE. UTC on the wire, local on the screen.
     updated_at: row.updatedAt.toISOString(),
     author_name: formatAuthorName(row.author),
-    last_reviewed_at: row.lastReviewedAt ? row.lastReviewedAt.toISOString() : null,
+    // Publishing *is* the review act, so the newest version's `created_at` is
+    // `last_reviewed_at` for the reader's freshness badge. `null` = never
+    // published.
+    last_reviewed_at: latest ? latest.createdAt.toISOString() : null,
+    is_essential: row.isEssential,
+    audience: row.audience,
+    latest_published_version: latest ? latest.version : null,
+    previous_published_version: previous ? previous.version : null,
+    // The newest version's author, falling back to the article's author so a
+    // legacy row without a version author still credits somebody.
+    latest_published_by: latest
+      ? latest.changedBy
+        ? formatAuthorName(latest.changedBy)
+        : formatAuthorName(row.author)
+      : null,
   };
 }
 

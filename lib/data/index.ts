@@ -61,3 +61,5 @@ export {
 } from "@/lib/data/staff";
 
 export { formatAuthorName } from "@/lib/data/mappers";
+
+export { getUserStaffType } from "@/lib/data/users";

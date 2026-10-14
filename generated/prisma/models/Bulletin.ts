@@ -723,10 +723,6 @@ export type BulletinUpdatedepartmentsInput = {
   push?: string | string[]
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type EnumBulletinPriorityFieldUpdateOperationsInput = {
   set?: $Enums.BulletinPriority
 }

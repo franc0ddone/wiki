@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { OperationsHubClient } from "@/components/OperationsHubClient";
 import { auth } from "@/lib/auth";
-import { getArticles, getAuthoredBulletinIds, getBulletinBoard, getStaff } from "@/lib/data";
+import { getArticles, getAuthoredBulletinIds, getBulletinBoard, getStaff, getUserStaffType } from "@/lib/data";
 import { getLatestRoleRequestForUser, listRoleRequests } from "@/lib/data/role-requests";
 import { canRequestAuthorAccess, canReviewRoleRequests } from "@/lib/role-requests";
 import { isRole, roleAtLeast, type Role } from "@/lib/roles";
@@ -24,6 +24,11 @@ import { isRole, roleAtLeast, type Role } from "@/lib/roles";
  *
  * Both are `null`/empty for everyone else, so a `readonly` session receives no
  * request data at all.
+ *
+ * The viewer's **staff type** (prompt 7c) is read here too, for the Knowledge
+ * Home feed's default audience. It is fetched rather than taken off the session
+ * because the auth callbacks are locked, and it is not an authorization value in
+ * any case.
  *
  * `proxy.ts` already requires a session for this path; the guard here is the
  * second lock (defense in depth) and also the thing that makes the redirect
@@ -55,9 +60,12 @@ export default async function PortalPage({
     searchParams,
   ]);
 
-  const [authorRequest, roleRequests] = await Promise.all([
+  const [authorRequest, roleRequests, viewerStaffType] = await Promise.all([
     canRequestAuthorAccess(role) ? getLatestRoleRequestForUser(session.user.id) : Promise.resolve(null),
     canReviewRoleRequests(role) ? listRoleRequests(["pending"]) : Promise.resolve([]),
+    // Prompt 7c: read server-side rather than off the session, which is locked.
+    // It only selects the Knowledge Home feed's default audience.
+    getUserStaffType(session.user.id),
   ]);
 
   // Only a viewer who could edit a notice needs the list of notices they wrote.
@@ -74,6 +82,7 @@ export default async function PortalPage({
       staff={staff}
       viewerRole={role}
       viewerId={session.user.id}
+      viewerStaffType={viewerStaffType}
       viewer={{ name: session.user.name ?? "", email: session.user.email ?? "" }}
       authoredBulletinIds={authoredBulletinIds}
       initialArticleSlug={articleParam ?? null}

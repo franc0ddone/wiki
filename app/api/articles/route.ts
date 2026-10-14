@@ -1,16 +1,19 @@
 import type { NextRequest } from "next/server";
 import type { ArticleStatus } from "@/generated/prisma/enums";
-import { errorResponse, optionalString, readJsonBody, requireString, requireStringArray } from "@/lib/api";
+import { ApiError, errorResponse, optionalString, readJsonBody, requireString, requireStringArray } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { createArticle, getArticles, type ArticleFilters } from "@/lib/data/articles";
-import type { Department } from "@/types/portal";
+import { AUDIENCES, isAudience, type Department } from "@/types/portal";
 
 /**
  * `GET  /api/articles` — list, with `status`, `department`, and `q` filters.
  * `POST /api/articles` — create, always as `draft`. Requires `author`+.
+ *
+ * The lifecycle is `draft → published` (prompt 7c removed the review state), and
+ * publishing is a single `PATCH` with `status: "published"`.
  */
 
-const STATUSES: readonly ArticleStatus[] = ["draft", "in_review", "published"];
+const STATUSES: readonly ArticleStatus[] = ["draft", "published"];
 
 function isStatus(value: string): value is ArticleStatus {
   return (STATUSES as readonly string[]).includes(value);
@@ -21,7 +24,7 @@ export async function GET(request: NextRequest) {
     await requireRole("readonly");
 
     const params = request.nextUrl.searchParams;
-    // `?status=draft&status=in_review` and `?status=draft,in_review` both work;
+    // `?status=draft&status=published` and `?status=draft,published` both work;
     // anything unrecognised is ignored rather than 400ing a read.
     const statuses = params
       .getAll("status")
@@ -49,11 +52,19 @@ export async function POST(request: NextRequest) {
     const actor = await requireRole("author");
     const body = await readJsonBody(request);
 
+    const audience = optionalString(body, "audience");
+    if (audience !== undefined && !isAudience(audience)) {
+      throw new ApiError(422, `\`audience\` must be one of ${AUDIENCES.join(", ")}.`, {
+        details: { field: "audience" },
+      });
+    }
+
     const article = await createArticle({
       title: requireString(body, "title", { maxLength: 300 }),
       slug: optionalString(body, "slug", { maxLength: 120 }),
       body_markdown: requireString(body, "body_markdown", { minLength: 1 }),
       departments: requireStringArray(body, "departments"),
+      ...(audience ? { audience } : {}),
       // Authors write their own drafts. An admin may attribute the draft to
       // someone else (an import, a dictated procedure) by passing `author_id`.
       author_id:

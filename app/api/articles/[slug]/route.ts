@@ -3,6 +3,7 @@ import type { ArticleStatus } from "@/generated/prisma/enums";
 import {
   ApiError,
   errorResponse,
+  optionalBoolean,
   optionalDate,
   optionalString,
   optionalStringArray,
@@ -10,17 +11,19 @@ import {
 } from "@/lib/api";
 import { requireRole } from "@/lib/auth";
 import { getArticleBySlug, updateArticle, type UpdateArticleInput } from "@/lib/data/articles";
-import { roleAtLeast } from "@/lib/roles";
+import { AUDIENCES, isAudience } from "@/types/portal";
 
 /**
  * `GET   /api/articles/[slug]` — one article.
  * `PATCH /api/articles/[slug]` — field updates, including the publish
- * transition. Requires `author`+; publishing additionally requires
- * `clinical_lead`+ *and* a reviewer who holds that role (enforced in
- * `updateArticle`, so it holds for every caller).
+ * transition. Requires `author`+.
+ *
+ * **Publishing is direct (prompt 7c):** there is no reviewer to name and no
+ * approval step, so `{ status: "published" }` is enough. The `author` floor is
+ * the only gate left.
  */
 
-const STATUSES: readonly ArticleStatus[] = ["draft", "in_review", "published"];
+const STATUSES: readonly ArticleStatus[] = ["draft", "published"];
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
@@ -51,29 +54,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (body.effective_date !== undefined) patch.effective_date = optionalDate(body, "effective_date");
 
-    if (body.reviewer_id !== undefined) {
-      const reviewer = optionalString(body, "reviewer_id");
-      patch.reviewer_id = reviewer && reviewer.length > 0 ? reviewer : null;
+    // Essential SOP curation (prompt 7c). Metadata only: it never versions the
+    // procedure and never moves its publish timestamp, so the feed order is
+    // untouched. Curating is the clinical lead's call.
+    if (body.is_essential !== undefined) {
+      patch.is_essential = optionalBoolean(body, "is_essential");
+    }
+
+    // Audience (prompt 7c) — who the procedure is written for. Not a permission
+    // boundary, so any author may set it.
+    if (body.audience !== undefined) {
+      const audience = optionalString(body, "audience");
+      if (!isAudience(audience)) {
+        throw new ApiError(422, `\`audience\` must be one of ${AUDIENCES.join(", ")}.`, {
+          details: { field: "audience" },
+        });
+      }
+      patch.audience = audience;
     }
 
     if (body.status !== undefined) {
       const status = optionalString(body, "status");
       if (!status || !(STATUSES as readonly string[]).includes(status)) {
-        throw new ApiError(422, "`status` must be one of `draft`, `in_review`, `published`.", {
+        throw new ApiError(422, "`status` must be one of `draft`, `published`.", {
           details: { field: "status" },
         });
       }
       patch.status = status as ArticleStatus;
-
-      // Publishing is a clinical act. The proxy already floors PATCH at
-      // `author`; this is the escalation that matters.
-      if (status === "published" && !roleAtLeast(actor.role, "clinical_lead")) {
-        throw new ApiError(
-          403,
-          "Publishing a procedure requires the clinical lead role or higher.",
-          { code: "forbidden", details: { requiredRole: "clinical_lead", actualRole: actor.role } },
-        );
-      }
     }
 
     if (Object.keys(patch).length === 0) {
