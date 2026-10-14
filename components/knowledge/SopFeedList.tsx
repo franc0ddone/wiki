@@ -1,6 +1,5 @@
 "use client";
 
-import { Star } from "lucide-react";
 import { lastPublishedAt, versionJumpLabel } from "@/lib/knowledge/feed";
 import { relativeTime } from "@/lib/knowledge/relative-time";
 import {
@@ -12,23 +11,37 @@ import {
 import { cx } from "@/lib/utils";
 
 /**
- * **One row of the Knowledge Home feed** (prompt 7c, items 3 and 4) — named for
- * the spec's `<SopFeedList />` row component.
+ * **One row of the Knowledge Home feed** — one component for both modes and both
+ * groups, so a Feed Mode row (recency ranked) and a Results Mode row (relevance
+ * ranked) are byte-identical in shape, as are the Essential SOPs rows above the
+ * feed. The surface owns the row's chrome, its card and its selection
+ * behaviour; this is only the content.
  *
- * One component serves both modes and both groups, so a Feed Mode row (recency
- * ranked) and a Results Mode row (relevance ranked) are byte-identical in shape,
- * as are the Essential SOPs rows above the feed. The shell owns the row's chrome
- * and its selection behaviour; this is only the content.
+ * What a row shows: who published the **latest published version** (falling back
+ * to the article's author), the title, and the evergreen SOP metadata — the
+ * version indicator (a version jump once the procedure has been published
+ * twice) and the relative publish time in the secondary slot beside the byline.
  *
- * What a row shows: the author of the **latest published version** (falling back
- * to the article's author), the relative publish time, the title, the department
- * badges, the version-jump badge, and — for anything not written for "All" — the
- * audience it belongs to.
+ * The treatment is the bulletin board's rail card, at the feed's measure:
+ *
+ *  - the title is Domine serif at the rail's title scale, in Dove Black
+ *    `#20241E`, moving to Dark Green `#5F6E00` under the cursor;
+ *  - everything else is Palanquin in quiet clinical greys (`text-zinc-500` for
+ *    the byline, the version indicator and the timestamp; `text-zinc-400` for
+ *    the department line);
+ *  - **departments are silent**: they stay indexed in Fuse.js and filterable
+ *    through the chip track, so a row states them as ultra-quiet plain text and
+ *    never as a coloured pill — exactly how a bulletin rail card behaves.
+ *
+ * The Essential group's caption is what says a row is curated. A row inside that
+ * group therefore draws no "Essential" pill; the curated accent survives as an
+ * accessible marker only, so the row's name still says why it sits in the top
+ * group while the visual language stays the board's.
  *
  * Rows open the procedure in the portal's reader rather than rendering a nested
- * `<a>`: the row *is* the shell's selection button (`MasterDetailShell`), and an
- * anchor inside a button is invalid HTML. `/procedures/<slug>` is the same
- * reader — that route redirects into this surface with the slug selected.
+ * `<a>`: the row *is* the surface's selection button, and an anchor inside a
+ * button is invalid HTML. `/procedures/<slug>` is the same reader — that route
+ * redirects into this surface with the slug selected.
  */
 
 export interface SopFeedListProps {
@@ -49,72 +62,65 @@ export function SopFeedList({ article, isSelected, now, variant = "standard" }: 
   const byline = displayName(article.latest_published_by ?? article.author_name);
 
   return (
-    <span className="block">
-      <span className="flex items-center justify-between gap-3">
-        <span className="truncate text-xs font-medium text-zinc-500">{byline}</span>
-        <time dateTime={publishedAt} className="shrink-0 text-xs font-medium tabular-nums text-zinc-500">
-          {when ?? publishedAt}
-        </time>
+    <span className="block min-w-0">
+      <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="min-w-0 truncate text-xs font-medium text-zinc-500">{byline}</span>
+        <span className="flex shrink-0 items-center gap-2.5">
+          {variant === "essential" ? <span className="sr-only">Essential procedure</span> : null}
+          {jump ? <VersionIndicator label={jump} /> : null}
+          <time
+            dateTime={publishedAt}
+            className="whitespace-nowrap text-xs font-medium tabular-nums text-zinc-500"
+          >
+            {when ?? publishedAt}
+          </time>
+        </span>
       </span>
       <span
         className={cx(
-          "mt-1 block text-[13.5px] font-semibold leading-snug tracking-[-0.005em]",
-          isSelected ? "text-zinc-900" : "text-zinc-800",
+          "dw-display mt-1 block min-w-0 break-words text-[13.5px] font-semibold leading-snug tracking-[-0.005em] transition-colors duration-150",
+          isSelected ? "text-[#5F6E00]" : "text-[#20241E] group-hover:text-[#5F6E00]",
         )}
       >
         {article.title}
       </span>
-      <span className="mt-2 flex flex-wrap items-center gap-1">
-        {variant === "essential" ? <EssentialChip /> : null}
-        <DepartmentTags departments={article.departments} />
-        {jump ? <VersionJumpChip label={jump} /> : null}
-        {article.audience !== "ALL" ? <AudienceChip audience={article.audience} /> : null}
+      <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-zinc-400">
+        <DepartmentLine departments={article.departments} />
+        {article.audience !== "ALL" ? (
+          <span className="whitespace-nowrap">{AUDIENCE_LABELS[article.audience]}</span>
+        ) : null}
       </span>
     </span>
   );
 }
 
-/** The curated accent — Dove Green, and the only filled chip in a feed row. */
-function EssentialChip() {
+/**
+ * The version indicator: `v8 → v9` once a procedure has been published twice,
+ * plain `v1` on its first. Palanquin, tabular figures, quiet — the same place a
+ * bulletin row states when it comes down, and never a loud badge.
+ */
+function VersionIndicator({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#5F6E00]/30 bg-[#AFBE23]/20 px-2 py-px text-[11px] font-semibold text-[#3F4A00]">
-      <Star size={11} strokeWidth={2} aria-hidden="true" fill="#AFBE23" />
-      Essential
-    </span>
-  );
-}
-
-/** `v8 → v9` once a procedure has been published twice; `v1` on its first. */
-function VersionJumpChip({ label }: { label: string }) {
-  return (
-    <span className="whitespace-nowrap rounded-full border border-[#5F6E00]/25 bg-white px-2 py-px text-[11px] font-medium tabular-nums text-[#3F4A00]">
+    <span
+      title="Latest published version"
+      className="whitespace-nowrap text-[11px] font-medium tabular-nums text-zinc-500"
+    >
       {label}
     </span>
   );
 }
 
-/** Only rendered when the procedure is not written for everyone. */
-function AudienceChip({ audience }: { audience: KnowledgeArticle["audience"] }) {
+/**
+ * Department associations, stated once as plain muted text. They remain indexed
+ * for search and filterable from the chip track; the row itself never repeats
+ * them as a coloured pill (the bulletin rail's rule).
+ */
+function DepartmentLine({ departments }: { departments: readonly ClinicalDepartment[] }) {
+  if (departments.length === 0) return null;
   return (
-    <span className="whitespace-nowrap rounded-full border border-zinc-300/70 bg-zinc-50 px-2 py-px text-[11px] font-medium text-zinc-600">
-      {AUDIENCE_LABELS[audience]}
+    <span className="min-w-0 break-words">
+      {departments.map((department) => DEPARTMENT_LABELS[department]).join(" \u00b7 ")}
     </span>
-  );
-}
-
-/** Department badges — the portal's outline-pill language, in Dark Green. */
-function DepartmentTags({ departments }: { departments: readonly ClinicalDepartment[] }) {
-  return (
-    <>
-      {departments.map((department) => (
-        <span
-          key={department}
-          className="whitespace-nowrap rounded-full border border-[#5F6E00]/25 bg-[#AFBE23]/10 px-2 py-px text-[11px] font-medium text-[#3F4A00]"
-        >
-          {DEPARTMENT_LABELS[department]}
-        </span>
-      ))}
-    </>
   );
 }
 

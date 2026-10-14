@@ -24,20 +24,32 @@ import { cx } from "@/lib/utils";
  * The fallback mark is a geometric dove drawn inline in the locked brand
  * colours — Dark Green #5F6E00 as the field and Dove Green #AFBE23 as the bird —
  * so there is no raster asset to ship and nothing to load before the Oct 21
- * demo. The wordmark is Domine bold in Dove Black #20241E.
+ * demo. The wordmark is Domine bold, in Dove Black #20241E on light surfaces and
+ * white in the Knowledge Home's dark header band (`tone="light"`). The mark
+ * itself is unchanged in either tone: it carries its own ground.
  */
 
 export interface BrandLockupProps {
   /** Optional extra classes; the slot's own geometry is fixed. */
   className?: string;
+  /**
+   * The surface the lockup sits on. `"dark"` (the default) is Dove Black on a
+   * light surface; `"light"` inverts the wordmark only, for the #20241E band.
+   */
+  tone?: "dark" | "light";
 }
 
-export function BrandLockup({ className }: BrandLockupProps) {
+export function BrandLockup({ className, tone = "dark" }: BrandLockupProps) {
   return (
     <div className={cx("flex h-9 items-center gap-2.5", className)}>
       {/* ---- DROP-IN REPLACEMENT POINT (see the docblock above) ---- */}
       <BrandMark />
-      <span className="dw-display truncate text-[17px] font-bold leading-9 tracking-[-0.01em] text-[#20241E]">
+      <span
+        className={cx(
+          "dw-display truncate text-[17px] font-bold leading-9 tracking-[-0.01em]",
+          tone === "light" ? "text-white" : "text-[#20241E]",
+        )}
+      >
         Dove Hub
       </span>
       {/* ------------------------------------------------------------ */}

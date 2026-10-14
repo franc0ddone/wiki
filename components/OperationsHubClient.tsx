@@ -75,9 +75,10 @@ const BulletinComposer = dynamic(() => import("@/components/bulletin/BulletinCom
  * unchanged.
  *
  * The knowledge view is the **Knowledge Home** surface (prompt 7c), a
- * component of its own: `KnowledgeHome` owns the feed, the audience switcher,
- * the Essential SOPs section, and both of its modes. This shell supplies the
- * datasets, the index, the selection, and the reader pane.
+ * component of its own: `KnowledgeHome` owns the full-width clinical surface —
+ * its dark header band, the feed, the audience switcher, the Essential SOPs
+ * group, and both of its modes. This shell supplies the datasets, the index,
+ * the section switch, the selection, and the reader pane.
  */
 
 export interface BulletinBoardProps {
@@ -965,12 +966,14 @@ export function OperationsHubClient({
 
         {activeView === "knowledge" ? (
           /*
-           * The Knowledge Home surface (prompt 7c) owns everything about the
-           * knowledge view's rail — brand lockup, search hero, Essential SOPs,
-           * audience switcher, corpus-derived department chips, and both modes.
-           * The shell hands it the datasets, the shared Fuse index, the
-           * selection, and the reader pane; the reader itself (prompt 7a) is
-           * unchanged.
+           * The Knowledge Home surface (prompt 7c) is a full-width clinical
+           * surface — no master/detail shell, no rail, matching the 7a reader
+           * and the bulletin board. It owns its dark header band (brand lockup,
+           * the Bulletins/Procedures navigation, and the "New SOP" entry point
+           * this shell gates), its single search hero, the filter bar, the
+           * Essential SOPs group, and both of its modes. The shell hands it the
+           * datasets, the shared Fuse index, the section switch, the selection,
+           * and the reader pane; the reader itself (prompt 7a) is unchanged.
            */
           <KnowledgeHome
             articles={articles}
@@ -978,14 +981,15 @@ export function OperationsHubClient({
             staffType={viewerStaffType}
             query={searchQuery}
             onQueryChange={setSearchQuery}
+            onNavigate={handleViewChange}
             listActions={
               isAuthor ? (
                 <Link
                   href="/articles/new"
-                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-[#5F6E00]/40 hover:text-[#3F4A00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/45"
+                  className="flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-[#AFBE23]/50 bg-[#AFBE23]/15 px-2.5 text-xs font-medium text-[#E6EBA5] transition-colors hover:bg-[#AFBE23]/25 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#AFBE23]/50"
                 >
                   <Plus size={13} strokeWidth={2} aria-hidden="true" />
-                  New procedure
+                  New SOP
                 </Link>
               ) : null
             }

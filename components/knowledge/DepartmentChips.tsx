@@ -61,7 +61,7 @@ export function DepartmentChips({
       ref={trackRef}
       role="group"
       aria-label={label}
-      className={cx("fade-x scrollbar-none -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5", className)}
+      className={cx("fade-x scrollbar-none flex gap-1.5 overflow-x-auto py-0.5", className)}
     >
       {options.map((department) => {
         const isActive = department === active;
@@ -75,11 +75,11 @@ export function DepartmentChips({
             onClick={() => onChange(department)}
             title={DEPARTMENT_LABELS[department]}
             className={cx(
-              "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-colors duration-150",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/45",
+              "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/30",
               isActive
-                ? "border-[#5F6E00]/40 bg-[#AFBE23]/15 text-[#3F4A00]"
-                : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
+                ? "border-[#5F6E00] bg-[#E6EBA5] text-[#5F6E00]"
+                : "border-zinc-300/60 bg-white text-zinc-600 hover:border-[#5F6E00]/40 hover:text-[#5F6E00]",
               isEmpty && "text-zinc-400",
             )}
           >
