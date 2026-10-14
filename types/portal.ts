@@ -85,6 +85,13 @@ export interface KnowledgeArticle {
   /** ISO 8601 timestamp. */
   updated_at: string;
   author_name: string;
+  /**
+   * ISO 8601 timestamp of the last review — the `created_at` of the article's
+   * latest immutable published version (`ArticleVersion`), or `null` when the
+   * procedure has never been published. The reader's freshness badge is derived
+   * from this (see `lib/reader/freshness.ts`); publishing *is* the review act.
+   */
+  last_reviewed_at: string | null;
 }
 
 /**

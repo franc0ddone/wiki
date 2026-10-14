@@ -87,6 +87,14 @@ import { extractHeadingIds, validateLinks } from "@/lib/links";
 import { validateArticle } from "@/lib/editor/validation";
 import { buildLinkRegistry } from "@/lib/links";
 import { stripMarkdown } from "@/lib/search/strip-markdown";
+import { STALE_AFTER_MONTHS, freshnessFor, monthsBetween } from "@/lib/reader/freshness";
+import { collapseDiff, diffLines, summarizeDiff } from "@/lib/markdown/diff";
+import {
+  DEFAULT_READER_FONT_SIZE,
+  parseReaderFontSize,
+  readerFontPx,
+  toggleReaderFontSize,
+} from "@/lib/reader/font-scale";
 import { expandQuery, SYNONYMS } from "@/lib/search/synonyms";
 import { buildSearchIndex, search } from "@/lib/search";
 import {
@@ -1548,6 +1556,69 @@ check("a table selection shows the merge/split menu; a paragraph shows the forma
     selection: TextSelection.create(pdoc, 1, 5),
   });
   assert.equal(bubbleMode(formatState, false), "format");
+});
+
+/* ==================================================== reader chrome (7a) === */
+
+console.log("reader chrome (prompt 7a)");
+
+check("freshness: 12 months is the lock — 11 fresh, 12 stale", () => {
+  const now = Date.parse("2026-10-12T00:00:00.000Z");
+  assert.equal(freshnessFor("2025-11-12T00:00:00.000Z", now).state, "fresh");
+  const stale = freshnessFor("2025-10-12T00:00:00.000Z", now);
+  assert.equal(stale.state, "stale");
+  assert.equal(stale.months, STALE_AFTER_MONTHS);
+  assert.equal(stale.label, "Last reviewed 12 months ago");
+});
+
+check("freshness: months floor on the day of month and never go negative", () => {
+  const now = Date.parse("2026-01-19T00:00:00.000Z");
+  assert.equal(monthsBetween("2025-12-20T00:00:00.000Z", now), 0, "day not yet reached");
+  assert.equal(monthsBetween("2025-12-19T00:00:00.000Z", now), 1);
+  assert.equal(monthsBetween("2027-01-01T00:00:00.000Z", now), 0, "a future date clamps to 0");
+});
+
+check("freshness: a never-published procedure is 'unknown', not 'stale'", () => {
+  const result = freshnessFor(null, Date.parse("2026-10-12T00:00:00.000Z"));
+  assert.equal(result.state, "unknown");
+  assert.equal(result.months, null);
+  assert.equal(result.label, "Not yet reviewed");
+});
+
+check("diff: a changed line is one removal then one addition, in order", () => {
+  const lines = diffLines("a\nb\nc", "a\nB\nc");
+  assert.deepEqual(
+    lines.map((line) => line.op),
+    ["same", "remove", "add", "same"],
+  );
+  assert.deepEqual(summarizeDiff(lines), { added: 1, removed: 1, unchanged: 2 });
+});
+
+check("diff: identical input and a pure addition are described correctly", () => {
+  assert.deepEqual(diffLines("x", "x"), [{ op: "same", text: "x" }]);
+  assert.deepEqual(diffLines("", "new"), [{ op: "add", text: "new" }]);
+});
+
+check("diff: collapse keeps context and marks the elided unchanged run", () => {
+  const before = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
+  const after = before.replace("line 10", "line 10 changed");
+  const collapsed = collapseDiff(diffLines(before, after), 2);
+  const gap = collapsed.find((line) => line.elided !== undefined);
+  assert.ok(gap, "a long unchanged run collapses to a gap marker");
+  assert.ok((gap.elided ?? 0) > 0, "the gap records how many lines it elided");
+  assert.ok(
+    collapsed.some((line) => line.op === "remove") && collapsed.some((line) => line.op === "add"),
+    "the change itself survives the collapse",
+  );
+});
+
+check("reader font size: workstation setting parses, toggles, and maps to px", () => {
+  assert.equal(parseReaderFontSize(null), "comfortable");
+  assert.equal(parseReaderFontSize("large"), "large");
+  assert.equal(parseReaderFontSize("nonsense"), DEFAULT_READER_FONT_SIZE);
+  assert.equal(toggleReaderFontSize("comfortable"), "large");
+  assert.equal(toggleReaderFontSize("large"), "comfortable");
+  assert.ok(readerFontPx("large") > readerFontPx("comfortable"), "large is larger than comfortable");
 });
 
 /* ==================================================== async / DB checks === */

@@ -78,6 +78,23 @@ body {
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
 }
 
+/*
+ * The reader surface (prompt 7a): body and UI in Palanquin, headlines in
+ * Domine — the locked reader type plan. Scoped to `.dw-reader` so the rest of
+ * the app keeps the system stack. The body column's base font-size is set
+ * inline from the workstation text-size preference (lib/reader/font-scale.ts);
+ * everything inside scales from that one value via `zoom` on the column.
+ */
+.dw-reader {
+  font-family: var(--font-reader), var(--font-sans);
+}
+
+.dw-reader h1,
+.dw-reader h2,
+.dw-reader h3 {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+}
+
 h1,
 h2,
 h3 {

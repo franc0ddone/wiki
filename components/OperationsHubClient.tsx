@@ -23,6 +23,14 @@ import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { PortalHeader } from "@/components/PortalHeader";
 import { ReferencedBy } from "@/components/ReferencedBy";
+import { ChangesBanner } from "@/components/reader/ChangesBanner";
+import { FreshnessBadge } from "@/components/reader/FreshnessBadge";
+import { ReaderTopBar } from "@/components/reader/ReaderTopBar";
+import { readerFontPx } from "@/lib/reader/font-scale";
+import type { ArticlePreview } from "@/lib/reader/preview";
+import type { ArticleReadState } from "@/lib/data/article-reads";
+import { useReaderFontSize } from "@/components/reader/readerSettings";
+import { VersionDiffDialog } from "@/components/reader/VersionDiffDialog";
 import { VersionHistoryDialog } from "@/components/VersionHistoryDialog";
 import { AuthorAccessMenu } from "@/components/auth/AuthorAccessMenu";
 import { ArticleAttachments } from "@/components/editor/ArticleAttachments";
@@ -336,23 +344,92 @@ function ArticleDetail({
   onOpenHistory,
   onOpenArticleBySlug,
   onOpenBulletin,
+  onOpenSearch,
+  previewFor,
 }: {
   article: KnowledgeArticle;
   canEdit: boolean;
   onOpenHistory: () => void;
   onOpenArticleBySlug: (slug: string, anchor?: string) => void;
   onOpenBulletin: (id: string) => void;
+  onOpenSearch: () => void;
+  previewFor: (slug: string) => ArticlePreview | null;
 }) {
+  const now = useNow();
+  const { size: fontSize, toggle: toggleFontSize } = useReaderFontSize();
+  const [readState, setReadState] = useState<ArticleReadState | null>(null);
+  const [diffOpen, setDiffOpen] = useState(false);
+
+  // Read state (item 1): what this user last saw vs. the current version. The
+  // marker is written a few seconds in, so a quick glance that is reloaded does
+  // not count as "read". Fire-and-forget — a failure just means no highlight.
+  useEffect(() => {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    (async () => {
+      try {
+        const response = await fetch(`/api/articles/${encodeURIComponent(article.slug)}/read`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const state = (await response.json()) as ArticleReadState;
+        setReadState(state);
+        if (state.latest_version !== null) {
+          const version = state.latest_version;
+          timer = setTimeout(() => {
+            void fetch(`/api/articles/${encodeURIComponent(article.slug)}/read`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ version }),
+            }).catch(() => {});
+          }, 3000);
+        }
+      } catch {
+        // Offline / unauthenticated: no highlight, and no marker to write.
+      }
+    })();
+    return () => {
+      controller.abort();
+      if (timer) clearTimeout(timer);
+    };
+  }, [article.slug]);
+
+  const latestVersion = readState?.latest_version ?? null;
+  const changedFrom =
+    readState !== null &&
+    readState.last_seen_version !== null &&
+    latestVersion !== null &&
+    latestVersion > readState.last_seen_version
+      ? readState.last_seen_version
+      : null;
+
+  const breadcrumbs = [
+    "Knowledge base",
+    article.departments[0] ? DEPARTMENT_LABELS[article.departments[0]] : "Procedure",
+    article.title,
+  ];
+
   return (
-    <DetailFrame>
+    <>
+      <ReaderTopBar
+        breadcrumbs={breadcrumbs}
+        onSearch={onOpenSearch}
+        markdown={article.body_markdown}
+        fontSize={fontSize}
+        onToggleFontSize={toggleFontSize}
+      />
+      <DetailFrame>
       <MarkdownReader
         source={article.body_markdown}
         onOpenArticle={onOpenArticleBySlug}
+        previewArticle={previewFor}
+        fontSizePx={readerFontPx(fontSize)}
         header={
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 <StatusBadge status={article.status} />
+                <FreshnessBadge lastReviewedAt={article.last_reviewed_at} now={now} />
                 <DepartmentTags departments={article.departments} />
               </div>
               <div className="flex shrink-0 items-center gap-1.5 print:hidden">
@@ -389,6 +466,15 @@ function ArticleDetail({
                 Updated {formatDate(article.updated_at)}
               </MetaItem>
             </div>
+            {changedFrom !== null && latestVersion !== null ? (
+              <div className="mt-5">
+                <ChangesBanner
+                  from={changedFrom}
+                  to={latestVersion}
+                  onViewChanges={() => setDiffOpen(true)}
+                />
+              </div>
+            ) : null}
           </>
         }
         footer={
@@ -422,7 +508,18 @@ function ArticleDetail({
           </div>
         }
       />
-    </DetailFrame>
+      </DetailFrame>
+
+      {diffOpen && changedFrom !== null && latestVersion !== null ? (
+        <VersionDiffDialog
+          slug={article.slug}
+          articleTitle={article.title}
+          fromVersion={changedFrom}
+          toVersion={latestVersion}
+          onClose={() => setDiffOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -683,6 +780,22 @@ export function OperationsHubClient({
     () => buildSearchIndex(articles, knownBulletins, staff),
     [articles, knownBulletins, staff],
   );
+
+  // Internal SOP link hover previews (prompt 7a, item 4): a lookup over the
+  // articles the portal already holds — no new endpoint, no fetch on hover.
+  const previewFor = useMemo(() => {
+    const bySlug = new Map(articles.map((article) => [article.slug, article]));
+    return (slug: string): ArticlePreview | null => {
+      const found = bySlug.get(slug);
+      if (!found) return null;
+      return {
+        title: found.title,
+        excerpt: excerpt(found.body_markdown, 140),
+        status: found.status,
+        departments: found.departments,
+      };
+    };
+  }, [articles]);
   const debouncedQuery = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS);
   // Clearing the field must restore the full list immediately, not 150 ms later.
   const effectiveQuery = searchQuery.trim().length === 0 ? "" : debouncedQuery;
@@ -904,6 +1017,8 @@ export function OperationsHubClient({
                   onOpenHistory={() => setHistoryOpen(true)}
                   onOpenArticleBySlug={openArticleBySlug}
                   onOpenBulletin={openBulletin}
+                  onOpenSearch={() => setPaletteOpen(true)}
+                  previewFor={previewFor}
                 />
               ) : null
             }

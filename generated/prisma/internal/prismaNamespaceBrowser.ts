@@ -54,6 +54,7 @@ export const ModelName = {
   User: 'User',
   Article: 'Article',
   ArticleVersion: 'ArticleVersion',
+  ArticleRead: 'ArticleRead',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
   BulletinReaction: 'BulletinReaction',
@@ -124,6 +125,17 @@ export const ArticleVersionScalarFieldEnum = {
 } as const
 
 export type ArticleVersionScalarFieldEnum = (typeof ArticleVersionScalarFieldEnum)[keyof typeof ArticleVersionScalarFieldEnum]
+
+
+export const ArticleReadScalarFieldEnum = {
+  id: 'id',
+  articleId: 'articleId',
+  userId: 'userId',
+  lastSeenVersion: 'lastSeenVersion',
+  seenAt: 'seenAt'
+} as const
+
+export type ArticleReadScalarFieldEnum = (typeof ArticleReadScalarFieldEnum)[keyof typeof ArticleReadScalarFieldEnum]
 
 
 export const BulletinScalarFieldEnum = {

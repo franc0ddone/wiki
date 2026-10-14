@@ -60,6 +60,18 @@ export type Article = Prisma.ArticleModel
  */
 export type ArticleVersion = Prisma.ArticleVersionModel
 /**
+ * Model ArticleRead
+ * **Reader "last read" marker (prompt 7a).** One row per (article, user): the
+ * latest published version number the reader had open when they last visited.
+ * 
+ * This is what powers the reader's "what changed since your last visit"
+ * highlight: the current latest version is compared against `lastSeenVersion`.
+ * It is deliberately **per user** (not per workstation, unlike the reader's
+ * font-size preference): the reader signs in, so "since your last visit"
+ * follows them across the shared 1080p workstations.
+ */
+export type ArticleRead = Prisma.ArticleReadModel
+/**
  * Model Bulletin
  * 
  */

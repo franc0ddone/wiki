@@ -400,6 +400,7 @@ export const ModelName = {
   User: 'User',
   Article: 'Article',
   ArticleVersion: 'ArticleVersion',
+  ArticleRead: 'ArticleRead',
   Bulletin: 'Bulletin',
   BulletinAck: 'BulletinAck',
   BulletinReaction: 'BulletinReaction',
@@ -423,7 +424,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "article" | "articleVersion" | "bulletin" | "bulletinAck" | "bulletinReaction" | "articleAttachment" | "bulletinAttachment" | "roleRequest" | "staffMember" | "searchLog"
+    modelProps: "user" | "article" | "articleVersion" | "articleRead" | "bulletin" | "bulletinAck" | "bulletinReaction" | "articleAttachment" | "bulletinAttachment" | "roleRequest" | "staffMember" | "searchLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -646,6 +647,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ArticleVersionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ArticleVersionCountAggregateOutputType> | number
+        }
+      }
+    }
+    ArticleRead: {
+      payload: Prisma.$ArticleReadPayload<ExtArgs>
+      fields: Prisma.ArticleReadFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ArticleReadFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ArticleReadFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        findFirst: {
+          args: Prisma.ArticleReadFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ArticleReadFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        findMany: {
+          args: Prisma.ArticleReadFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>[]
+        }
+        create: {
+          args: Prisma.ArticleReadCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        createMany: {
+          args: Prisma.ArticleReadCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ArticleReadCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>[]
+        }
+        delete: {
+          args: Prisma.ArticleReadDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        update: {
+          args: Prisma.ArticleReadUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        deleteMany: {
+          args: Prisma.ArticleReadDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ArticleReadUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ArticleReadUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>[]
+        }
+        upsert: {
+          args: Prisma.ArticleReadUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArticleReadPayload>
+        }
+        aggregate: {
+          args: Prisma.ArticleReadAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateArticleRead>
+        }
+        groupBy: {
+          args: Prisma.ArticleReadGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArticleReadGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ArticleReadCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArticleReadCountAggregateOutputType> | number
         }
       }
     }
@@ -1326,6 +1401,17 @@ export const ArticleVersionScalarFieldEnum = {
 export type ArticleVersionScalarFieldEnum = (typeof ArticleVersionScalarFieldEnum)[keyof typeof ArticleVersionScalarFieldEnum]
 
 
+export const ArticleReadScalarFieldEnum = {
+  id: 'id',
+  articleId: 'articleId',
+  userId: 'userId',
+  lastSeenVersion: 'lastSeenVersion',
+  seenAt: 'seenAt'
+} as const
+
+export type ArticleReadScalarFieldEnum = (typeof ArticleReadScalarFieldEnum)[keyof typeof ArticleReadScalarFieldEnum]
+
+
 export const BulletinScalarFieldEnum = {
   id: 'id',
   title: 'title',
@@ -1817,6 +1903,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   article?: Prisma.ArticleOmit
   articleVersion?: Prisma.ArticleVersionOmit
+  articleRead?: Prisma.ArticleReadOmit
   bulletin?: Prisma.BulletinOmit
   bulletinAck?: Prisma.BulletinAckOmit
   bulletinReaction?: Prisma.BulletinReactionOmit

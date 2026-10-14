@@ -118,6 +118,9 @@ model User {
   /// Requests this user has decided (clinical leads and admins).
   decidedRoleRequests RoleRequest[] @relation("RoleRequestDecider")
 
+  /// Per-user "last read" markers, one row per (article, user) once read.
+  articleReads ArticleRead[]
+
   @@map("users")
 }
 
@@ -157,6 +160,9 @@ model Article {
   versions ArticleVersion[]
   bulletins Bulletin[]
   attachments ArticleAttachment[]
+  /// Per-user "last read" markers (prompt 7a). Cascade: a deleted article
+  /// takes its readers' markers with it.
+  reads ArticleRead[]
 
   @@index([status])
   @@index([updatedAt(sort: Desc)])
@@ -187,6 +193,35 @@ model ArticleVersion {
   @@unique([articleId, version])
   @@index([articleId, createdAt(sort: Desc)])
   @@map("article_versions")
+}
+
+/// **Reader "last read" marker (prompt 7a).** One row per (article, user): the
+/// latest published version number the reader had open when they last visited.
+///
+/// This is what powers the reader's "what changed since your last visit"
+/// highlight: the current latest version is compared against `lastSeenVersion`.
+/// It is deliberately **per user** (not per workstation, unlike the reader's
+/// font-size preference): the reader signs in, so "since your last visit"
+/// follows them across the shared 1080p workstations.
+model ArticleRead {
+  id        String @id @default(uuid()) @db.Uuid
+  articleId String @map("article_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  /// The latest published version number at the time of the visit. Kept as a
+  /// plain integer (not a FK to a version row) so a marker survives even if the
+  /// version it named is ever pruned by a retention policy; comparison is
+  /// numeric against the article's current latest version.
+  lastSeenVersion Int @map("last_seen_version")
+
+  seenAt DateTime @default(now()) @map("seen_at")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
+  @@index([userId])
+  @@map("article_reads")
 }
 
 // ----------------------------------------------------------------- bulletins

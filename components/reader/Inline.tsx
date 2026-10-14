@@ -4,6 +4,8 @@ import { createContext, useContext, useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { parseInline } from "@/lib/markdown/inline";
 import type { Inline } from "@/lib/markdown/inline";
+import { InternalSopLink } from "@/components/reader/LinkPreview";
+import type { ArticlePreview } from "@/lib/reader/preview";
 import {
   footnoteDefinitionId,
   footnoteReferenceId,
@@ -24,6 +26,11 @@ import {
 export interface ReaderNav {
   /** Called for `/procedures/<slug>[#anchor]` links so the portal can open the article in place. */
   onOpenArticle?: (slug: string, anchor?: string) => boolean | void;
+  /**
+   * Resolve an internal SOP link's hover-preview summary (prompt 7a, item 4).
+   * Supplied from data the portal already holds; absent → plain links.
+   */
+  previewArticle?: (slug: string) => ArticlePreview | null;
   /** Open the lightbox on the image with this `src`. */
   openImage?: (src: string) => void;
   /** label → 1-based number, for the footnote references this reader has resolved. */
@@ -54,6 +61,9 @@ export function safeImageSrc(src: string): string | undefined {
 
 const PROCEDURE_PREFIX = "/procedures/";
 
+const LINK_CLASS =
+  "font-medium text-[#5F6E00] underline decoration-[#5F6E00]/30 underline-offset-[3px] transition-colors hover:decoration-[#5F6E00]";
+
 function renderNodes(
   nodes: readonly Inline[],
   nav: ReaderNav,
@@ -69,7 +79,7 @@ function renderNodes(
         return (
           <code
             key={key}
-            className="rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 py-px font-mono text-[0.84em] font-medium text-teal-800"
+            className="rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 py-px font-mono text-[0.84em] font-medium text-[#5F6E00]"
           >
             {node.v}
           </code>
@@ -124,7 +134,7 @@ function renderNodes(
             <a
               href={`#${footnoteDefinitionId(node.label)}`}
               aria-label={`Footnote ${number}`}
-              className="ml-0.5 rounded-[3px] px-0.5 text-[0.72em] font-semibold text-[#0F766E] no-underline transition-colors hover:bg-teal-50"
+              className="ml-0.5 rounded-[3px] px-0.5 text-[0.72em] font-semibold text-[#5F6E00] no-underline transition-colors hover:bg-[#E6EBA5]/40"
             >
               {number}
             </a>
@@ -142,6 +152,7 @@ function renderNodes(
         if (!href) return <span key={key}>{label}</span>;
 
         const isExternal = /^https?:/i.test(href);
+        const rel = isExternal ? "noopener noreferrer" : undefined;
         const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
           if (event.defaultPrevented || event.button !== 0) return;
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -167,14 +178,25 @@ function renderNodes(
           }
         };
 
+        // Internal SOP links carry a hover preview when the portal supplies one.
+        if (href.startsWith(PROCEDURE_PREFIX) && nav.previewArticle) {
+          const [slug] = href.slice(PROCEDURE_PREFIX.length).split("#", 2);
+          return (
+            <InternalSopLink
+              key={key}
+              href={href}
+              onClick={handleClick}
+              rel={rel}
+              className={LINK_CLASS}
+              preview={slug ? nav.previewArticle(slug) : null}
+            >
+              {label}
+            </InternalSopLink>
+          );
+        }
+
         return (
-          <a
-            key={key}
-            href={href}
-            onClick={handleClick}
-            {...(isExternal ? { rel: "noopener noreferrer" } : {})}
-            className="font-medium text-[#0F766E] underline decoration-teal-600/30 underline-offset-[3px] transition-colors hover:decoration-teal-600"
-          >
+          <a key={key} href={href} onClick={handleClick} rel={rel} className={LINK_CLASS}>
             {label}
           </a>
         );

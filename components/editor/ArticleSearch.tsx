@@ -68,6 +68,7 @@ export function ArticleSearch({
           body_markdown: entry.body_markdown,
           updated_at: "",
           author_name: "",
+          last_reviewed_at: null,
         })),
         [],
         [],

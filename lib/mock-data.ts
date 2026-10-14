@@ -22,6 +22,7 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     status: "published",
     updated_at: "2026-09-12T16:40:00.000Z",
     author_name: "Trevor Lindqvist, ICU Technician II",
+    last_reviewed_at: "2026-09-12T16:40:00.000Z",
     body_markdown: [
       "**Owner:** Infectious Disease Control Committee · **Review cycle:** Every 6 months · **Applies to:** All clinical staff entering the isolation ward",
       "",
@@ -74,6 +75,7 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     status: "published",
     updated_at: "2026-08-29T19:15:00.000Z",
     author_name: "Dr. Maya Okonkwo, Lead Emergency Clinician",
+    last_reviewed_at: "2026-08-29T19:15:00.000Z",
     body_markdown: [
       "**Owner:** Emergency & Critical Care · **Reference:** RECOVER 2012 CPR guidelines, hospital-internal adaptation",
       "",
@@ -122,6 +124,7 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     status: "published",
     updated_at: "2026-09-08T11:25:00.000Z",
     author_name: "Dr. Sofia Almeida, Medical Oncologist",
+    last_reviewed_at: "2026-09-08T11:25:00.000Z",
     body_markdown: [
       "**Owner:** Oncology Service · **Applies to:** Anyone administering or assisting with vesicant chemotherapy",
       "",
@@ -164,6 +167,7 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     status: "published",
     updated_at: "2026-09-20T17:30:00.000Z",
     author_name: "Priya Raghunathan, Client Experience Coordinator",
+    last_reviewed_at: "2026-09-20T17:30:00.000Z",
     body_markdown: [
       "**Owner:** Client Experience · **Revision:** September 2026 — deposit thresholds updated",
       "",
@@ -212,6 +216,8 @@ export const KNOWLEDGE_ARTICLES: readonly KnowledgeArticle[] = [
     status: "draft",
     updated_at: "2026-09-18T14:05:00.000Z",
     author_name: "Dana Whitfield, Facilities & Safety Officer",
+    // Draft: never published, so it has no review date yet.
+    last_reviewed_at: null,
     body_markdown: [
       "**Owner:** Safety Committee · **Status:** DRAFT — pending review by the clinical leads. Not yet in force.",
       "",

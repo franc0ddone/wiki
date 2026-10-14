@@ -20,9 +20,32 @@ import type { Department, KnowledgeArticle } from "@/types/portal";
 
 const AUTHOR_SELECT = { select: { name: true, title: true } } as const;
 
+/**
+ * The latest published version, selected alongside every article read so the
+ * reader's freshness badge needs no second round-trip. Publishing is the review
+ * act, so the newest version's `created_at` *is* `last_reviewed_at`; `null`
+ * means the procedure has never been published.
+ */
+const LATEST_VERSION_SELECT = {
+  orderBy: { createdAt: "desc" },
+  take: 1,
+  select: { createdAt: true },
+} as const;
+
+const ARTICLE_INCLUDE = { author: AUTHOR_SELECT, versions: LATEST_VERSION_SELECT } as const;
+
 type ArticleWithAuthor = Prisma.ArticleGetPayload<{
   include: { author: typeof AUTHOR_SELECT };
 }>;
+
+type ArticleWithAuthorAndVersion = Prisma.ArticleGetPayload<{
+  include: { author: typeof AUTHOR_SELECT; versions: typeof LATEST_VERSION_SELECT };
+}>;
+
+/** Row + author + latest-version timestamps → portal shape (resolves `last_reviewed_at`). */
+function toPortalArticle(row: ArticleWithAuthorAndVersion): KnowledgeArticle {
+  return toKnowledgeArticle({ ...row, lastReviewedAt: row.versions[0]?.createdAt ?? null });
+}
 
 export interface ArticleFilters {
   /** One status, or several (`?status=draft&status=in_review`). */
@@ -77,29 +100,29 @@ function buildWhere(filters: ArticleFilters): Prisma.ArticleWhereInput {
 export async function getArticles(filters: ArticleFilters = {}): Promise<KnowledgeArticle[]> {
   const rows = await getDb().article.findMany({
     where: buildWhere(filters),
-    include: { author: AUTHOR_SELECT },
+    include: ARTICLE_INCLUDE,
     orderBy: [{ updatedAt: "desc" }, { title: "asc" }],
   });
 
-  return rows.map(toKnowledgeArticle);
+  return rows.map(toPortalArticle);
 }
 
 /** One article by slug, or `null` — the mock's `find` by slug. */
 export async function getArticleBySlug(slug: string): Promise<KnowledgeArticle | null> {
   const row = await getDb().article.findUnique({
     where: { slug },
-    include: { author: AUTHOR_SELECT },
+    include: ARTICLE_INCLUDE,
   });
-  return row ? toKnowledgeArticle(row) : null;
+  return row ? toPortalArticle(row) : null;
 }
 
 /** One article by id, or `null`. Needed because bulletins link by id. */
 export async function getArticleById(id: string): Promise<KnowledgeArticle | null> {
   const row = await getDb().article.findUnique({
     where: { id },
-    include: { author: AUTHOR_SELECT },
+    include: ARTICLE_INCLUDE,
   });
-  return row ? toKnowledgeArticle(row) : null;
+  return row ? toPortalArticle(row) : null;
 }
 
 /* --------------------------------------------------------------- versions */
@@ -231,7 +254,8 @@ export async function createArticle(input: CreateArticleInput): Promise<Knowledg
     include: { author: AUTHOR_SELECT },
   });
 
-  return toKnowledgeArticle(row);
+  // A brand-new draft has no published version yet.
+  return toKnowledgeArticle({ ...row, lastReviewedAt: null });
 }
 
 export interface UpdateArticleInput {
@@ -352,11 +376,11 @@ export async function updateArticle(
         effectiveDate: next.effectiveDate,
         updatedAt: new Date(),
       },
-      include: { author: AUTHOR_SELECT },
+      include: ARTICLE_INCLUDE,
     });
   });
 
-  return toKnowledgeArticle(updated);
+  return toPortalArticle(updated);
 }
 
 /** `"My Title"` → `"my-title"`, then `-2`, `-3`, ... until it is free. */

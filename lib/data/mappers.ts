@@ -46,6 +46,12 @@ export interface ArticleRowInput {
   status: ArticleStatus;
   updatedAt: Date;
   author: AuthorRow | null;
+  /**
+   * `created_at` of the article's latest published version, or `null` when it
+   * has never been published. The data layer resolves it from the immutable
+   * `article_versions` history (see `lib/data/articles.ts`).
+   */
+  lastReviewedAt: Date | null;
 }
 
 export function toKnowledgeArticle(row: ArticleRowInput): KnowledgeArticle {
@@ -60,6 +66,7 @@ export function toKnowledgeArticle(row: ArticleRowInput): KnowledgeArticle {
     // FACILITY_TIME_ZONE. UTC on the wire, local on the screen.
     updated_at: row.updatedAt.toISOString(),
     author_name: formatAuthorName(row.author),
+    last_reviewed_at: row.lastReviewedAt ? row.lastReviewedAt.toISOString() : null,
   };
 }
 

@@ -16,9 +16,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { ClinicalTable } from "@/components/reader/ClinicalTable";
+import { ContentsMenu } from "@/components/reader/ContentsMenu";
 import { InlineText, ReaderNavContext, safeHref, safeImageSrc } from "@/components/reader/Inline";
 import type { ReaderNav } from "@/components/reader/Inline";
 import { Lightbox } from "@/components/reader/Lightbox";
+import type { ArticlePreview } from "@/lib/reader/preview";
 import {
   collectFootnotes,
   collectImages,
@@ -500,6 +502,17 @@ export interface MarkdownReaderProps {
    * omitted, those links are ordinary site-relative anchors.
    */
   onOpenArticle?: (slug: string, anchor?: string) => boolean | void;
+  /**
+   * Resolve an internal SOP link's hover-preview summary (prompt 7a, item 4).
+   * Absent → internal links render without a preview card.
+   */
+  previewArticle?: (slug: string) => ArticlePreview | null;
+  /**
+   * Reader body base size in px (prompt 7a, item 5). The prose is scaled by
+   * `zoom` on the body column so every heading, table, and callout grows
+   * together; the surrounding chrome does not move. Default 16.
+   */
+  fontSizePx?: number;
   className?: string;
 }
 
@@ -520,6 +533,8 @@ export function MarkdownReader({
   footer,
   showTableOfContents = true,
   onOpenArticle,
+  previewArticle,
+  fontSizePx = 16,
   className,
 }: MarkdownReaderProps) {
   const blocks = useMemo(() => parseMarkdown(source), [source]);
@@ -534,10 +549,13 @@ export function MarkdownReader({
 
   const hasToc = showTableOfContents && toc.length >= 2;
   const activeId = spyId && toc.some((entry) => entry.id === spyId) ? spyId : (toc[0]?.id ?? null);
+  // Reader body base size → a scale factor for the body column (16px = 1).
+  const zoom = fontSizePx / 16;
 
   const nav = useMemo<ReaderNav>(
     () => ({
       onOpenArticle,
+      previewArticle,
       footnoteNumbers: footnotes.numbers,
       footnoteTargets,
       openImage: (src) => {
@@ -549,7 +567,7 @@ export function MarkdownReader({
         }
       },
     }),
-    [onOpenArticle, images, footnotes, footnoteTargets],
+    [onOpenArticle, previewArticle, images, footnotes, footnoteTargets],
   );
 
   const closeLightbox = useCallback(() => {
@@ -649,7 +667,7 @@ export function MarkdownReader({
       <div
         ref={rootRef}
         className={cx(
-          "w-full",
+          "dw-reader w-full",
           hasToc && "xl:grid xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:items-start xl:gap-10 print:block",
           className,
         )}
@@ -657,34 +675,12 @@ export function MarkdownReader({
         <article className="min-w-0 rounded-xl border border-zinc-300/70 bg-white p-8 shadow-[0_1px_2px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)] ring-1 ring-black/[0.04] md:p-12 print:rounded-none print:border-0 print:p-0 print:shadow-none print:ring-0">
           {header ? <header className="mb-6 border-b border-zinc-200 pb-6">{header}</header> : null}
 
-          {hasToc ? (
-            <nav
-              aria-label="Jump to section"
-              className="mb-8 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3 xl:hidden print:hidden"
-            >
-              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                <ListTree size={14} strokeWidth={1.75} aria-hidden="true" />
-                On this page
-              </p>
-              <ul className="mt-2 flex flex-wrap gap-x-1 gap-y-1">
-                {toc
-                  .filter((entry) => entry.level === 2)
-                  .map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        onClick={() => jumpTo(entry.id)}
-                        className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
-                      >
-                        {entry.text}
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </nav>
-          ) : null}
+          {hasToc ? <ContentsMenu toc={toc} activeId={activeId} onJump={jumpTo} /> : null}
 
-          <div className="max-w-3xl space-y-4 print:max-w-none">
+          <div
+            className="max-w-3xl space-y-4 print:max-w-none"
+            style={zoom !== 1 ? { zoom } : undefined}
+          >
             {blocks.map((block, index) =>
               block.kind === "footnoteDefinition" && footnotes.numbers.has(block.label)
                 ? null

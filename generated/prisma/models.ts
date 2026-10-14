@@ -11,6 +11,7 @@
 export type * from './models/User'
 export type * from './models/Article'
 export type * from './models/ArticleVersion'
+export type * from './models/ArticleRead'
 export type * from './models/Bulletin'
 export type * from './models/BulletinAck'
 export type * from './models/BulletinReaction'
