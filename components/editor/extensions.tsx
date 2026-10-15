@@ -1087,19 +1087,19 @@ function CtaButtonView({ node, updateAttributes, deleteNode }: NodeViewProps) {
           maxLength={CTA_LABEL_MAX_LENGTH}
           placeholder="Button label"
           onChange={(event) => updateAttributes({ label: event.target.value })}
-          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
         />
         <input
           aria-label="Button link"
           value={href}
           placeholder="https://… or /portal/path"
           onChange={(event) => updateAttributes({ href: event.target.value })}
-          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+          className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
         />
         <button
           type="button"
           onClick={() => deleteNode()}
-          className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2.5 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+          className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2.5 text-[12.5px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
         >
           Remove
         </button>
@@ -1124,14 +1124,14 @@ function StepsView({ node, updateAttributes, deleteNode }: NodeViewProps) {
           <button
             type="button"
             onClick={() => replace([...steps, { title: "", description: "" }])}
-            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             Add step
           </button>
         </div>
         {steps.map((step, index) => (
           <div key={index} className="flex items-start gap-2.5">
-            <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-teal-600/30 bg-teal-50 text-[12px] font-semibold tabular-nums text-[#0F766E]">
+            <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#5F6E00]/30 bg-[#AFBE23]/20 text-[12px] font-semibold tabular-nums text-[#5F6E00]">
               {index + 1}
             </span>
             <div className="min-w-0 flex-1 space-y-1.5">
@@ -1140,7 +1140,7 @@ function StepsView({ node, updateAttributes, deleteNode }: NodeViewProps) {
                 value={step.title}
                 placeholder="Step title"
                 onChange={(event) => replace(steps.map((entry, i) => (i === index ? { ...entry, title: event.target.value } : entry)))}
-                className="h-8 w-full rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+                className="h-8 w-full rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
               />
               <textarea
                 aria-label={`Step ${index + 1} description`}
@@ -1148,14 +1148,14 @@ function StepsView({ node, updateAttributes, deleteNode }: NodeViewProps) {
                 placeholder="Description"
                 rows={2}
                 onChange={(event) => replace(steps.map((entry, i) => (i === index ? { ...entry, description: event.target.value } : entry)))}
-                className="w-full resize-y rounded-md border border-zinc-300/60 bg-white px-2.5 py-1.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+                className="w-full resize-y rounded-md border border-zinc-300/60 bg-white px-2.5 py-1.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
               />
             </div>
             <button
               type="button"
               onClick={() => replace(steps.filter((_, i) => i !== index))}
               aria-label={`Remove step ${index + 1}`}
-              className="mt-1.5 h-7 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+              className="mt-1.5 h-7 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
             >
               Remove
             </button>
@@ -1186,7 +1186,7 @@ function SpotlightView({ node, updateAttributes, deleteNode }: NodeViewProps) {
           <button
             type="button"
             onClick={() => replace([...entries, { initials: "", name: "", label: "" }])}
-            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="h-7 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             Add entry
           </button>
@@ -1199,27 +1199,27 @@ function SpotlightView({ node, updateAttributes, deleteNode }: NodeViewProps) {
               maxLength={3}
               placeholder="AB"
               onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, initials: event.target.value } : e)))}
-              className="h-8 w-12 shrink-0 rounded-md border border-zinc-300/60 bg-white px-2 text-center text-[13px] font-semibold uppercase text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              className="h-8 w-12 shrink-0 rounded-md border border-zinc-300/60 bg-white px-2 text-center text-[13px] font-semibold uppercase text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
             />
             <input
               aria-label={`Entry ${index + 1} name`}
               value={entry.name}
               placeholder="Full name"
               onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, name: event.target.value } : e)))}
-              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
             />
             <input
               aria-label={`Entry ${index + 1} label`}
               value={entry.label}
               placeholder="Label"
               onChange={(event) => replace(entries.map((e, i) => (i === index ? { ...e, label: event.target.value } : e)))}
-              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              className="h-8 min-w-0 flex-1 rounded-md border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
             />
             <button
               type="button"
               onClick={() => replace(entries.filter((_, i) => i !== index))}
               aria-label={`Remove entry ${index + 1}`}
-              className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+              className="h-8 shrink-0 rounded-md border border-zinc-300/60 px-2 text-[12px] font-medium text-zinc-600 transition-colors hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
             >
               Remove
             </button>
@@ -1635,9 +1635,9 @@ export function buildEditorExtensions(options: Partial<EditorExtensionOptions> =
     // Pasted Word / Google Docs HTML is reduced to the schema's own element set
     // before it is parsed — no classes, styles, namespaces, VML, or images.
     PasteCleanup,
-    // The drop indicator 5b shipped without: a 2px petroleum-teal line where a
+    // The drop indicator 5b shipped without: a 2px dove-green line where a
     // dragged block will land. No custom CSS class needed.
-    Dropcursor.configure({ color: "#0f766e", width: 2 }),
+    Dropcursor.configure({ color: "#5F6E00", width: 2 }),
     // The block drag handle is opt-out: the bulletin composer passes
     // `dragHandle: false`, because its grip read as a modal-window handle the
     // modal does not have.

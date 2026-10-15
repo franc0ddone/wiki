@@ -363,7 +363,7 @@ function PaletteDialog({
                   <button
                     type="button"
                     onClick={() => clearRecentSearches()}
-                    className="rounded-md px-1.5 py-0.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                    className="rounded-md px-1.5 py-0.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                   >
                     Clear
                   </button>
@@ -446,7 +446,7 @@ function PaletteRow({
 }) {
   const base = cx(
     "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
-    isActive ? "bg-teal-50 ring-1 ring-inset ring-teal-600/25" : "hover:bg-zinc-50",
+    isActive ? "bg-[#AFBE23]/20 ring-1 ring-inset ring-[#5F6E00]/25" : "hover:bg-zinc-50",
   );
 
   if (row.kind === "recent") {
@@ -463,11 +463,11 @@ function PaletteRow({
   if (row.kind === "suggestion") {
     return (
       <div id={id} role="option" aria-selected={isActive} onMouseMove={onHover} onClick={onActivate} className={base}>
-        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-teal-200 bg-teal-50 text-[#0F766E]">
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#5F6E00]/20 bg-[#AFBE23]/20 text-[#5F6E00]">
           <Lightbulb size={13} strokeWidth={1.75} />
         </span>
         <span className="min-w-0 flex-1 truncate text-[13.5px] text-zinc-800">
-          Try <em className="font-semibold not-italic text-teal-800">{row.text}</em>
+          Try <em className="font-semibold not-italic text-[#5F6E00]">{row.text}</em>
         </span>
       </div>
     );
@@ -484,7 +484,7 @@ function PaletteRow({
         aria-hidden="true"
         className={cx(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-white",
-          isActive ? "border-teal-200 text-[#0F766E]" : "border-zinc-200 text-zinc-500",
+          isActive ? "border-[#5F6E00]/20 text-[#5F6E00]" : "border-zinc-200 text-zinc-500",
         )}
       >
         {meta.icon}
@@ -507,7 +507,7 @@ function PaletteRow({
           {shownDepartments.map((department) => (
             <span
               key={department}
-              className="whitespace-nowrap rounded-full border border-teal-600/30 bg-teal-50/50 px-2 py-px text-xs font-medium text-teal-700"
+              className="whitespace-nowrap rounded-full border border-[#5F6E00]/30 bg-[#AFBE23]/15 px-2 py-px text-xs font-medium text-[#5F6E00]"
             >
               {DEPARTMENT_LABELS[department]}
             </span>

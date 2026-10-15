@@ -139,7 +139,7 @@ export function ClinicalTable({ head, rows }: { head: TableCell[]; rows: TableCe
               aria-label="Filter table rows"
               autoComplete="off"
               spellCheck={false}
-              className="h-7 w-full rounded-md border border-zinc-300/60 bg-white pl-8 pr-2 text-[12.5px] text-zinc-900 placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+              className="h-7 w-full rounded-md border border-zinc-300/60 bg-white pl-8 pr-2 text-[12.5px] text-zinc-900 placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
             />
           </div>
           <p className="shrink-0 text-xs tabular-nums text-zinc-500" aria-live="polite">
@@ -172,15 +172,15 @@ export function ClinicalTable({ head, rows }: { head: TableCell[]; rows: TableCe
                     <button
                       type="button"
                       onClick={() => cycleSort(columnIndex)}
-                      className="-mx-2 flex h-10 items-center gap-1.5 rounded-md px-2 text-left uppercase tracking-[0.08em] transition-colors hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:pointer-events-none"
+                      className="-mx-2 flex h-10 items-center gap-1.5 rounded-md px-2 text-left uppercase tracking-[0.08em] transition-colors hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 print:pointer-events-none"
                     >
                       <InlineText text={cell.text} />
                       <span aria-hidden="true" className="text-zinc-400 print:hidden">
                         {active ? (
                           active.direction === "asc" ? (
-                            <ChevronUp size={13} strokeWidth={2} className="text-[#0F766E]" />
+                            <ChevronUp size={13} strokeWidth={2} className="text-[#5F6E00]" />
                           ) : (
-                            <ChevronDown size={13} strokeWidth={2} className="text-[#0F766E]" />
+                            <ChevronDown size={13} strokeWidth={2} className="text-[#5F6E00]" />
                           )
                         ) : (
                           <ChevronsUpDown size={12} strokeWidth={1.75} />
@@ -239,7 +239,7 @@ export function ClinicalTable({ head, rows }: { head: TableCell[]; rows: TableCe
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={!collapsed}
-            className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="rounded-md px-2 py-1 text-[12.5px] font-medium text-[#5F6E00] transition-colors hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             {collapsed ? `Show all ${matchCount} rows` : "Show fewer rows"}
           </button>

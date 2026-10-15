@@ -211,12 +211,12 @@ export function BulletinDetail({
               onClick={() => void handleReact(entry.emoji)}
               className={cx(
                 "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium tabular-nums transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed",
                 entry.viewer_reacted
-                  ? "border-teal-600/40 bg-teal-50 text-teal-800"
+                  ? "border-[#5F6E00]/40 bg-[#AFBE23]/20 text-[#5F6E00]"
                   : muted
                     ? "border-zinc-200 bg-white text-zinc-400 hover:border-zinc-300"
-                    : "border-zinc-300/60 bg-white text-zinc-700 hover:border-teal-600/40 hover:text-teal-800",
+                    : "border-zinc-300/60 bg-white text-zinc-700 hover:border-[#5F6E00]/40 hover:text-[#5F6E00]",
               )}
             >
               <span aria-hidden="true">{entry.emoji}</span>
@@ -242,9 +242,9 @@ export function BulletinDetail({
         <button
           type="button"
           onClick={() => onOpenArticle(linkedArticle.id)}
-          className="group flex w-full items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+          className="group flex w-full items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors duration-150 hover:border-[#5F6E00]/40 hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-[#0F766E]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#5F6E00]/20 bg-[#AFBE23]/20 text-[#5F6E00]">
             <FileText size={14} strokeWidth={1.75} aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
@@ -255,7 +255,7 @@ export function BulletinDetail({
             size={14}
             strokeWidth={1.75}
             aria-hidden="true"
-            className="shrink-0 text-zinc-400 transition-colors group-hover:text-[#0F766E]"
+            className="shrink-0 text-zinc-400 transition-colors group-hover:text-[#5F6E00]"
           />
         </button>
       ) : (
@@ -366,7 +366,7 @@ export function BulletinDetail({
                   </div>
                   {canAck ? (
                     myAck ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#5F6E00]/40 bg-[#AFBE23]/20 px-2.5 py-1 text-[13px] font-medium text-[#5F6E00]">
                         <Check size={14} strokeWidth={2} aria-hidden="true" />
                         Acknowledged {formatDateTime(myAck.acked_at)}
                       </span>

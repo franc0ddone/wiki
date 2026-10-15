@@ -92,9 +92,9 @@ export function ReferencedBy({
                 <button
                   type="button"
                   onClick={() => (link.kind === "article" && link.slug ? onOpenArticleBySlug(link.slug) : onOpenBulletin(link.id))}
-                  className="group flex w-full items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="group flex w-full items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-3.5 py-2.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-[#5F6E00]/40 hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-500 group-hover:border-teal-200 group-hover:text-[#0F766E]">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-500 group-hover:border-[#5F6E00]/20 group-hover:text-[#5F6E00]">
                     {link.kind === "article" ? (
                       <FileText size={13} strokeWidth={1.75} aria-hidden="true" />
                     ) : (

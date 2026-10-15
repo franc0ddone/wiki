@@ -97,7 +97,7 @@ export function Modal({
             onClick={onClose}
             disabled={!dismissible}
             aria-label="Close dialog"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:opacity-40"
           >
             <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -109,10 +109,10 @@ export function Modal({
 }
 
 export const primaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#5F6E00] px-4 text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#4D5900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const secondaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-zinc-300/70 bg-white px-4 text-[13.5px] font-medium text-zinc-800 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-zinc-300/70 bg-white px-4 text-[13.5px] font-medium text-zinc-800 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const fieldClass =
-  "h-9 w-full rounded-lg border border-zinc-300/70 bg-white px-3 text-[13.5px] text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] placeholder:text-zinc-400 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15";
+  "h-9 w-full rounded-lg border border-zinc-300/70 bg-white px-3 text-[13.5px] text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] placeholder:text-zinc-400 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15";

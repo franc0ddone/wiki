@@ -19,7 +19,7 @@ export function EditorUnavailable({
         <p className="mt-2 text-[13.5px] leading-6 text-zinc-600">{message}</p>
         <Link
           href={backHref}
-          className="mt-5 inline-flex h-9 items-center rounded-lg bg-[#0F766E] px-4 text-[13.5px] font-medium text-white transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1"
+          className="mt-5 inline-flex h-9 items-center rounded-lg bg-[#5F6E00] px-4 text-[13.5px] font-medium text-white transition-colors hover:bg-[#4D5900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 focus-visible:ring-offset-1"
         >
           {backLabel}
         </Link>

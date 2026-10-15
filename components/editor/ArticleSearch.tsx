@@ -190,7 +190,7 @@ export function ArticleSearch({
             setOpen(true);
             inputRef.current?.focus();
           }}
-          className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-600 transition-colors hover:bg-zinc-300/80 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40"
+          className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-600 transition-colors hover:bg-zinc-300/80 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40"
         >
           <X size={11} strokeWidth={2.25} aria-hidden="true" />
         </button>
@@ -218,7 +218,7 @@ export function ArticleSearch({
                 onClick={() => choose(hit.slug, hit.title)}
                 className={cx(
                   "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
-                  index_ === activeIndex ? "bg-teal-50 ring-1 ring-inset ring-teal-600/25" : "hover:bg-zinc-50",
+                  index_ === activeIndex ? "bg-[#AFBE23]/20 ring-1 ring-inset ring-[#5F6E00]/25" : "hover:bg-zinc-50",
                 )}
               >
                 <span

@@ -181,7 +181,7 @@ export function FindReplaceBar({ editor, onClose }: FindReplaceBarProps) {
           placeholder="Find"
           aria-label="Find"
           data-testid="find-input"
-          className="h-8 w-52 rounded-md border border-zinc-300/70 bg-white pl-8 pr-2 text-[13px] text-zinc-900 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+          className="h-8 w-52 rounded-md border border-zinc-300/70 bg-white pl-8 pr-2 text-[13px] text-zinc-900 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
         />
       </div>
 
@@ -223,7 +223,7 @@ export function FindReplaceBar({ editor, onClose }: FindReplaceBarProps) {
         title="Match case"
         className={cx(
           "flex h-8 w-8 items-center justify-center rounded-md",
-          matchCase ? "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25" : "text-zinc-600 hover:bg-zinc-200/70",
+          matchCase ? "bg-[#AFBE23]/20 text-[#5F6E00] ring-1 ring-inset ring-[#5F6E00]/25" : "text-zinc-600 hover:bg-zinc-200/70",
         )}
       >
         <CaseSensitive size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -237,7 +237,7 @@ export function FindReplaceBar({ editor, onClose }: FindReplaceBarProps) {
         placeholder="Replace with"
         aria-label="Replace with"
         data-testid="replace-input"
-        className="h-8 w-52 rounded-md border border-zinc-300/70 bg-white px-2 text-[13px] text-zinc-900 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+        className="h-8 w-52 rounded-md border border-zinc-300/70 bg-white px-2 text-[13px] text-zinc-900 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
       />
       <button
         type="button"

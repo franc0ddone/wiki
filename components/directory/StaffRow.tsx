@@ -252,7 +252,7 @@ export function StaffRow({
         {/*
          * The open row's accent rule — the board's selection language (a 3px rail
          * on the active row), in the locked dove green rather than the legacy
-         * teal, so the directory marks "this one is open" the way the product
+         * retired accent, so the directory marks "this one is open" the way the product
          * marks "this one is selected".
          */}
         <span

@@ -42,9 +42,9 @@ export function ArticleAttachments({ slug }: { slug: string }) {
           <li key={item.id}>
             <a
               href={attachmentDownloadUrl(slug, item.id)}
-              className="group flex items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-teal-600/40 hover:bg-teal-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+              className="group flex items-center gap-3 rounded-[10px] border border-zinc-300/60 bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-[#5F6E00]/40 hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-[#0F766E]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#5F6E00]/20 bg-[#AFBE23]/20 text-[#5F6E00]">
                 <FileText size={14} strokeWidth={1.75} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
@@ -55,7 +55,7 @@ export function ArticleAttachments({ slug }: { slug: string }) {
                 size={15}
                 strokeWidth={1.75}
                 aria-hidden="true"
-                className="shrink-0 text-zinc-400 transition-colors group-hover:text-[#0F766E]"
+                className="shrink-0 text-zinc-400 transition-colors group-hover:text-[#5F6E00]"
               />
             </a>
           </li>

@@ -970,7 +970,7 @@ check("summarizeReactions returns the allowlist order with viewer state", () => 
 
 console.log("bulletin headline (Option C)");
 
-check("the headline rule renders 64px × 3px in #0f766e with the exact type", () => {
+check("the headline rule renders 64px × 3px in the locked dove green with the exact type", () => {
   const html = renderToStaticMarkup(createElement(BulletinHeadline, { title: "Isolation bays" }));
   assert.match(html, /text-\[34px\]/);
   assert.match(html, /font-bold/);
@@ -980,7 +980,7 @@ check("the headline rule renders 64px × 3px in #0f766e with the exact type", ()
   assert.match(html, /h-\[3px\]/);
   assert.match(html, /w-16/);
   assert.match(html, /rounded-\[2px\]/);
-  assert.match(html, /bg-\[#0f766e\]/);
+  assert.match(html, /bg-\[#5F6E00\]/);
 });
 
 console.log("bulletin hero image");
@@ -1656,9 +1656,9 @@ check("the editor schema includes the configured drop cursor exactly once", () =
   const extensions = buildEditorExtensions();
   const dropcursors = extensions.filter((extension) => extension.name === Dropcursor.name);
   assert.equal(dropcursors.length, 1, "expected exactly one dropCursor extension");
-  const configured = Dropcursor.configure({ color: "#0f766e", width: 2 });
+  const configured = Dropcursor.configure({ color: "#5F6E00", width: 2 });
   const options = configured.options as { color: string; width: number };
-  assert.equal(options.color, "#0f766e");
+  assert.equal(options.color, "#5F6E00");
   assert.equal(options.width, 2);
 });
 
@@ -3056,6 +3056,58 @@ check("nothing this batch added carries teal or an emoji", () => {
     assert.equal(TEAL.test(line), false, `an added line carries teal: ${line.trim()}`);
     assert.equal(EMOJI.test(line), false, `an added line carries an emoji: ${line.trim()}`);
   }
+});
+
+check("no surface carries teal, cyan or emerald any more", () => {
+  /**
+   * The whole app, not just the board: every bulletin component, the rail
+   * shell, the document renderer, the clinical table, the editor chrome, the
+   * header, the account menu, the palette and the stylesheet's prose — the
+   * product is on the locked dove green end to end, so this is a standing
+   * whole-tree guard rather than a per-prompt one.
+   *
+   * `scripts/` is excluded from the walk (this file names the tokens in order to
+   * ban them), and the three reaction emoji are the board's own documented
+   * exception (`lib/bulletin/reactions.ts`), so no emoji assertion here.
+   */
+  const TEAL_RGB =
+    /rgba?\(\s*(15, *118, *110|13, *148, *136|17, *94, *89|19, *78, *74|4, *47, *46|240, *253, *250|204, *251, *241|153, *246, *228|45, *212, *191|6, *182, *212)/i;
+
+  const offenders: string[] = [];
+  const visit = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(full);
+        continue;
+      }
+      if (!/\.(ts|tsx|css)$/.test(entry.name)) continue;
+      const source = readFileSync(full, "utf8");
+      // Word-boundary on the colour names, so "stealing focus" is not a hit.
+      if (/(^|[^a-z])(teal|cyan|emerald)/i.test(source) || TEAL.test(source) || TEAL_RGB.test(source)) {
+        offenders.push(path.relative(process.cwd(), full));
+      }
+    }
+  };
+  for (const root of ["app", "components", "lib", "types"]) visit(path.join(process.cwd(), root));
+  assert.deepEqual(offenders, [], "these files still carry a teal-family colour");
+
+  // And the board's own accents landed on the locked green.
+  const shell = readFileSync(path.join(process.cwd(), "components", "MasterDetailShell.tsx"), "utf8");
+  const hub = readFileSync(path.join(process.cwd(), "components", "OperationsHubClient.tsx"), "utf8");
+  assert.ok(hub.includes("hover:border-[#5F6E00]/40 hover:text-[#5F6E00]"), "the New bulletin control is dove-green");
+  assert.match(shell, /w-\[3px\] bg-\[#5F6E00\]/, "the selected row's rail is the locked dove green");
+  assert.match(shell, /border-\[#5F6E00\]\/40 bg-\[#AFBE23\]\/20 text-\[#5F6E00\]/, "the active chip is a pale dove tint");
+  assert.match(shell, /bg-\[#AFBE23\]\/12/, "the selected row's tint is the KBase feed's own value");
+
+  // The pieces this migration was last asked for: the two bulletin blocks the
+  // reader renders inside a notice body, and the chrome around the board.
+  const reader = readFileSync(path.join(process.cwd(), "components", "MarkdownReader.tsx"), "utf8");
+  assert.match(reader, /bg-\[#AFBE23\]\/20 text-\[12\.5px\] font-semibold uppercase text-\[#5F6E00\]/, "the spotlight disc is a dove tint");
+  assert.match(reader, /border-\[#5F6E00\]\/30 bg-\[#AFBE23\]\/20 text-\[12px\] font-semibold tabular-nums text-\[#5F6E00\]/, "the steps disc is a dove tint");
+  const menu = readFileSync(path.join(process.cwd(), "components", "auth", "AuthorAccessMenu.tsx"), "utf8");
+  assert.match(menu, /bg-\[#AFBE23\]\/20 text-\[13px\] font-semibold text-\[#20241E\] ring-1 ring-inset ring-\[#5F6E00\]\/20/, "the account avatar is the directory's initials recipe");
+  assert.match(menu, /bg-\[#5F6E00\] px-3 text-\[13px\] font-medium text-white/, "the menu's primary action is the dove primary");
 });
 
 check("no wiki-link syntax reaches a modified, added, or owned file", () => {

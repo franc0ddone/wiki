@@ -45,9 +45,9 @@ const ICONS: Record<FormatCommandId, ComponentType<{ size?: number; strokeWidth?
 };
 
 const BUTTON_BASE =
-  "flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 disabled:cursor-not-allowed disabled:opacity-40";
+  "flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 disabled:cursor-not-allowed disabled:opacity-40";
 const BUTTON_IDLE = "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900";
-const BUTTON_ACTIVE = "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25";
+const BUTTON_ACTIVE = "bg-[#AFBE23]/20 text-[#5F6E00] ring-1 ring-inset ring-[#5F6E00]/25";
 
 export function EditorBubbleMenu({
   editor,

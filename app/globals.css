@@ -4,7 +4,7 @@
  * Dove Hub — "Clinical Light" design system.
  *
  * Built for reading dense SOPs under fluorescent clinical lighting: a warm
- * oyster canvas, crisp white panes, graphite ink, and a single petroleum-teal
+ * oyster canvas, crisp white panes, graphite ink, and a single dove-green
  * accent. Low glare, high legibility.
  *
  * Target platform is Windows 11 on Chromium (Edge / Chrome), typically a
@@ -13,7 +13,7 @@
  *
  * Tailwind v4: `@theme` registers the tokens below as utilities
  * (`bg-canvas`, `text-ink`, `border-hairline`, `bg-accent` ...). Components use
- * stock `zinc-*` / `teal-*` utilities plus arbitrary hex values, so they render
+ * stock `zinc-*` utilities plus arbitrary hex values, so they render
  * the same if the tokens are never referenced.
  */
 @theme {
@@ -36,8 +36,8 @@
   --color-ink-muted: #71717a; /* zinc-500 */
 
   /* Accent */
-  --color-accent: #0f766e; /* petroleum teal */
-  --color-accent-deep: #005953;
+  --color-accent: #5F6E00; /* dove green */
+  --color-accent-deep: #4D5900;
 
   /* Elevation */
   --shadow-pane: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -66,7 +66,7 @@ body {
 }
 
 ::selection {
-  background-color: rgba(15, 118, 110, 0.16);
+  background-color: rgba(95, 110, 0, 0.16);
   color: #18181b;
 }
 
@@ -467,10 +467,10 @@ input[type="search"]::-webkit-search-decoration {
 }
 
 .dw-prose a {
-  color: #0f766e;
+  color: #5F6E00;
   font-weight: 500;
   text-decoration: underline;
-  text-decoration-color: rgba(13, 148, 136, 0.3);
+  text-decoration-color: rgba(95, 110, 0, 0.35);
   text-underline-offset: 3px;
   cursor: pointer;
 }
@@ -525,7 +525,7 @@ input[type="search"]::-webkit-search-decoration {
 }
 
 .dw-prose li::marker {
-  color: #0d9488;
+  color: #5F6E00;
 }
 
 .dw-prose blockquote {
@@ -542,7 +542,7 @@ input[type="search"]::-webkit-search-decoration {
 }
 
 .dw-prose .ProseMirror-selectednode {
-  outline: 2px solid rgba(13, 148, 136, 0.6);
+  outline: 2px solid rgba(95, 110, 0, 0.6);
   outline-offset: 2px;
 }
 
@@ -566,11 +566,11 @@ input[type="search"]::-webkit-search-decoration {
 /* Callouts */
 .dw-callout {
   margin: 1.5rem 0;
-  border: 1px solid #99f6e4;
+  border: 1px solid rgba(95, 110, 0, 0.25);
   border-radius: 10px;
-  background: rgba(240, 253, 250, 0.7);
+  background: rgba(175, 190, 35, 0.12);
   padding: 0.75rem 1rem 0.875rem;
-  color: rgba(4, 47, 46, 0.85);
+  color: rgba(63, 74, 0, 0.9);
 }
 
 .dw-callout::before {
@@ -641,7 +641,7 @@ input[type="search"]::-webkit-search-decoration {
 
 .dw-details-summary input:focus-visible {
   border-radius: 4px;
-  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 0 0 2px rgba(95, 110, 0, 0.35);
 }
 
 .dw-details-body {
@@ -672,7 +672,7 @@ input[type="search"]::-webkit-search-decoration {
 .dw-task-box input {
   width: 1rem;
   height: 1rem;
-  accent-color: #0f766e;
+  accent-color: #5F6E00;
   cursor: pointer;
 }
 
@@ -736,7 +736,7 @@ input[type="search"]::-webkit-search-decoration {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(13, 148, 136, 0.12);
+  background: rgba(175, 190, 35, 0.18);
   pointer-events: none;
 }
 
@@ -751,11 +751,11 @@ input[type="search"]::-webkit-search-decoration {
 /* The reference marker as it appears while editing. */
 .dw-fn-ref {
   border-radius: 3px;
-  background: rgba(15, 118, 110, 0.1);
+  background: rgba(175, 190, 35, 0.18);
   padding: 0 0.2em;
   font-size: 0.72em;
   font-weight: 600;
-  color: #0f766e;
+  color: #5F6E00;
   user-select: none;
 }
 
@@ -775,7 +775,7 @@ input[type="search"]::-webkit-search-decoration {
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-  color: #0f766e;
+  color: #5F6E00;
   user-select: none;
 }
 
@@ -830,7 +830,7 @@ input[type="search"]::-webkit-search-decoration {
 
 .dw-find-active {
   border-radius: 2px;
-  background: rgba(13, 148, 136, 0.42);
-  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.55);
+  background: rgba(95, 110, 0, 0.42);
+  box-shadow: 0 0 0 1px rgba(95, 110, 0, 0.55);
 }
 

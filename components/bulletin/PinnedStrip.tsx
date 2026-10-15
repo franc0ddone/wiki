@@ -41,7 +41,7 @@ export interface BulletinActionsMenuProps {
 }
 
 const ITEM_CLASS =
-  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-50";
+  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function BulletinActionsMenu({
   bulletin,
@@ -114,7 +114,7 @@ export function BulletinActionsMenu({
         aria-label="Notice actions"
         onClick={() => (open ? close() : setOpen(true))}
         className={cx(
-          "flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-300/60 bg-white text-zinc-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:hidden",
+          "flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-300/60 bg-white text-zinc-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 print:hidden",
           open && "border-zinc-400 text-zinc-900",
         )}
       >

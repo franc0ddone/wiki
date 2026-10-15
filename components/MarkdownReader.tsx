@@ -48,10 +48,10 @@ import { cx } from "@/lib/utils";
  * horizontal rules, blockquotes, nested inline emphasis / code / links, and
  * clinical callouts:
  *
- *   > [!note]     general information           (teal)
- *   > [!tip]      practical advice              (teal)
- *   > [!dosing]   dosing / drug reference        (teal)
- *   > [!protocol] mandatory protocol step        (teal)
+ *   > [!note]     general information           (dove green)
+ *   > [!tip]      practical advice              (dove green)
+ *   > [!dosing]   dosing / drug reference        (dove green)
+ *   > [!protocol] mandatory protocol step        (dove green)
  *   > [!warning]  caution                       (amber)
  *   > [!critical] patient-safety critical        (red)
  *
@@ -91,30 +91,30 @@ const CALLOUT_STYLES: Record<
 > = {
   note: {
     title: "Note",
-    wrap: "border-teal-200 bg-teal-50/70",
-    label: "text-teal-800",
-    body: "text-teal-950/85",
+    wrap: "border-[#5F6E00]/20 bg-[#AFBE23]/12",
+    label: "text-[#5F6E00]",
+    body: "text-[#3F4A00]/85",
     icon: <Info size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   tip: {
     title: "Tip",
-    wrap: "border-teal-200 bg-teal-50/70",
-    label: "text-teal-800",
-    body: "text-teal-950/85",
+    wrap: "border-[#5F6E00]/20 bg-[#AFBE23]/12",
+    label: "text-[#5F6E00]",
+    body: "text-[#3F4A00]/85",
     icon: <Lightbulb size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   dosing: {
     title: "Dosing",
-    wrap: "border-teal-200 bg-teal-50/70",
-    label: "text-teal-800",
-    body: "text-teal-950/85",
+    wrap: "border-[#5F6E00]/20 bg-[#AFBE23]/12",
+    label: "text-[#5F6E00]",
+    body: "text-[#3F4A00]/85",
     icon: <Syringe size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   protocol: {
     title: "Protocol",
-    wrap: "border-teal-200 bg-teal-50/70",
-    label: "text-teal-800",
-    body: "text-teal-950/85",
+    wrap: "border-[#5F6E00]/20 bg-[#AFBE23]/12",
+    label: "text-[#5F6E00]",
+    body: "text-[#3F4A00]/85",
     icon: <ClipboardList size={14} strokeWidth={1.75} aria-hidden="true" />,
   },
   warning: {
@@ -146,7 +146,7 @@ function TaskBox({ checked }: { checked: boolean }) {
       aria-label={checked ? "Done" : "Not done"}
       className={cx(
         "mt-[5px] flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border",
-        checked ? "border-[#0F766E] bg-[#0F766E] text-white" : "border-zinc-400 bg-white",
+        checked ? "border-[#5F6E00] bg-[#5F6E00] text-white" : "border-zinc-400 bg-white",
       )}
     >
       {checked ? <Check size={11} strokeWidth={3} aria-hidden="true" /> : null}
@@ -181,8 +181,8 @@ function renderList(list: ListBlock, key: string | number, depth = 0): ReactNode
             className={cx(
               "pl-1.5",
               list.ordered
-                ? "list-decimal marker:text-[13px] marker:font-semibold marker:text-teal-700"
-                : "list-disc marker:text-teal-600/70",
+                ? "list-decimal marker:text-[13px] marker:font-semibold marker:text-[#5F6E00]"
+                : "list-disc marker:text-[#5F6E00]/70",
               BODY_TEXT,
             )}
           >
@@ -230,7 +230,7 @@ function ArticleFigure({
         aria-label={`Enlarge image: ${alt}`}
         style={width !== null ? { width: `${width}px`, maxWidth: "100%" } : undefined}
         className={cx(
-          "block cursor-zoom-in overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 print:cursor-auto",
+          "block cursor-zoom-in overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 print:cursor-auto",
           width === null && "w-full",
           alignment,
         )}
@@ -385,7 +385,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           key={key}
           className="group rounded-[10px] border border-zinc-300/60 bg-white print:border-zinc-400"
         >
-          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[10px] px-4 py-3 text-[14.5px] font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[10px] px-4 py-3 text-[14.5px] font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 [&::-webkit-details-marker]:hidden">
             <ChevronRight
               size={15}
               strokeWidth={2}
@@ -421,7 +421,7 @@ function renderBlock(block: Block, key: number): ReactNode {
           <a
             href={href}
             {...(/^https?:/i.test(href) ? { rel: "noopener noreferrer" } : {})}
-            className="group inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1 print:border print:border-[#0F766E] print:bg-white print:text-[#0F766E]"
+            className="group inline-flex items-center gap-2 rounded-lg bg-[#5F6E00] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#4D5900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 focus-visible:ring-offset-1 print:border print:border-[#5F6E00] print:bg-white print:text-[#5F6E00]"
           >
             {block.label}
             <ArrowUpRight size={15} strokeWidth={2} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" />
@@ -437,7 +437,7 @@ function renderBlock(block: Block, key: number): ReactNode {
             <li key={index} className="flex gap-3.5">
               <span
                 aria-hidden="true"
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-teal-600/30 bg-teal-50 text-[12px] font-semibold tabular-nums text-[#0F766E]"
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#5F6E00]/30 bg-[#AFBE23]/20 text-[12px] font-semibold tabular-nums text-[#5F6E00]"
               >
                 {index + 1}
               </span>
@@ -469,7 +469,7 @@ function renderBlock(block: Block, key: number): ReactNode {
             >
               <span
                 aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-[12.5px] font-semibold uppercase text-[#0F766E]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#AFBE23]/20 text-[12.5px] font-semibold uppercase text-[#5F6E00]"
               >
                 {entry.initials}
               </span>
@@ -706,7 +706,7 @@ export function MarkdownReader({
                       <a
                         href={`#${footnoteReferenceId(label)}`}
                         aria-label="Back to reference"
-                        className="ml-1 rounded text-[#0F766E] no-underline hover:underline"
+                        className="ml-1 rounded text-[#5F6E00] no-underline hover:underline"
                       >
                         ↩
                       </a>
@@ -739,9 +739,9 @@ export function MarkdownReader({
                         className={cx(
                           "-ml-px block w-full border-l-2 py-1 pr-2 text-left text-[12.5px] leading-5 transition-colors duration-150",
                           entry.level === 3 ? "pl-6" : "pl-3",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#5F6E00]/35",
                           isActive
-                            ? "border-[#0F766E] font-medium text-teal-800"
+                            ? "border-[#5F6E00] font-medium text-[#5F6E00]"
                             : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900",
                         )}
                       >

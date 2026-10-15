@@ -100,14 +100,14 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
                   onClick={() => command(item)}
                   className={cx(
                     "flex w-full items-center gap-3 px-3 py-2 text-left",
-                    isSelected ? "bg-teal-50" : "bg-transparent hover:bg-zinc-50",
+                    isSelected ? "bg-[#AFBE23]/20" : "bg-transparent hover:bg-zinc-50",
                   )}
                 >
                   <span
                     aria-hidden="true"
                     className={cx(
                       "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border",
-                      isSelected ? "border-teal-600/30 bg-white text-[#0F766E]" : "border-zinc-200 bg-zinc-50 text-zinc-600",
+                      isSelected ? "border-[#5F6E00]/30 bg-white text-[#5F6E00]" : "border-zinc-200 bg-zinc-50 text-zinc-600",
                     )}
                   >
                     <Icon size={15} strokeWidth={1.75} />

@@ -224,7 +224,7 @@ function DepartmentTags({ departments }: { departments: readonly ClinicalDepartm
       {departments.map((department) => (
         <span
           key={department}
-          className="whitespace-nowrap rounded-full border border-teal-600/30 bg-teal-50/50 px-2 py-px text-xs font-medium text-teal-700"
+          className="whitespace-nowrap rounded-full border border-[#5F6E00]/30 bg-[#AFBE23]/15 px-2 py-px text-xs font-medium text-[#5F6E00]"
         >
           {DEPARTMENT_LABELS[department]}
         </span>
@@ -448,7 +448,7 @@ function ArticleDetail({
                 <button
                   type="button"
                   onClick={onOpenHistory}
-                  className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                 >
                   <History size={14} strokeWidth={1.75} aria-hidden="true" />
                   History
@@ -456,7 +456,7 @@ function ArticleDetail({
                 {canEdit ? (
                   <Link
                     href={`/articles/${encodeURIComponent(article.slug)}/edit`}
-                    className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#0c635c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 focus-visible:ring-offset-1"
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-[#5F6E00] px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.12)] transition-colors hover:bg-[#4D5900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 focus-visible:ring-offset-1"
                   >
                     <Pencil size={13} strokeWidth={2} aria-hidden="true" />
                     Edit
@@ -1013,7 +1013,7 @@ export function OperationsHubClient({
                 <button
                   type="button"
                   onClick={() => setComposer({ mode: "create" })}
-                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                  className="flex h-7 items-center gap-1 rounded-md border border-zinc-300/60 bg-white px-2 text-xs font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                 >
                   <Plus size={13} strokeWidth={2} aria-hidden="true" />
                   New bulletin

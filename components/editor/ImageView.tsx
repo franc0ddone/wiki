@@ -101,7 +101,7 @@ export function ImageView({ node, selected, updateAttributes, editor, getPos }: 
                 aria-valuemax={IMAGE_MAX_WIDTH}
                 aria-valuenow={width ?? undefined}
                 onPointerDown={startResize}
-                className="absolute -right-1.5 top-1/2 h-9 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-teal-600/50 bg-white shadow-[0_1px_3px_rgba(16,24,40,0.2)]"
+                className="absolute -right-1.5 top-1/2 h-9 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-[#5F6E00]/50 bg-white shadow-[0_1px_3px_rgba(16,24,40,0.2)]"
               />
               <div className="absolute -top-9 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5 shadow-[0_4px_16px_-6px_rgba(24,24,27,0.25)]">
                 {ALIGNMENTS.map((option) => {
@@ -116,8 +116,8 @@ export function ImageView({ node, selected, updateAttributes, editor, getPos }: 
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => updateAttributes({ align: option.value })}
                       className={cx(
-                        "flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-                        active ? "bg-teal-50 text-[#0F766E]" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
+                        "flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40",
+                        active ? "bg-[#AFBE23]/20 text-[#5F6E00]" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
                       )}
                     >
                       <Icon size={15} strokeWidth={1.75} aria-hidden="true" />

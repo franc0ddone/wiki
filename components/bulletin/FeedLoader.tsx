@@ -61,7 +61,7 @@ export function FeedLoader({
         <button
           type="button"
           onClick={onLoadMore}
-          className="flex h-8 items-center rounded-lg border border-zinc-300/60 bg-white px-3 text-[12.5px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+          className="flex h-8 items-center rounded-lg border border-zinc-300/60 bg-white px-3 text-[12.5px] font-medium text-zinc-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
         >
           Load more
         </button>

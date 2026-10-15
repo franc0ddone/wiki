@@ -580,7 +580,7 @@ export default function BulletinComposer({
                 aria-selected={tab === "write"}
                 onClick={() => setTab("write")}
                 className={cx(
-                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35",
                   tab === "write" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
                 )}
               >
@@ -593,7 +593,7 @@ export default function BulletinComposer({
                 aria-selected={tab === "preview"}
                 onClick={() => setTab("preview")}
                 className={cx(
-                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                  "flex h-7 items-center gap-1 rounded-md px-2.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35",
                   tab === "preview" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
                 )}
               >
@@ -633,7 +633,7 @@ export default function BulletinComposer({
                           onClick={() =>
                             editor.chain().focus().insertContent({ type: "ctaButton", attrs: { label: "Read more", href: "https://" } }).run()
                           }
-                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                         >
                           Insert link
                         </button>
@@ -642,7 +642,7 @@ export default function BulletinComposer({
                           onClick={() =>
                             editor.chain().focus().insertContent({ type: "steps", attrs: { steps: [{ title: "", description: "" }] } }).run()
                           }
-                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                         >
                           Steps
                         </button>
@@ -651,7 +651,7 @@ export default function BulletinComposer({
                           onClick={() =>
                             editor.chain().focus().insertContent({ type: "spotlight", attrs: { entries: [{ initials: "", name: "", label: "" }] } }).run()
                           }
-                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-teal-600/40 hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+                          className="h-7 rounded-md border border-zinc-300/60 bg-white px-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-[#5F6E00]/40 hover:text-[#5F6E00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
                         >
                           Spotlight
                         </button>

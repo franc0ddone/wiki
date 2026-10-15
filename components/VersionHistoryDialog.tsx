@@ -130,7 +130,7 @@ export function VersionHistoryDialog({
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3.5">
           <div className="min-w-0">
             <h2 id="version-history-title" className="flex items-center gap-2 text-[15px] font-semibold text-zinc-900">
-              <History size={16} strokeWidth={1.75} aria-hidden="true" className="text-[#0F766E]" />
+              <History size={16} strokeWidth={1.75} aria-hidden="true" className="text-[#5F6E00]" />
               Version history
             </h2>
             <p className="mt-0.5 truncate text-[12.5px] text-zinc-500">{articleTitle}</p>
@@ -140,7 +140,7 @@ export function VersionHistoryDialog({
             type="button"
             onClick={onClose}
             aria-label="Close version history"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -184,9 +184,9 @@ export function VersionHistoryDialog({
                         aria-current={isSelected ? "true" : undefined}
                         className={cx(
                           "w-full rounded-[10px] border px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#5F6E00]/35",
                           isSelected
-                            ? "border-teal-600/40 bg-teal-50/70"
+                            ? "border-[#5F6E00]/40 bg-[#AFBE23]/12"
                             : "border-zinc-300/60 bg-white hover:border-zinc-400",
                         )}
                       >
@@ -194,7 +194,7 @@ export function VersionHistoryDialog({
                           <span className="flex items-center gap-2 text-[13px] font-semibold text-zinc-900">
                             Version {version.version}
                             {version.version === latest ? (
-                              <span className="rounded-full border border-teal-200 bg-teal-50 px-1.5 py-px text-xs font-semibold text-teal-800">
+                              <span className="rounded-full border border-[#5F6E00]/20 bg-[#AFBE23]/20 px-1.5 py-px text-xs font-semibold text-[#5F6E00]">
                                 Latest
                               </span>
                             ) : null}
@@ -223,7 +223,7 @@ export function VersionHistoryDialog({
                   <button
                     type="button"
                     onClick={() => setSelectedId(null)}
-                    className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-[#0F766E] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 md:hidden"
+                    className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-[#5F6E00] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 md:hidden"
                   >
                     <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
                     Versions

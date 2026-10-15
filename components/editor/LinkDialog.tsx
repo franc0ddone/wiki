@@ -107,7 +107,7 @@ export function LinkDialog({
               aria-selected={kind === option.id}
               onClick={() => setKind(option.id)}
               className={cx(
-                "h-8 flex-1 rounded-md px-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                "h-8 flex-1 rounded-md px-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35",
                 kind === option.id ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900",
               )}
             >

@@ -466,7 +466,7 @@ export default function ArticleEditor({ viewer, article, registrySource }: Artic
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href={slug ? `/portal?article=${encodeURIComponent(slug)}` : "/portal"}
-            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#5F6E00] transition-colors hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
             {slug ? "Back to procedure" : "Back to portal"}
@@ -549,7 +549,7 @@ export default function ArticleEditor({ viewer, article, registrySource }: Artic
                   "h-12 w-full rounded-xl border bg-white px-4 text-[1.35rem] font-semibold tracking-tight text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.05)] placeholder:font-normal placeholder:text-zinc-400 focus:outline-none focus:ring-2",
                   errorsFor("title").length > 0
                     ? "border-red-300 focus:border-red-400 focus:ring-red-500/15"
-                    : "border-zinc-300/70 focus:border-teal-600/40 focus:ring-teal-600/15",
+                    : "border-zinc-300/70 focus:border-[#5F6E00]/40 focus:ring-[#5F6E00]/15",
                 )}
               />
               <div id="article-title-help" className="mt-1.5 flex items-start justify-between gap-3 text-xs">
@@ -583,9 +583,9 @@ export default function ArticleEditor({ viewer, article, registrySource }: Artic
                       }
                       className={cx(
                         "flex h-7 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35",
                         selected
-                          ? "border-teal-600/40 bg-teal-50 text-teal-800"
+                          ? "border-[#5F6E00]/40 bg-[#AFBE23]/20 text-[#5F6E00]"
                           : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
                       )}
                     >
@@ -892,7 +892,7 @@ export default function ArticleEditor({ viewer, article, registrySource }: Artic
 function FeedbackBanner({ feedback, viewerRole }: { feedback: Feedback; viewerRole: EditorViewer["role"] }): ReactNode {
   if (feedback.kind === "success") {
     return (
-      <p role="status" className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-[13px] font-medium text-teal-900">
+      <p role="status" className="flex items-center gap-2 rounded-lg border border-[#5F6E00]/20 bg-[#AFBE23]/20 px-3 py-2 text-[13px] font-medium text-[#3F4A00]">
         <CheckCircle2 size={15} strokeWidth={1.75} aria-hidden="true" />
         {feedback.message}
       </p>

@@ -103,7 +103,7 @@ export function SearchField({
         className={cx(
           "h-8 w-full rounded-lg border border-zinc-300/60 bg-white pl-8 text-[13px] text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)]",
           "placeholder:text-zinc-400 transition-colors duration-150",
-          "focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15",
+          "focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15",
           hasValue ? "pr-8" : enableShortcut ? "pr-12" : "pr-3",
         )}
       />
@@ -115,7 +115,7 @@ export function SearchField({
             inputRef.current?.focus();
           }}
           aria-label="Clear search"
-          className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-600 transition-colors hover:bg-zinc-300/80 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40"
+          className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-600 transition-colors hover:bg-zinc-300/80 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40"
         >
           <X size={11} strokeWidth={2.25} aria-hidden="true" />
         </button>
@@ -185,9 +185,9 @@ export function DepartmentChipTrack({
             title={DEPARTMENT_LABELS[department]}
             className={cx(
               "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-colors duration-150",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35",
               isActive
-                ? "border-teal-600/40 bg-teal-50 text-teal-800"
+                ? "border-[#5F6E00]/40 bg-[#AFBE23]/20 text-[#5F6E00]"
                 : "border-zinc-300/60 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900",
               isEmpty && "text-zinc-400",
             )}
@@ -196,7 +196,7 @@ export function DepartmentChipTrack({
             <span
               className={cx(
                 "tabular-nums text-[11px]",
-                isActive ? "text-teal-700/70" : "text-zinc-400",
+                isActive ? "text-[#5F6E00]/70" : "text-zinc-400",
               )}
             >
               {count}
@@ -344,16 +344,16 @@ export function MasterDetailShell<T>({
           aria-current={isSelected ? "true" : undefined}
           className={cx(
             "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/35",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#5F6E00]/35",
             isSelected
-              ? "border-zinc-300/60 bg-teal-50/60 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
+              ? "border-zinc-300/60 bg-[#AFBE23]/12 shadow-[0_1px_2px_rgba(16,24,40,0.05)]"
               : "border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:shadow-[0_2px_6px_rgba(16,24,40,0.08)]",
           )}
         >
           <span
             aria-hidden="true"
             className={cx(
-              "absolute inset-y-0 left-0 w-[3px] bg-[#0F766E] transition-opacity",
+              "absolute inset-y-0 left-0 w-[3px] bg-[#5F6E00] transition-opacity",
               isSelected ? "opacity-100" : "opacity-0",
             )}
           />
@@ -476,7 +476,7 @@ export function MasterDetailShell<T>({
           <button
             type="button"
             onClick={() => onSelect(null)}
-            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#0F766E] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35"
+            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[#5F6E00] transition-colors hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35"
           >
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
             {listTitle}

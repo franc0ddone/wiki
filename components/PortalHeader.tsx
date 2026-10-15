@@ -335,13 +335,13 @@ export function PortalHeader({
             aria-label={`Current section: ${activeOption.label}. Switch section`}
             className={cx(
               "flex h-8 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-zinc-800 transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40 focus-visible:ring-offset-1",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40 focus-visible:ring-offset-1",
               isOpen
                 ? "bg-zinc-900/[0.06]"
                 : "hover:bg-zinc-900/[0.04] active:bg-zinc-900/[0.07]",
             )}
           >
-            <ActiveIcon size={14} strokeWidth={1.75} aria-hidden="true" className="text-[#0F766E]" />
+            <ActiveIcon size={14} strokeWidth={1.75} aria-hidden="true" className="text-[#5F6E00]" />
             <span className="hidden sm:inline">{activeOption.label}</span>
             <ChevronDown
               size={14}
@@ -385,7 +385,7 @@ export function PortalHeader({
                     className={cx(
                       "group flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left outline-none transition-colors",
                       "hover:bg-zinc-100 focus-visible:bg-zinc-100",
-                      isActive && "bg-teal-50/70 hover:bg-teal-50 focus-visible:bg-teal-50",
+                      isActive && "bg-[#AFBE23]/12 hover:bg-[#AFBE23]/15 focus-visible:bg-[#AFBE23]/15",
                     )}
                   >
                     <span
@@ -393,7 +393,7 @@ export function PortalHeader({
                       className={cx(
                         "mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
                         isActive
-                          ? "border-teal-200 bg-white text-[#0F766E]"
+                          ? "border-[#5F6E00]/20 bg-white text-[#5F6E00]"
                           : "border-zinc-200/80 bg-white text-zinc-500",
                       )}
                     >
@@ -403,7 +403,7 @@ export function PortalHeader({
                       <span
                         className={cx(
                           "block text-[13px] font-medium leading-5",
-                          isActive ? "text-teal-900" : "text-zinc-900",
+                          isActive ? "text-[#3F4A00]" : "text-zinc-900",
                         )}
                       >
                         {option.label}
@@ -417,7 +417,7 @@ export function PortalHeader({
                       strokeWidth={2}
                       aria-hidden="true"
                       className={cx(
-                        "mt-1 shrink-0 text-[#0F766E]",
+                        "mt-1 shrink-0 text-[#5F6E00]",
                         isActive ? "opacity-100" : "opacity-0",
                       )}
                     />

@@ -1,7 +1,9 @@
 /**
  * The bulletin headline treatment (owner's "Option C"): 34px, weight 700,
  * letter-spacing -0.02em, line-height 1.1, with a 64px-wide × 3px-tall
- * petroleum-teal (`#0f766e`) rule sitting 14px below the headline.
+ * dove-green (`#5F6E00`) rule sitting 14px below the headline — the deep end of
+ * the locked brand green, the same accent the product draws its other rules and
+ * dots in (`BulletinHeadline` used to carry the retired petroleum tone).
  *
  * Kept pure and presentational so `scripts/verify-frontend.ts` can render it
  * with `renderToStaticMarkup` and assert the exact classes; `BulletinDetail`
@@ -22,7 +24,7 @@ export function BulletinHeadline({ title, light = false }: { title: string; ligh
       </h1>
       <div
         aria-hidden="true"
-        className={cx("mt-[14px] h-[3px] w-16 rounded-[2px]", light ? "bg-white/45" : "bg-[#0f766e]")}
+        className={cx("mt-[14px] h-[3px] w-16 rounded-[2px]", light ? "bg-white/45" : "bg-[#5F6E00]")}
       />
     </div>
   );

@@ -115,7 +115,7 @@ export function DropImagePopover({ editor, file, pos, anchor, onClose }: DropIma
           "h-9 w-full rounded-lg border bg-white px-2.5 text-[13px] text-zinc-900 focus:outline-none focus:ring-2",
           touched && decision.altError
             ? "border-red-300 focus:border-red-400 focus:ring-red-500/15"
-            : "border-zinc-300/70 focus:border-teal-600/40 focus:ring-teal-600/15",
+            : "border-zinc-300/70 focus:border-[#5F6E00]/40 focus:ring-[#5F6E00]/15",
         )}
         disabled={busy}
       />
@@ -146,7 +146,7 @@ export function DropImagePopover({ editor, file, pos, anchor, onClose }: DropIma
           type="button"
           onClick={() => void submit()}
           disabled={busy}
-          className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 text-[13px] font-medium text-white hover:bg-[#0d6a63] disabled:opacity-60"
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-[#5F6E00] px-3 text-[13px] font-medium text-white hover:bg-[#4D5900] disabled:opacity-60"
         >
           <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
           {busy ? "Uploading…" : "Insert"}

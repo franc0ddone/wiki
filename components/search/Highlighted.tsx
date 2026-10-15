@@ -20,7 +20,7 @@ export function Highlighted({ text, ranges }: { text: string; ranges: readonly T
   merged.forEach((range, index) => {
     if (range.start > cursor) parts.push(<Fragment key={`t${index}`}>{text.slice(cursor, range.start)}</Fragment>);
     parts.push(
-      <mark key={`m${index}`} className="rounded-[3px] bg-teal-100 px-px font-semibold text-teal-900">
+      <mark key={`m${index}`} className="rounded-[3px] bg-[#AFBE23]/30 px-px font-semibold text-[#3F4A00]">
         {text.slice(range.start, range.end)}
       </mark>,
     );

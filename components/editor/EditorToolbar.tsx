@@ -83,8 +83,8 @@ function ToolButton({
       onClick={onClick}
       className={cx(
         "flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-        active ? "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40",
+        active ? "bg-[#AFBE23]/20 text-[#5F6E00] ring-1 ring-inset ring-[#5F6E00]/25" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
         "disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent",
       )}
       {...rest}
@@ -152,8 +152,8 @@ function CalloutMenu({ editor, active }: { editor: Editor; active: CalloutVarian
         onClick={() => setOpen((value) => !value)}
         className={cx(
           "flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-          active ? "bg-teal-50 text-[#0F766E] ring-1 ring-inset ring-teal-600/25" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/40",
+          active ? "bg-[#AFBE23]/20 text-[#5F6E00] ring-1 ring-inset ring-[#5F6E00]/25" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
         )}
       >
         <Info size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -182,7 +182,7 @@ function CalloutMenu({ editor, active }: { editor: Editor; active: CalloutVarian
                 aria-hidden="true"
                 className={cx(
                   "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
-                  variant === "warning" ? "bg-amber-500" : variant === "critical" ? "bg-red-500" : "bg-teal-600",
+                  variant === "warning" ? "bg-amber-500" : variant === "critical" ? "bg-red-500" : "bg-[#5F6E00]",
                 )}
               />
               <span>
@@ -333,7 +333,7 @@ export function EditorToolbar({
                 ? chain().unsetLineHeight().run()
                 : chain().setLineHeight(event.target.value as LineHeight).run()
             }
-            className="h-8 rounded-md border border-zinc-300/70 bg-white px-1.5 text-[12.5px] text-zinc-700 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+            className="h-8 rounded-md border border-zinc-300/70 bg-white px-1.5 text-[12.5px] text-zinc-700 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
           >
             <option value="">Line spacing</option>
             {LINE_HEIGHTS.map((value) => (
@@ -409,7 +409,7 @@ export function EditorToolbar({
                 .updateAttributes("codeBlock", { language: event.target.value || null })
                 .run()
             }
-            className="h-7 rounded-md border border-zinc-300/70 bg-white px-2 text-xs text-zinc-800 focus:border-teal-600/40 focus:outline-none focus:ring-2 focus:ring-teal-600/15"
+            className="h-7 rounded-md border border-zinc-300/70 bg-white px-2 text-xs text-zinc-800 focus:border-[#5F6E00]/40 focus:outline-none focus:ring-2 focus:ring-[#5F6E00]/15"
           >
             {languageOptions.map((option) => (
               <option key={option || "plain"} value={option}>
@@ -439,7 +439,7 @@ export function EditorToolbar({
               onMouseDown={(event) => event.preventDefault()}
               onClick={action.run}
               title={action.disabled ? "The header row can’t be deleted" : undefined}
-              className="h-7 rounded-md border border-zinc-300/70 bg-white px-2 font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/35 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-7 rounded-md border border-zinc-300/70 bg-white px-2 font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/35 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {action.label}
             </button>
