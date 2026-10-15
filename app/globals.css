@@ -111,6 +111,16 @@ body {
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
 }
 
+/*
+ * The auth landing surface (the branded sign-in / create-account page): body
+ * copy, labels, control text and the submit button in Palanquin; the "Dove Hub"
+ * wordmark in Domine. Scoped to `.dw-auth` so the rest of the app keeps the
+ * system stack — the same pattern `.dw-reader` and `.dw-knowledge` follow.
+ */
+.dw-auth {
+  font-family: var(--font-reader), var(--font-sans);
+}
+
 h1,
 h2,
 h3 {

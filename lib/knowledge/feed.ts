@@ -34,8 +34,9 @@ export const VERSION_ARROW = "\u2192";
 export const RESULTS_BANNER_TEXT = "Showing search results across all published SOPs";
 
 /**
- * The switcher position a viewer starts on: their own staff type, or `All` when
- * nothing is on file (which includes the unauthenticated fallback).
+ * The audience a viewer's feed starts on: their own staff type, or `All` when
+ * nothing is on file (which includes the unauthenticated fallback). A silent,
+ * page-level decision — the surface renders no control for it.
  */
 export function defaultAudience(staffType: StaffType | null | undefined): ArticleAudience {
   if (staffType === "MEDICAL") return "MEDICAL";
@@ -85,16 +86,16 @@ export function compareByRecency(a: KnowledgeArticle, b: KnowledgeArticle): numb
 }
 
 export interface FeedFilters {
-  /** The audience switcher's position. */
+  /** The audience the feed is read through — derived from the viewer's staff type. */
   audience: ArticleAudience;
   /** `"All"` (or omitted) does not filter. */
   department?: Department;
 }
 
 /**
- * Feed Mode: published procedures for the active switcher and department,
- * strictly newest publish first. Composes as a logical AND, exactly as the
- * spec's WHERE clause describes.
+ * Feed Mode: published procedures for the viewer's audience and the selected
+ * department, strictly newest publish first. Composes as a logical AND, exactly
+ * as the spec's WHERE clause describes.
  */
 export function feedArticles(
   articles: readonly KnowledgeArticle[],
@@ -152,10 +153,10 @@ export function searchFeedArticles(
 }
 
 /**
- * The department chips: `All Departments`, then every department that actually
- * occurs on a published procedure visible from the active switcher, sorted by
- * label. Derived from the corpus — there is no separate chip taxonomy to keep in
- * step with the data.
+ * The department filter's options: `All Departments`, then every department that
+ * actually occurs on a published procedure visible to the viewer's audience,
+ * sorted by label. Derived from the corpus — there is no separate taxonomy to
+ * keep in step with the data.
  */
 export function departmentOptions(
   articles: readonly KnowledgeArticle[],
@@ -172,7 +173,7 @@ export function departmentOptions(
   return ["All", ...sorted];
 }
 
-/** Chip counts over the same set the chips are derived from. */
+/** Counts over the same set the options are derived from. */
 export function departmentCounts(
   articles: readonly KnowledgeArticle[],
   audience: ArticleAudience,

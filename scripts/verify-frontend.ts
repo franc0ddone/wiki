@@ -2512,7 +2512,7 @@ check("the version jump badge is `v8 → v9` after a republication and plain `v1
   assert.equal(jump?.includes("->"), false);
 });
 
-check("the audience switcher starts on the viewer's staff type, and admits ALL-documents from every position", () => {
+check("the silent audience follows the viewer's staff type, and admits ALL-documents from every position", () => {
   assert.equal(defaultAudience("MEDICAL"), "MEDICAL");
   assert.equal(defaultAudience("NON_MEDICAL"), "NON_MEDICAL");
   assert.equal(defaultAudience(null), "ALL");
@@ -2530,7 +2530,7 @@ check("the audience switcher starts on the viewer's staff type, and admits ALL-d
   assert.deepEqual(asAll.sort(), ["all", "med", "nonmed"]);
 });
 
-check("the department chip and the switcher compose as a logical AND", () => {
+check("the department filter and the silent audience compose as a logical AND", () => {
   const icu = sop({ slug: "icu", departments: ["ICU"], audience: "MEDICAL" });
   const er = sop({ slug: "er", departments: ["ER"], audience: "MEDICAL" });
   const both = feedArticles([icu, er], { audience: "MEDICAL", department: "ICU" });
@@ -2550,7 +2550,7 @@ check("the Essential section is title-sorted, published-only, and audience-filte
   assert.deepEqual(essentialArticles([plain], "ALL"), []);
 });
 
-check("the department chips are derived from the corpus, sorted by label, with All Departments first", () => {
+check("the department filter's options are derived from the corpus, sorted by label, with All Departments first", () => {
   const options = departmentOptions(
     [sop({ slug: "a", departments: ["ICU", "ER"] }), sop({ slug: "b", departments: ["Cardiology"] })],
     "ALL",
@@ -2628,7 +2628,7 @@ function renderKnowledgeHome(overrides: Partial<Parameters<typeof KnowledgeHome>
   );
 }
 
-check("Feed Mode shows the Essential SOPs section, the switcher, and the publish-time feed", () => {
+check("Feed Mode shows the Essential SOPs section, the department dropdown, and the publish-time feed", () => {
   const html = renderKnowledgeHome();
   assert.ok(html.includes("Essential SOPs"), "the Essential SOPs section is missing");
   // The two curated fixtures, title-sorted: Canine Parvovirus… before Code Blue…
@@ -2648,13 +2648,33 @@ check("Feed Mode shows the Essential SOPs section, the switcher, and the publish
   );
 });
 
-check("the audience switcher's default position follows the viewer's staff type", () => {
+check("the audience is silent: no control renders, and the feed still follows the staff type", () => {
+  // The audience is now a page-level decision from the signed-in staff type —
+  // there is no control for it anywhere on the surface.
   const asMedical = renderKnowledgeHome({ staffType: "MEDICAL" });
-  assert.match(asMedical, /aria-pressed="true"[^>]*>Medical</);
   const asNonMedical = renderKnowledgeHome({ staffType: "NON_MEDICAL" });
-  assert.match(asNonMedical, /aria-pressed="true"[^>]*>Non-medical</);
   const unassigned = renderKnowledgeHome({ staffType: null });
-  assert.match(unassigned, /aria-pressed="true"[^>]*>All</);
+  for (const html of [asMedical, asNonMedical, unassigned]) {
+    assert.equal(html.includes('aria-label="Audience"'), false, "no audience control may render");
+    assert.equal(html.includes("Audience"), false, "the audience wording must not appear on the surface");
+  }
+
+  // …while the silent derivation still picks the slice of the corpus: the
+  // non-medical-only fixture is in the non-medical feed, not the medical one.
+  assert.ok(asNonMedical.includes("Client Estimates"));
+  assert.equal(asMedical.includes("Client Estimates"), false);
+  assert.ok(unassigned.includes("Client Estimates"), "an unassigned viewer falls back to the whole corpus");
+});
+
+check("the filter bar is one department dropdown, not a chip row", () => {
+  const html = renderKnowledgeHome({ staffType: null });
+  assert.ok(html.includes("<select"), "the department dropdown must render");
+  assert.ok(html.includes("All departments"), "the dropdown's default option must read All departments");
+  // The options carry the counts the chips used to. (ICU is on published fixtures.)
+  assert.match(html, /<option[^>]*>[^<]*\(\d+\)<\/option>/, "each department option carries its count");
+  // The old segmented switcher and the horizontal chip track are gone entirely.
+  assert.equal(/aria-pressed/.test(html), false, "no segmented control may remain");
+  assert.equal(html.includes("fade-x"), false, "the horizontal chip track may not remain");
 });
 
 check("an unassigned viewer sees the non-medical-only procedure, a medical viewer does not", () => {
@@ -2665,14 +2685,14 @@ check("an unassigned viewer sees the non-medical-only procedure, a medical viewe
   assert.ok(renderKnowledgeHome({ staffType: "MEDICAL", query: "estimates" }).includes("Client Estimates"));
 });
 
-check("Results Mode collapses the Essential section and bypasses the switches", () => {
+check("Results Mode collapses the Essential section and bypasses the filter", () => {
   const html = renderKnowledgeHome({ query: "parvovirus" });
   assert.equal(html.includes("Essential SOPs"), false, "the Essential section must collapse");
   assert.ok(html.includes(RESULTS_BANNER_TEXT), "the results banner is missing");
   assert.ok(html.includes("Clear search"), "the results banner must offer the way back");
   assert.ok(html.includes("Search all published SOPs (Ctrl Space)"), "the hero stays in Results Mode");
   assert.ok(html.includes("Canine Parvovirus Isolation Protocol"), "the matching procedure is missing");
-  assert.equal(html.includes("Cardiology"), false, "the department chips must be bypassed in Results Mode");
+  assert.equal(html.includes("Cardiology"), false, "the department dropdown must be bypassed in Results Mode");
 });
 
 check("a zero-result search says so without pretending the filters are at fault", () => {
@@ -2755,8 +2775,7 @@ const KNOWLEDGE_FILES = [
   "components/knowledge/BrandLockup.tsx",
   "components/knowledge/KnowledgeHome.tsx",
   "components/knowledge/SopSearchHero.tsx",
-  "components/knowledge/AudienceSwitcher.tsx",
-  "components/knowledge/DepartmentChips.tsx",
+  "components/knowledge/DepartmentSelect.tsx",
   "components/knowledge/SopFeedList.tsx",
   "lib/knowledge/feed.ts",
   "lib/knowledge/relative-time.ts",

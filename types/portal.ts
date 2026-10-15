@@ -74,24 +74,23 @@ export type DepartmentCounts = Partial<Record<Department, number>>;
 export type KnowledgeArticleStatus = "draft" | "published";
 
 /**
- * Who a procedure is written for (prompt 7c). Steers the Knowledge Home
- * audience switcher only — it is **not** a permission or access-control
- * boundary, so no reader is ever blocked from a procedure by this value.
+ * Who a procedure is written for (prompt 7c). Steers which slice of the
+ * Knowledge Home feed a viewer starts on — the signed-in staff type picks the
+ * audience silently, with no control on the surface. It is **not** a permission
+ * or access-control boundary, so no reader is ever blocked from a procedure by
+ * this value.
  */
 export type ArticleAudience = "MEDICAL" | "NON_MEDICAL" | "ALL";
 
 /** Every audience value. The API validates against exactly this list. */
 export const AUDIENCES: readonly ArticleAudience[] = ["MEDICAL", "NON_MEDICAL", "ALL"];
 
-/** The audience switcher's positions, left to right. */
-export const FEED_AUDIENCES: readonly ArticleAudience[] = AUDIENCES;
-
 /** Is this raw value an audience? A type guard, so callers narrow rather than cast. */
 export function isAudience(value: unknown): value is ArticleAudience {
   return typeof value === "string" && (AUDIENCES as readonly string[]).includes(value);
 }
 
-/** Compact labels for the switcher and the row pill. */
+/** Compact labels for the feed row's pill and the writer's selector. */
 export const AUDIENCE_LABELS: Record<ArticleAudience, string> = {
   MEDICAL: "Medical",
   NON_MEDICAL: "Non-medical",

@@ -4,9 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { ArrowLeft, BookOpen, X } from "lucide-react";
 import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
-import { AudienceSwitcher } from "@/components/knowledge/AudienceSwitcher";
 import { BrandLockup } from "@/components/knowledge/BrandLockup";
-import { DepartmentChips } from "@/components/knowledge/DepartmentChips";
+import { DepartmentSelect } from "@/components/knowledge/DepartmentSelect";
 import { SopFeedList } from "@/components/knowledge/SopFeedList";
 import { SopSearchHero } from "@/components/knowledge/SopSearchHero";
 import { useDebouncedValue } from "@/lib/hooks";
@@ -22,8 +21,8 @@ import {
 } from "@/lib/knowledge/feed";
 import type { SearchIndex } from "@/lib/search";
 import type {
-  ArticleAudience,
   Department,
+  DepartmentCounts,
   KnowledgeArticle,
   PortalView,
   StaffType,
@@ -34,19 +33,20 @@ import { cx } from "@/lib/utils";
  * **The Knowledge Home surface** — one full-width clinical surface, two modes.
  *
  * *Feed Mode* (the search hero is empty): the Essential SOPs group, the
- * audience switcher, the corpus-derived department chips, and the published
- * procedures ranked strictly by when they last went live.
+ * department dropdown, and the published procedures ranked strictly by when they
+ * last went live — read through the audience the viewer's staff type selects,
+ * silently.
  *
  * *Results Mode* (the hero has non-whitespace text): the Essential group
- * collapses, the audience switcher and the department chips are bypassed, and
- * the whole **published corpus** is searched through the shared Fuse index and
- * rendered relevance-first in the very same row component. The active filters
- * are kept, not reset, so clearing the query restores Feed Mode exactly where
- * the reader left it.
+ * collapses, the department dropdown is bypassed, and the whole **published
+ * corpus** is searched through the shared Fuse index and rendered
+ * relevance-first in the very same row component. The active filter is kept, not
+ * reset, so clearing the query restores Feed Mode exactly where the reader left
+ * it.
  *
  * Where things live:
  *  - the rules (ordering, audience derivation, Essential selection, version-jump
- *    formatting, chip derivation) are pure and unit-tested in
+ *    formatting, department-option derivation) are pure and unit-tested in
  *    `lib/knowledge/feed.ts`;
  *  - the relative publish time is `lib/knowledge/relative-time.ts`;
  *  - the row is `SopFeedList`, shared by both modes and both groups;
@@ -61,10 +61,10 @@ import { cx } from "@/lib/utils";
  * workstation container. Selecting a row opens the 7a reader in place of the
  * feed — never beside it.
  *
- * **Nothing here is a permission boundary.** `audience`/`staffType` pick the
- * default view; every reader can switch, search the whole corpus, and open any
- * procedure. The reader pane is the 7a reader, which `/procedures/<slug>`
- * redirects into.
+ * **Nothing here is a permission boundary.** `staffType` picks the audience the
+ * feed starts on — silently, with no control on the surface; every reader can
+ * search the whole corpus and open any procedure. The reader pane is the 7a
+ * reader, which `/procedures/<slug>` redirects into.
  */
 
 /** Matches the portal's other per-view search fields. */
@@ -126,9 +126,12 @@ export function KnowledgeHome({
   detail,
   now,
 }: KnowledgeHomeProps) {
-  /** The switcher position this viewer starts on; what "Reset filters" returns to. */
-  const defaultView = useMemo(() => defaultAudience(staffType), [staffType]);
-  const [audience, setAudience] = useState<ArticleAudience>(defaultView);
+  /**
+   * The feed's audience is a page-level, silent decision: the signed-in staff
+   * type picks it and there is no control on the surface. A viewer with nothing
+   * on file falls back to the whole corpus (`ALL`).
+   */
+  const audience = defaultAudience(staffType);
   const [department, setDepartment] = useState<Department>("All");
   const searchRef = useRef<HTMLInputElement | null>(null);
 
@@ -159,14 +162,14 @@ export function KnowledgeHome({
   );
 
   const items = searching ? results : feed;
-  const chipOptions = useMemo(() => departmentOptions(articles, audience), [articles, audience]);
-  const chipCounts = useMemo(() => departmentCounts(articles, audience), [articles, audience]);
+  const departmentFilterOptions = useMemo(() => departmentOptions(articles, audience), [articles, audience]);
+  const departmentFilterCounts = useMemo(() => departmentCounts(articles, audience), [articles, audience]);
   const publishedCount = useMemo(
     () => articles.filter((article) => article.status === "published").length,
     [articles],
   );
-  /** The filters are away from where this viewer started, so the bar offers its reset. */
-  const filtersTouched = audience !== defaultView || department !== "All";
+  /** The filter is away from "All departments", so the bar offers its reset. */
+  const filtersTouched = department !== "All";
 
   /**
    * **Ctrl+Space** focuses the search hero, from anywhere on the surface.
@@ -194,11 +197,10 @@ export function KnowledgeHome({
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  /** The combined-filter escape hatch: Audience back to this viewer's own, Department to All. */
+  /** The escape hatch: the department filter back to All departments. */
   const resetFilters = useCallback(() => {
-    setAudience(defaultView);
     setDepartment("All");
-  }, [defaultView]);
+  }, []);
 
   const clearSearch = useCallback(() => onQueryChange(""), [onQueryChange]);
 
@@ -264,12 +266,10 @@ export function KnowledgeHome({
               <ResultsBanner onClear={clearSearch} />
             ) : (
               <FilterBar
-                audience={audience}
-                onAudienceChange={setAudience}
                 department={department}
                 onDepartmentChange={setDepartment}
-                chipOptions={chipOptions}
-                chipCounts={chipCounts}
+                options={departmentFilterOptions}
+                counts={departmentFilterCounts}
                 touched={filtersTouched}
                 onReset={resetFilters}
               />
@@ -306,7 +306,7 @@ export function KnowledgeHome({
                   ) : (
                     <EmptyPanel
                       title="No published SOPs match these filters."
-                      message="Another audience or department may hold what you are after."
+                      message="Another department may hold what you are after."
                       action={{ label: "Reset filters", onClick: resetFilters }}
                     />
                   )}
@@ -398,52 +398,40 @@ function KnowledgeHeader({
 /* -------------------------------------------------------------- filter bar */
 
 /**
- * Audience switcher plus department chips, on the Clinical Light canvas directly
- * below the band — one unified row on a workstation, two tiers when the
- * viewport is too narrow for both. The chip track scrolls horizontally rather
- * than widening the page, and the reset affordance appears only once the
- * filters have actually moved off this viewer's starting view.
+ * The Knowledge Home's one filter control, on the Clinical Light canvas directly
+ * below the band: the department dropdown, and the reset affordance once a
+ * department is chosen. A single quiet line — no panel, no chip track, nothing
+ * that sprawls horizontally. There is no audience control here: the viewer's
+ * staff type decides that silently, a level above this surface.
  */
 function FilterBar({
-  audience,
-  onAudienceChange,
   department,
   onDepartmentChange,
-  chipOptions,
-  chipCounts,
+  options,
+  counts,
   touched,
   onReset,
 }: {
-  audience: ArticleAudience;
-  onAudienceChange: (value: ArticleAudience) => void;
   department: Department;
   onDepartmentChange: (department: Department) => void;
-  chipOptions: readonly Department[];
-  chipCounts: ReturnType<typeof departmentCounts>;
+  options: readonly Department[];
+  counts: DepartmentCounts;
   touched: boolean;
   onReset: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-3 py-3 sm:px-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-        <AudienceSwitcher
-          value={audience}
-          onChange={onAudienceChange}
-          className="min-w-0 md:w-[19rem] md:shrink-0"
-        />
-        <DepartmentChips
-          options={chipOptions}
-          active={department}
-          onChange={onDepartmentChange}
-          counts={chipCounts}
-          className="min-w-0 md:flex-1"
-        />
-        {touched ? (
-          <button type="button" onClick={onReset} className={RESET_BUTTON_CLASS}>
-            Reset filters
-          </button>
-        ) : null}
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <DepartmentSelect
+        options={options}
+        active={department}
+        onChange={onDepartmentChange}
+        counts={counts}
+      />
+      {touched ? (
+        <button type="button" onClick={onReset} className={RESET_BUTTON_CLASS}>
+          Reset filters
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -511,8 +499,8 @@ function FeedGroup({
 
 /**
  * Results Mode's header: what the search is doing, and the way back to Feed
- * Mode. Clearing here keeps the audience and department filters the reader had
- * set before they typed.
+ * Mode. Clearing here keeps the department filter the reader had set before they
+ * typed.
  */
 function ResultsBanner({ onClear }: { onClear: () => void }) {
   return (
