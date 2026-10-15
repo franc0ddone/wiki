@@ -761,10 +761,6 @@ export default function ArticleEditor({ viewer, article, registrySource }: Artic
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11.5px] leading-4 text-zinc-500">
-                Everyone can still read this procedure; the selector only sets which feed it
-                appears in by default.
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

@@ -125,6 +125,8 @@ export function KnowledgeHome({
   const audience = defaultAudience(staffType);
   const [department, setDepartment] = useState<Department>("All");
   const searchRef = useRef<HTMLInputElement | null>(null);
+  /** The reading pane's scroller — the `[data-scroll-root]` the reader measures. */
+  const readerScrollRef = useRef<HTMLDivElement | null>(null);
 
   const searching = query.trim().length > 0;
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
@@ -188,6 +190,43 @@ export function KnowledgeHome({
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  /**
+   * **A new procedure starts at the top.**
+   *
+   * The reader is swapped in place here — same scroll container, different
+   * article — so the pane would otherwise keep whatever offset the previous
+   * procedure had been read to. This resets it whenever the *displayed* article
+   * changes, by any route: an internal `/procedures/<slug>` link, a related SOP
+   * in the backlinks list, the command palette, or the browser's own
+   * back/forward.
+   *
+   * Keyed on the article's **id**, not the article object, so the things that
+   * are *not* navigation leave the pane alone: a same-article contents jump, a
+   * republish that swaps `body_markdown` under an open reader, and a re-render
+   * from the ticking clock all keep their place.
+   *
+   * The first run is skipped — a fresh mount is already at the top, and
+   * forcing it would clobber a `/procedures/<slug>#section` fragment scroll.
+   *
+   * `scrollTop = 0` rather than `scrollTo({ behavior: "smooth" })`: this is a
+   * navigation reset, not an animation. Both scrollers are reset — the pane,
+   * which is the one that actually scrolls in this layout, and the window,
+   * which is the scroller anywhere the reader sits in normal flow.
+   *
+   * Order matters: this is a child effect, so it runs *before*
+   * `OperationsHubClient`'s anchor effect — an in-app link that names a
+   * `#section` still lands on that section, not on the top.
+   */
+  const lastArticleId = useRef<string | null>(selectedId);
+  useEffect(() => {
+    const previousId = lastArticleId.current;
+    lastArticleId.current = selectedId;
+    if (selectedId === null || selectedId === previousId) return;
+    const pane = readerScrollRef.current;
+    if (pane) pane.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, [selectedId]);
+
   /** The escape hatch: the department filter back to All departments. */
   const resetFilters = useCallback(() => {
     setDepartment("All");
@@ -229,6 +268,7 @@ export function KnowledgeHome({
           </div>
         </div>
         <div
+          ref={readerScrollRef}
           data-scroll-root
           aria-label="Procedure reader"
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto print:overflow-visible"

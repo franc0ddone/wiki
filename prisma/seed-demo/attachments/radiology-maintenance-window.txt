@@ -1,0 +1,22 @@
+RADIOLOGY SUITE — SATURDAY MAINTENANCE WINDOW
+Setup notes for the side bay (07:00 – 11:00)
+
+1. Portable unit
+   - Warm-up cycle takes approximately four minutes after power-on.
+   - Do not take the first exposure until the panel's ready lamp is steady.
+   - The unit's battery will not complete a full morning. Keep it on mains power
+     between studies and treat any amber battery indication as "return to mains".
+
+2. Plate reader
+   - The side bay reader is loaded with the same plate size as the main suite.
+   - If the reader's lid status light flashes, reseat the plate before retrying.
+   - A plate that fails twice should be set aside and logged; do not keep re-running it.
+
+3. Positioning aids
+   - The sandbag set and one trough live in the side bay cupboard for the morning.
+   - Return everything to the main suite after the all-clear so the next shift
+     finds the cupboards as they expect them.
+
+4. Contact
+   - Radiology lead is on site from 07:00. The service engineer is the only person
+     in the main suite during the window.

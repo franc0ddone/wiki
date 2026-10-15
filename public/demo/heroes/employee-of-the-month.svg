@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-label="Employee of the month">
+  <rect width="1200" height="400" fill="#20241E"/>
+  <circle cx="1000" cy="320" r="200" fill="#AFBE23" opacity="0.08"/>
+  <g fill="none" stroke="#AFBE23" stroke-width="7" stroke-linecap="round" opacity="0.9">
+    <path d="M960 110c-70 30-70 140 0 170"/>
+    <path d="M1010 100c-80 40-80 160 0 200"/>
+    <path d="M1060 110c-70 40-70 150 0 180"/>
+  </g>
+  <circle cx="985" cy="196" r="26" fill="#AFBE23" opacity="0.85"/>
+  <circle cx="1035" cy="176" r="26" fill="#AFBE23" opacity="0.65"/>
+  <circle cx="1035" cy="216" r="26" fill="#AFBE23" opacity="0.65"/>
+  <text x="90" y="170" fill="#E9EDD6" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="700">Employee of the Month</text>
+  <text x="90" y="230" fill="#AFBE23" font-family="Georgia, 'Times New Roman', serif" font-size="30" letter-spacing="4">DOVE LEWIS EMERGENCY HOSPITAL</text>
+</svg>
