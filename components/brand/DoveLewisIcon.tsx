@@ -178,16 +178,33 @@ export const DoveLewisIcon: React.FC<DoveLewisIconProps> = ({
 
       /*
        * The dashed row of `borders-set`, lifted out on its own and recentred in
-       * a 400×24 band (the dashes ride `y=12`, that box's midline). Path
-       * geometry is that row's, unchanged. The stroke is the one the divider on
-       * the bulletin board asks for: 3px, round caps, 70% opacity. `currentColor`
-       * is how every icon in this file takes its colour, so a caller's `color`
-       * prop still resolves through the SVG's `style` the usual way.
+       * a 400×24 band (the dashes ride `y≈12`, that box's midline) — the
+       * bulletin board's divider between its two groups of notices.
+       *
+       * **Hand-drawn, not ruled.** The geometry itself is irregular: the six
+       * dashes are 34–46 units long with gaps of 18–36 between them, each riding
+       * a slightly different `y` (11.2–12.8) and a slightly different stroke
+       * weight, so the row never reads as a CSS `border-dashed`. The caller adds
+       * the shared freehand roughness filter on top for the sketch quality the
+       * brand guide's hand-drawn elements carry.
+       *
+       * Full strength: the row carries **no** opacity of its own. It used to sit
+       * at `0.7` here, which compounded with a wrapper's own utility and washed
+       * the rule out (0.35 × 0.7 ≈ 0.25) — the divider is a crisp mark now, and
+       * any softening belongs in one place only, the call site.
+       *
+       * `currentColor` is how every icon in this file takes its colour, so a
+       * caller's `color` prop still resolves through the SVG's `style`.
        */
       case 'border-dashed':
         return (
-          <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.7">
-            <path d="M20 12 L60 12 M80 12 L120 12 M140 12 L180 12 M200 12 L240 12 M260 12 L300 12 M320 12 L360 12" />
+          <g fill="none" stroke="currentColor" strokeLinecap="round">
+            <path strokeWidth="3.1" d="M20 11.4 L64 11.4" />
+            <path strokeWidth="2.8" d="M88 12.7 L122 12.7" />
+            <path strokeWidth="3.2" d="M142 11.2 L188 11.2" />
+            <path strokeWidth="2.9" d="M216 12.8 L248 12.8" />
+            <path strokeWidth="3.1" d="M266 11.6 L306 11.6" />
+            <path strokeWidth="3" d="M342 12.5 L380 12.5" />
           </g>
         );
 

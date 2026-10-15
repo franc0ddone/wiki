@@ -75,7 +75,7 @@ export default async function PortalPage({
 
   const articleParam = Array.isArray(params.article) ? params.article[0] : params.article;
   // `?bulletin=<id>` opens the board with that notice already in the reading
-  // pane; absent means "nothing selected" — the pane shows the living-dove
+  // pane; absent means "nothing selected" — the pane shows the empty-bowl
   // empty state (see `OperationsHubClient`).
   const bulletinParam = Array.isArray(params.bulletin) ? params.bulletin[0] : params.bulletin;
 

@@ -262,7 +262,10 @@ input[type="search"]::-webkit-search-decoration {
 /* -------------------------------------------------------------- living dove */
 
 /*
- * The bulletin board's "nothing selected" mark (`components/bulletin/LivingDove`).
+ * The animated mosaic dove (`components/bulletin/LivingDove`) — the brand mark
+ * that used to stand in for the bulletin reader's "nothing selected" state; that
+ * surface now shows the canonical empty bowl, and the mark stays available on
+ * its own.
  *
  * Motion is CSS only — there is no requestAnimationFrame loop — so the mark
  * costs no JavaScript and cannot jank while the reader scrolls the rail.
@@ -299,6 +302,65 @@ input[type="search"]::-webkit-search-decoration {
 .dw-dove-piece:hover {
   fill: #5F6E00;
   transform: scale(1.12);
+}
+
+/* -------------------------------------------------------- empty bowl rock */
+
+/*
+ * The bulletin reader's "nothing selected" bowl (`components/bulletin/
+ * BulletinReaderEmptyState`): three slow rocks as the state appears, decaying to
+ * stillness. One run only — an entrance, never a loop.
+ *
+ * The pivot is the bowl's own base, not the icon box's centre: in the icon's
+ * 200×200 viewBox the bowl's foot sits at y=162, so the origin is 50% / 81%
+ * *of the view box* (`transform-box: view-box` is what makes those percentages
+ * resolve against the viewBox rather than the rendered 120px box). The bowl
+ * therefore tips on its foot, the way a real bowl does.
+ *
+ * Six half-swings at a decaying ±3.4°→±0.8° read as exactly three side-to-side
+ * rocks; the last frame is already the rest pose, so nothing snaps at the end,
+ * and the still pose is plain `rotate(0)`. The app-wide
+ * `prefers-reduced-motion` rule above would still this anyway; the explicit
+ * block below states it for this mark so the guarantee survives any narrowing of
+ * that rule.
+ */
+@keyframes bowl-rock {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(-3.4deg);
+  }
+  25% {
+    transform: rotate(3.2deg);
+  }
+  45% {
+    transform: rotate(-2.6deg);
+  }
+  63% {
+    transform: rotate(2.4deg);
+  }
+  80% {
+    transform: rotate(-1.4deg);
+  }
+  92% {
+    transform: rotate(0.8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.dw-bowl-rock {
+  transform-box: view-box;
+  transform-origin: 50% 81%;
+  animation: bowl-rock 4.5s cubic-bezier(0.42, 0, 0.58, 1) 120ms 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-bowl-rock {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------------------------ print */

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { ArrowLeft, BookOpen, X } from "lucide-react";
 import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
-import { BrandLockup } from "@/components/knowledge/BrandLockup";
 import { DepartmentSelect } from "@/components/knowledge/DepartmentSelect";
 import { SopFeedList } from "@/components/knowledge/SopFeedList";
 import { SopSearchHero } from "@/components/knowledge/SopSearchHero";
@@ -24,7 +23,6 @@ import type {
   Department,
   DepartmentCounts,
   KnowledgeArticle,
-  PortalView,
   StaffType,
 } from "@/types/portal";
 import { cx } from "@/lib/utils";
@@ -55,11 +53,17 @@ import { cx } from "@/lib/utils";
  * **Layout.** There is no master/detail shell here — the surface is a single
  * full-width column, the same no-sidebar architecture as the 7a SOP reader and
  * the bulletin board. A full-bleed dark header band (`#20241E`, the bulletin
- * hero's ground) anchors the top and carries the brand lockup, the portal
- * navigation, the write entry point, and the one search input on the page;
- * everything below it lives on the Clinical Light canvas inside a centered
- * workstation container. Selecting a row opens the 7a reader in place of the
- * feed — never beside it.
+ * hero's ground) anchors the top and carries the surface title treatment, the
+ * write entry point, and the one search input on the page; everything below it
+ * lives on the Clinical Light canvas inside a centered workstation container.
+ * Selecting a row opens the 7a reader in place of the feed — never beside it.
+ *
+ * The band carries **no brand lockup and no section navigation**: the viewer is
+ * already inside Dove Hub (the wordmark is in the global header) and the surfaces
+ * are switched from the header's own section menu, so repeating either here was
+ * noise on every surface. What is left is the surface's own identity — a Domine
+ * headline and a muted subtitle, the same treatment the Staff Directory band
+ * uses — plus the one thing the band is *for*: searching the corpus.
  *
  * **Nothing here is a permission boundary.** `staffType` picks the audience the
  * feed starts on — silently, with no control on the surface; every reader can
@@ -81,12 +85,6 @@ const RESULTS_SECTION_LABEL = "Search Results";
 const RESET_BUTTON_CLASS =
   "flex h-7 shrink-0 items-center rounded-md border border-[#5F6E00]/30 bg-white px-2.5 text-[12px] font-medium text-[#3F4A00] transition-colors hover:bg-[#AFBE23]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5F6E00]/45";
 
-/** The band's navigation targets, in reading order. */
-const NAV_ITEMS: readonly { view: PortalView; label: string }[] = [
-  { view: "bulletins", label: "Bulletins" },
-  { view: "knowledge", label: "Procedures" },
-];
-
 export interface KnowledgeHomeProps {
   /** Every article, published and draft. The feed itself only ever shows published ones. */
   articles: readonly KnowledgeArticle[];
@@ -99,12 +97,6 @@ export interface KnowledgeHomeProps {
   onQueryChange: (value: string) => void;
   /** The write entry point (the "New SOP" link), gated and owned by the portal shell. */
   listActions?: ReactNode;
-  /**
-   * The portal's section switch, so the band's Bulletins/Procedures navigation
-   * can move between surfaces. Optional: the surface renders its navigation
-   * regardless, and without a handler the links simply do not move the shell.
-   */
-  onNavigate?: (view: PortalView) => void;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   /** The reader pane, already resolved by the portal shell. */
@@ -120,7 +112,6 @@ export function KnowledgeHome({
   query,
   onQueryChange,
   listActions,
-  onNavigate,
   selectedId,
   onSelect,
   detail,
@@ -256,7 +247,6 @@ export function KnowledgeHome({
           onQueryChange={onQueryChange}
           inputRef={searchRef}
           actions={listActions}
-          onNavigate={onNavigate}
           countLabel={countLabel}
         />
 
@@ -324,8 +314,13 @@ export function KnowledgeHome({
 
 /**
  * The dark header band (`#20241E`, the bulletin hero's ground) at the top of the
- * surface: the brand lockup and the portal navigation on the top rule, the
- * "New SOP" write entry point beside them, and the single search hero beneath.
+ * surface: the surface's own title and subtitle on the left, the "New SOP" write
+ * entry point right-aligned on the same rule, and the single search hero beneath.
+ *
+ * Deliberately **no brand lockup and no section navigation** — see the surface
+ * docblock. What the band carries is the surface's identity and its one control.
+ * The title block is the same treatment as the Staff Directory band (Domine
+ * headline, muted subtitle beneath it) so the two read as one language.
  *
  * A compact utility header rather than a tall editorial banner (`py-6 sm:py-8`
  * against the hero's `py-8 md:py-10`), so the whole feed is on screen at 1080p.
@@ -337,49 +332,30 @@ function KnowledgeHeader({
   onQueryChange,
   inputRef,
   actions,
-  onNavigate,
   countLabel,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
   inputRef: RefObject<HTMLInputElement | null>;
   actions?: ReactNode;
-  onNavigate?: (view: PortalView) => void;
   countLabel: string;
 }) {
   return (
     <header className="border-b border-[rgba(175,190,35,0.30)] bg-[#20241E] text-white print:hidden">
       <div className={cx(CONTAINER, "py-6 sm:py-8")}>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <BrandLockup tone="light" />
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav aria-label="Portal sections" className="flex min-w-0 items-center gap-1">
-              {NAV_ITEMS.map((item) => {
-                const isCurrent = item.view === "knowledge";
-                return (
-                  <button
-                    key={item.view}
-                    type="button"
-                    aria-current={isCurrent ? "page" : undefined}
-                    onClick={() => onNavigate?.(item.view)}
-                    className={cx(
-                      "flex h-7 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#AFBE23]/50",
-                      isCurrent
-                        ? "bg-white/10 text-white"
-                        : "text-white/70 hover:bg-white/10 hover:text-white",
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
-            {actions}
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            <h1 className="dw-display text-[22px] font-bold leading-tight tracking-[-0.01em] text-white sm:text-[26px]">
+              Knowledge Base
+            </h1>
+            <p className="mt-1 text-[12.5px] text-white/60">
+              Standard operating procedures, current and searchable.
+            </p>
           </div>
+          {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
         </div>
 
-        <div className="mt-5 sm:mt-6">
+        <div className="mt-4">
           <SopSearchHero
             inputRef={inputRef}
             value={query}

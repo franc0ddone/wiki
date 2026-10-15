@@ -204,8 +204,11 @@ import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { BulletinActionsMenu } from "@/components/bulletin/PinnedStrip";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
-import { LivingDoveEmptyState } from "@/components/bulletin/LivingDove";
+import { LivingDove } from "@/components/bulletin/LivingDove";
+import { BulletinReaderEmptyState } from "@/components/bulletin/BulletinReaderEmptyState";
+import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
+import { PortalHeader } from "@/components/PortalHeader";
 import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
 import { SopFeedList } from "@/components/knowledge/SopFeedList";
 import {
@@ -1190,8 +1193,8 @@ check("the pinned section renders above the feed, and only an empty board shows 
   assert.ok(!nothing.includes("Pinned"), "an empty rail shows no pinned caption");
 });
 
-check("the living dove empty state is the 35-piece decorative brand mark", () => {
-  const html = renderToStaticMarkup(createElement(LivingDoveEmptyState));
+check("the living dove is still the 35-piece decorative brand mark", () => {
+  const html = renderToStaticMarkup(createElement(LivingDove));
 
   // Every silhouette of the source mosaic renders, each tagged with its part.
   assert.equal((html.match(/data-part="/g) ?? []).length, 35, "all 35 silhouettes render");
@@ -1208,9 +1211,6 @@ check("the living dove empty state is the 35-piece decorative brand mark", () =>
   assert.match(html, /class="dw-dove-piece"/, "each silhouette carries the hover class");
   assert.ok(!html.includes("requestAnimationFrame"), "no JavaScript animation loop");
 
-  // The quiet caption, and none of the showcase page around the mark.
-  assert.match(html, /Select a bulletin to read/);
-
   // The stylesheet — not the markup — owns the brand fill.
   const css = readFileSync(path.join(process.cwd(), "app", "globals.css"), "utf8");
   assert.match(css, /\.dw-dove-piece\s*\{[^}]*fill:\s*#AFBE23/, "silhouettes use the brand dove green");
@@ -1218,9 +1218,131 @@ check("the living dove empty state is the 35-piece decorative brand mark", () =>
   assert.ok(!css.includes("#B3C12D"), "the retired showcase green is gone");
 });
 
+check("the bulletin reader's empty state is the canonical empty bowl, not the dove", () => {
+  const html = renderToStaticMarkup(createElement(BulletinReaderEmptyState));
+
+  // The bowl: one rim ellipse plus its body and the heart inside it, in the
+  // square icon frame every empty-state accent uses — and none of the mosaic
+  // dove's 35 `data-part` silhouettes.
+  assert.match(html, /viewBox="0 0 200 200"/, "the bowl renders in the shared icon frame");
+  assert.match(html, /<ellipse/, "the bowl's rim is an ellipse");
+  assert.equal(html.includes("data-part="), false, "the mosaic dove must not be this state's mark");
+
+  // The same weight and colour as the board's and the Knowledge Home's accents.
+  assert.match(html, /opacity-55/, "the bowl carries the shared empty-state weight");
+  assert.match(html, /style="color:#5F6E00"/, "the bowl is dark green");
+
+  // Drawn as an illustration, not an accent: at least 2× the 44px the other two
+  // surfaces set their bowl at, so it carries a wide reading canvas on its own.
+  const box = html.match(/width="(\d+)" height="(\d+)"/);
+  const size = Number(box?.[1] ?? 0);
+  assert.ok(size >= 88, `the bowl must be scaled up as an illustration (got ${size}px)`);
+  assert.equal(size, Number(box?.[2] ?? -1), "the bowl stays square");
+
+  // Decorative mark, one line of copy, no controls.
+  assert.match(html, /aria-hidden="true"/, "the mark is decorative");
+  assert.ok(!html.includes("<button") && !html.includes("<a "), "the state is not interactive");
+  assert.match(html, /Select a bulletin to begin reading/, "the instruction is the new copy");
+  assert.equal(html.includes("Select a bulletin to read"), false, "the old copy is gone");
+
+  // It rocks once as it appears: the class is on the mark, the keyframes tip it
+  // on its own foot, the run is a single iteration, and reduced motion stills it.
+  assert.match(html, /class="dw-bowl-rock mx-auto mb-3 opacity-55"/, "the bowl carries the entrance rock");
+  const css = readFileSync(path.join(process.cwd(), "app", "globals.css"), "utf8");
+  const frames = css.match(/@keyframes bowl-rock\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.ok(frames.length > 0, "the rock keyframes exist");
+  const stops = [...frames.matchAll(/rotate\((-?[\d.]+)deg\)/g)].map((m) => Number(m[1]));
+  assert.equal(stops.length, 8, "eight stops: rest, six decaying swings, rest");
+  assert.equal(stops[0], 0, "the rock starts from rest");
+  assert.equal(stops[stops.length - 1], 0, "the rock settles still");
+  assert.ok(Math.max(...stops.map(Math.abs)) <= 5, "the rock is a nudge, not a wobble");
+  assert.match(css, /\.dw-bowl-rock\s*\{[^}]*transform-box:\s*view-box/, "the pivot is measured in the view box");
+  assert.match(css, /\.dw-bowl-rock\s*\{[^}]*transform-origin:\s*50% 81%/, "the bowl pivots on its own base");
+  assert.match(css, /\.dw-bowl-rock\s*\{[^}]*animation:\s*bowl-rock[^;]*\s1\s+both;/, "one run, never a loop");
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.dw-bowl-rock\s*\{\s*animation:\s*none;/,
+    "reduced motion stills the rock entirely",
+  );
+
+  // The board wires that state to "nothing selected", and never the dove.
+  const source = readFileSync(path.join(process.cwd(), "components", "OperationsHubClient.tsx"), "utf8");
+  assert.ok(source.includes("<BulletinReaderEmptyState />"), "the reader pane renders the bowl state");
+  assert.equal(source.includes("LivingDoveEmptyState"), false, "the dove empty state is retired");
+});
+
+check("the rail's boundary divider is hand-drawn, centred, and full strength", () => {
+  const divider = createElement(
+    "div",
+    { className: "flex select-none justify-center py-12 pointer-events-none" },
+    createElement(DoveLewisIcon, { className: "h-auto", color: "dark-green", name: "border-dashed", roughness: true, width: 240 }),
+  );
+
+  // The icon itself: six separate dashes of uneven length, each on its own
+  // baseline, each with its own weight — never one uniform `border-dashed` row.
+  const icon = renderToStaticMarkup(
+    createElement(DoveLewisIcon, { color: "dark-green", name: "border-dashed", roughness: true, width: 240 }),
+  );
+  assert.equal((icon.match(/<path/g) ?? []).length, 6, "six hand-placed dashes render");
+  assert.ok(icon.includes('stroke-width="2.8"') && icon.includes('stroke-width="3.2"'), "the dashes vary in weight");
+  assert.ok(/d="M20 11\.4 L64 11\.4"/.test(icon) && /d="M342 12\.5 L380 12\.5"/.test(icon), "the dashes sit on different baselines");
+  assert.equal(icon.includes('opacity="0.7"'), false, "the icon carries no opacity of its own");
+  assert.match(icon, /feDisplacementMap/, "the freehand roughness filter is applied");
+
+  // Centred: with a divider the leading group drops its own `mb-24`, so the
+  // mark's own symmetric padding is the whole gap — 48px either side of it.
+  const shellHtml = (leadingGroupDivider?: unknown) =>
+    renderToStaticMarkup(
+      createElement(MasterDetailShell<string>, {
+        items: ["feed-1"],
+        getId: (item: string) => item,
+        selectedId: null,
+        onSelect: () => {},
+        renderListItem: (item: string) => createElement("span", null, `feed:${item}`),
+        leadingGroup: {
+          label: "Pinned",
+          items: ["pinned-1"],
+          renderItem: (item: string) => createElement("span", null, `pinned:${item}`),
+        },
+        leadingGroupDivider: leadingGroupDivider as never,
+        detail: null,
+        listTitle: "Bulletin Board",
+        searchQuery: "",
+        onSearchChange: () => {},
+        searchPlaceholder: "Search notices",
+        searchLabel: "Search bulletins",
+        activeDepartment: "All" as const,
+        onDepartmentChange: () => {},
+        counts: {},
+        emptyListState: createElement("span", null, "NOTHING HERE"),
+        emptyDetailState: null,
+        detailLabel: "Bulletin reader",
+      }),
+    );
+
+  const withDivider = shellHtml(divider);
+  assert.match(withDivider, /class="flex select-none justify-center py-12 pointer-events-none"/, "the divider owns the gap");
+  assert.equal(withDivider.includes("mb-24"), false, "the leading group drops its margin while a divider is present");
+  assert.ok(
+    withDivider.indexOf("pinned:pinned-1") < withDivider.indexOf("py-12") &&
+      withDivider.indexOf("py-12") < withDivider.indexOf("feed:feed-1"),
+    "the divider renders between the two groups",
+  );
+
+  // Without one, the group keeps the plain margin it has always had.
+  assert.match(shellHtml(), /aria-label="Pinned" class="mb-24"/, "no divider leaves the group's own break intact");
+
+  // Full strength at the call site: no opacity utility anywhere on the rule.
+  const source = readFileSync(path.join(process.cwd(), "components", "OperationsHubClient.tsx"), "utf8");
+  const dividerSource = source.slice(source.indexOf("const PINNED_FEED_DIVIDER"), source.indexOf("export function OperationsHubClient"));
+  assert.ok(dividerSource.includes("justify-center py-12"), "the board's divider owns its symmetric gap");
+  assert.equal(dividerSource.includes("opacity-"), false, "the board's divider carries no opacity utility");
+  assert.ok(dividerSource.includes("roughness={true}"), "the board's divider asks for the hand-drawn pass");
+});
+
 check("the board opens with no selection, so the reader pane can empty out", () => {
   // The board no longer preselects the newest notice: `?bulletin=` seeds the
-  // selection, and its absence means "nothing selected" (the dove).
+  // selection, and its absence means "nothing selected" (the empty bowl).
   const source = readFileSync(path.join(process.cwd(), "components", "OperationsHubClient.tsx"), "utf8");
   assert.ok(
     /useState<string \| null>\(initialBulletinId\)/.test(source),
@@ -2636,7 +2758,20 @@ check("Feed Mode shows the Essential SOPs section, the department dropdown, and 
     html.indexOf("Canine Parvovirus Isolation Protocol") < html.indexOf("Code Blue: RECOVER Resuscitation Team Roles"),
     "the Essential section must be sorted by title",
   );
-  assert.ok(html.includes("Dove Hub"), "the brand lockup is missing");
+  // The band carries the surface's own identity, not Dove Hub's: the wordmark
+  // lives in the global header and the surfaces are switched from that header's
+  // menu, so neither repeats on the surface. What the band says is where you are.
+  assert.ok(html.includes("Knowledge Base"), "the surface title is missing from the band");
+  assert.ok(
+    html.includes("Standard operating procedures, current and searchable."),
+    "the band subtitle is missing",
+  );
+  assert.equal(html.includes("Dove Hub"), false, "the brand lockup must not repeat in the band");
+  assert.equal(
+    html.includes('aria-label="Portal sections"'),
+    false,
+    "the band must carry no section navigation",
+  );
   assert.ok(html.includes("Search all published SOPs"), "the search hero is missing");
   assert.ok(html.includes("Ctrl Space"), "the shortcut affordance is missing");
   // Recency: the most recently published fixture leads the feed. (The Essential
@@ -2646,6 +2781,74 @@ check("Feed Mode shows the Essential SOPs section, the department dropdown, and 
       html.indexOf("Chemotherapy Extravasation Response"),
     "the feed must lead with the most recently published procedure",
   );
+});
+
+check("the band's only action is the write entry point, never navigation", () => {
+  const html = renderKnowledgeHome({
+    listActions: createElement("a", { href: "/articles/new" }, "New SOP"),
+  });
+  assert.ok(html.includes("New SOP"), "the write entry point must render in the band");
+  assert.ok(
+    html.indexOf("Knowledge Base") < html.indexOf("New SOP"),
+    "the title treatment leads, the creation action is right-aligned beside it",
+  );
+  for (const navigational of ["Bulletins", ">Procedures<", "aria-current=\"page\""]) {
+    assert.equal(html.includes(navigational), false, `the band must not carry ${navigational}`);
+  }
+});
+
+check("the header's universal search starts as an icon-only control", () => {
+  const html = renderToStaticMarkup(
+    createElement(PortalHeader, {
+      activeView: "knowledge",
+      onViewChange: () => {},
+      onOpenSearch: () => {},
+    }),
+  );
+  assert.match(html, /aria-label="Search everything \(/, "the icon carries the accessible name");
+  assert.ok(html.includes('aria-expanded="false"'), "the folded control reports its state");
+  assert.ok(
+    html.includes('tabindex="-1"'),
+    "the folded field is out of the tab order, so the icon is the only stop",
+  );
+  // Presentation only: the field is still the universal-search entry point.
+  assert.ok(html.includes('placeholder="Search everything"'), "the unfolded field is still search");
+});
+
+check("the header's identity mark is the dove symbol, not a status dot", () => {
+  const html = renderToStaticMarkup(
+    createElement(PortalHeader, {
+      activeView: "bulletins",
+      onViewChange: () => {},
+      onOpenSearch: () => {},
+    }),
+  );
+
+  // The official standalone dove, used exactly as supplied.
+  assert.match(
+    html,
+    /src="\/_next\/image\?url=%2Fbrand%2Fdove-symbol\.png/,
+    "the header must load the dove symbol asset",
+  );
+  assert.equal(html.includes("dovelewis-logo"), false, "the header must not use the DoveLewis lockup");
+
+  // Sized to the ~34px header slot, and decorative: the wordmark names the product.
+  assert.match(html, /class="h-\[34px\] w-auto shrink-0"/, "the dove is sized to the header slot");
+  assert.match(html, /alt="" aria-hidden="true"/, "the mark is decorative, not a second title");
+  // The wordmark: title case in the display face (Domine), no all-caps treatment.
+  assert.match(html, /<h1 class="dw-display [^"]*">Dove Hub<\/h1>/, "the wordmark is Domine, title case");
+  assert.equal(html.includes("uppercase"), false, "the header must not force all caps");
+  // The subtitle is the sign-in page's tagline, in the same muted treatment.
+  assert.match(html, /Institutional knowledge/, "the subtitle reads institutional knowledge");
+  assert.equal(
+    html.includes("Clinical operations"),
+    false,
+    "the retired facility line must be gone",
+  );
+  assert.match(html, /class="truncate text-xs text-zinc-400"/, "the subtitle keeps its muted styling");
+
+  // The pulsing status dot the mark replaced is gone from the header entirely.
+  assert.equal(html.includes("animate-presence"), false, "the status dot must be gone");
 });
 
 check("the audience is silent: no control renders, and the feed still follows the staff type", () => {

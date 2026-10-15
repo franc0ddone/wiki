@@ -243,8 +243,14 @@ export interface MasterDetailShellProps<T> {
    * An optional accent drawn between the leading group and the feed — one
    * decorative element, and only when there is something on both sides of it
    * (a leading group with at least one row, *and* a feed below it). The shell
-   * stays brand-agnostic: the caller passes the node (the bulletin board's paw
-   * trail), so nothing brand-specific is baked in here. Omitted renders nothing.
+   * stays brand-agnostic: the caller passes the node (the bulletin board's
+   * dashed rule), so nothing brand-specific is baked in here. Omitted renders
+   * nothing.
+   *
+   * The node owns the whitespace it is centred in: the leading group drops its
+   * own bottom margin while a divider is present, so the gap between the two
+   * becomes the divider's padding and the mark sits in the middle of it rather
+   * than hugging either group.
    */
   leadingGroupDivider?: ReactNode;
   /** Rendered below the list inside the same scroll container (e.g. an expired tray). */
@@ -421,10 +427,16 @@ export function MasterDetailShell<T>({
           ) : (
             <>
               {leadingGroup && leadingGroup.items.length > 0 ? (
-                // `mb-24` (≈ one tile) makes the boundary between the leading
-                // group and the feed unmistakable — the caption alone read as too
-                // slight a break.
-                <section aria-label={leadingGroup.label} className="mb-24">
+                // The group's own separation from the feed. When the caller
+                // supplies a divider, *that* owns the whole gap and splits it
+                // evenly either side of itself, so a boundary mark can never sit
+                // low against one group; without one, the group keeps its plain
+                // `mb-24` (≈ one tile) so the caption alone still reads as the
+                // break it has always been.
+                <section
+                  aria-label={leadingGroup.label}
+                  className={leadingGroupDivider ? undefined : "mb-24"}
+                >
                   <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                     {leadingGroup.label}
                   </p>

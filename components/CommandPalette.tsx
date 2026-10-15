@@ -20,11 +20,19 @@ import { cx } from "@/lib/utils";
 import { DEPARTMENT_LABELS } from "@/types/portal";
 
 /**
- * Unified command palette. Owns the global `Ctrl+K` / `⌘K` shortcut.
+ * Unified command palette. Owns `Ctrl+K` / `⌘K` **while it is open** — it closes
+ * itself on the keystroke and stands down entirely while closed, because the
+ * header's search field owns that shortcut then (it unfolds on `⌘K` and hands
+ * what gets typed here).
  *
  * Searches procedures, bulletins, and people at once (grouped), highlights the
  * matched terms in titles and snippets, and recovers from empty results
  * (closest matches → synonym suggestions → a plain-language hint).
+ *
+ * `initialQuery` seeds the input for a caller that already has one — the
+ * header's unfolded field passes what was typed before the palette took over. It
+ * is read once, when the palette opens; everything after that is the palette's
+ * own query state, exactly as before.
  *
  * Dialog semantics: `role="dialog"` + `aria-modal`, focus trapped inside and
  * restored on close, `Esc` closes, `↑`/`↓` move through results with focus
@@ -72,35 +80,60 @@ export interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   index: SearchIndex;
   onOpenResult: (hit: SearchHit) => void;
+  /**
+   * The query to open with — the header's unfolded search field passes what was
+   * typed before handing over. Read once, on open.
+   */
+  initialQuery?: string;
 }
 
-export function CommandPalette({ open, onOpenChange, index, onOpenResult }: CommandPaletteProps) {
-  // The palette owns Ctrl/Cmd+K everywhere, including while typing in a field.
+export function CommandPalette({
+  open,
+  onOpenChange,
+  index,
+  onOpenResult,
+  initialQuery = "",
+}: CommandPaletteProps) {
+  /**
+   * Ctrl/Cmd+K closes an open palette. While it is closed this listener is not
+   * registered at all: the shortcut belongs to the header's search field then, so
+   * exactly one handler ever answers the keystroke.
+   */
   useEffect(() => {
+    if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
       if (event.altKey || event.shiftKey) return;
       event.preventDefault();
-      onOpenChange(!open);
+      onOpenChange(false);
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open, onOpenChange]);
 
   if (!open) return null;
-  return <PaletteDialog index={index} onClose={() => onOpenChange(false)} onOpenResult={onOpenResult} />;
+  return (
+    <PaletteDialog
+      index={index}
+      initialQuery={initialQuery}
+      onClose={() => onOpenChange(false)}
+      onOpenResult={onOpenResult}
+    />
+  );
 }
 
 function PaletteDialog({
   index,
+  initialQuery,
   onClose,
   onOpenResult,
 }: {
   index: SearchIndex;
+  initialQuery: string;
   onClose: () => void;
   onOpenResult: (hit: SearchHit) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [active, setActive] = useState(0);
   const debounced = useDebouncedValue(query, DEBOUNCE_MS);
   const recents = useSyncExternalStore(subscribeRecents, getRecentsSnapshot, getRecentsServerSnapshot);

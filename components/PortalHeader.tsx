@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import Image from "next/image";
 import { BookOpen, Check, ChevronDown, Megaphone, Search, Users } from "lucide-react";
 import type { PortalView } from "@/types/portal";
 import { useSearchShortcutLabel } from "@/lib/platform";
@@ -10,19 +11,39 @@ import { cx } from "@/lib/utils";
 /**
  * Single frosted navigation bar.
  *
- * Left: institutional identity with a live presence indicator.
- * Right: a discreet contextual menu that names the current section and opens a
- * floating popover to switch between the three surfaces. There is no tab bar.
+ * Left: institutional identity — the official dove symbol beside the wordmark.
+ * Right: the universal-search control, a discreet contextual menu that names the
+ * current section and opens a floating popover to switch between the three
+ * surfaces, and the viewer's account menu. There is no tab bar.
+ *
+ * **Universal search is icon-only until it is wanted.** The bar used to carry a
+ * full-width `Search everything ⌘K` field, which spent its width on a control
+ * nobody typed into directly: the search itself happens in the command palette.
+ * The control is now a single magnifier button that unfolds into a field on
+ * click (or `Ctrl/⌘ K`), hands the typed query to that same palette, and folds
+ * back to the icon on Escape — or on blur, while it is empty. Nothing about the
+ * search behind it changed: same index, same groups, same keyboard model, same
+ * logging.
  */
 
 export interface PortalHeaderProps {
   activeView: PortalView;
   onViewChange: (view: PortalView) => void;
-  /** Opens the command palette (which also owns the global Ctrl/Cmd+K shortcut). */
-  onOpenSearch?: () => void;
-  /** Product wordmark shown as the primary title. Rendered uppercase. */
+  /**
+   * Opens the command palette. Receives the query the unfolded field handed
+   * over, or `undefined` when the field was empty (the palette then opens on its
+   * own input, exactly as it always has).
+   */
+  onOpenSearch?: (query?: string) => void;
+  /**
+   * Product wordmark shown as the primary title, in the display face (Domine),
+   * title case.
+   */
   title?: string;
-  /** Subtle facility / product subtext under the wordmark. */
+  /**
+   * Subtle facility / product subtext under the wordmark. Defaults to the same
+   * "Institutional knowledge" line the sign-in page carries.
+   */
   facilityName?: string;
   /** Rendered at the far right of the bar, after the section menu (e.g. the account menu). */
   rightSlot?: ReactNode;
@@ -61,15 +82,57 @@ export function PortalHeader({
   onViewChange,
   onOpenSearch,
   title = "Dove Hub",
-  facilityName = "Clinical operations · Dove Lewis Emergency Animal Hospital",
+  facilityName = "Institutional knowledge",
   rightSlot,
 }: PortalHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+  /**
+   * Set while a typed query is being handed to the palette, so the blur that
+   * follows (the palette takes focus) does not fold the field away underneath
+   * it — the field has to stay mounted for focus to come back to it on close.
+   */
+  const handedOff = useRef(false);
   const menuId = useId();
+  const searchInputId = `${menuId}-search`;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const shortcutLabel = useSearchShortcutLabel();
+
+  const expandSearch = useCallback(() => {
+    setSearchExpanded(true);
+    // Focus after paint, so the field exists and the width transition starts.
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, []);
+
+  const collapseSearch = useCallback(() => {
+    handedOff.current = false;
+    setSearchValue("");
+    setSearchExpanded(false);
+  }, []);
+
+  /**
+   * `Ctrl/⌘ K` unfolds and focuses the field. The command palette owns the same
+   * keystroke *while it is open* (it closes itself); this listener stands down
+   * when any modal is up, so the two can never fight over one press.
+   */
+  useEffect(() => {
+    if (!onOpenSearch) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
+      if (event.altKey || event.shiftKey) return;
+      if (document.querySelector("[aria-modal='true']")) return;
+      event.preventDefault();
+      if (searchExpanded) collapseSearch();
+      else expandSearch();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onOpenSearch, searchExpanded, expandSearch, collapseSearch]);
 
   const activeIndex = Math.max(
     0,
@@ -145,40 +208,118 @@ export function PortalHeader({
       <div className="flex h-14 w-full items-center justify-between gap-6 px-4 sm:px-6">
         {/* Identity */}
         <div className="flex min-w-0 items-center gap-3">
-          <span aria-hidden="true" className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className="animate-presence absolute inset-0 rounded-full bg-[#0F766E]" />
-            <span className="relative h-2.5 w-2.5 rounded-full bg-[#0F766E] ring-2 ring-teal-100" />
-          </span>
+          {/*
+           * The official dove symbol — the standalone mark only, never the
+           * DoveLewis lockup whose brand text the wordmark beside it would
+           * duplicate. Used exactly as supplied (no recolour, no crop), sized to
+           * the ~34px header slot the graphic design package specifies, over the
+           * intrinsic dimensions so the aspect ratio is never stretched.
+           * Decorative: the <h1> below already names the product.
+           */}
+          <Image
+            src="/brand/dove-symbol.png"
+            alt=""
+            aria-hidden="true"
+            width={580}
+            height={553}
+            priority
+            className="h-[34px] w-auto shrink-0"
+          />
           <div className="min-w-0">
-            <h1 className="truncate text-[13px] font-bold uppercase leading-4 tracking-[0.06em] text-zinc-900">
+            {/*
+             * The wordmark: "Dove Hub" in Domine, the product's serif display
+             * face (`--font-display`, the same face the brand lockup and the
+             * sign-in wordmark use) — title case, never the all-caps treatment
+             * this bar used to carry. The all-caps letter-spacing went with the
+             * caps: it is replaced by the brand wordmark's own tracking, the
+             * value `BrandLockup` sets.
+             */}
+            <h1 className="dw-display truncate text-[13px] font-bold leading-4 tracking-[-0.01em] text-zinc-900">
               {title}
             </h1>
             <p className="truncate text-xs text-zinc-400">{facilityName}</p>
           </div>
         </div>
 
-        {/* Global search */}
+        {/* Universal search — a magnifier until it is wanted */}
         {onOpenSearch ? (
-          <button
-            type="button"
-            onClick={onOpenSearch}
-            aria-label={`Search everything (${shortcutLabel})`}
-            aria-keyshortcuts="Control+K Meta+K"
+          <div
             className={cx(
-              "ml-auto flex h-8 min-w-0 items-center gap-2 rounded-lg border border-zinc-300/60 bg-white px-2.5 text-[13px] text-zinc-500 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors",
-              "hover:border-zinc-400 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]/40 focus-visible:ring-offset-1",
-              "sm:w-64 md:w-72",
+              "relative ml-auto flex h-8 items-center overflow-hidden rounded-lg border transition-[width,border-color,background-color,box-shadow] duration-200 ease-out",
+              searchExpanded
+                ? "w-full border-zinc-300/60 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:w-64 md:w-72"
+                : "w-8 border-transparent",
             )}
           >
-            <Search size={14} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-zinc-400" />
-            <span className="hidden min-w-0 flex-1 truncate text-left sm:inline">Search everything</span>
-            <kbd
-              aria-hidden="true"
-              className="hidden h-[18px] shrink-0 items-center rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-[11px] font-medium tracking-wide text-zinc-500 sm:flex"
+            <button
+              ref={searchButtonRef}
+              type="button"
+              onClick={() => (searchExpanded ? searchInputRef.current?.focus() : expandSearch())}
+              aria-label={`Search everything (${shortcutLabel})`}
+              aria-keyshortcuts="Control+K Meta+K"
+              aria-expanded={searchExpanded}
+              aria-controls={searchInputId}
+              className={cx(
+                "absolute inset-y-0 left-0 z-10 flex w-8 items-center justify-center rounded-lg transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60",
+                searchExpanded
+                  ? "text-[#5F6E00]/70 hover:text-zinc-900"
+                  : "text-zinc-500 hover:bg-zinc-900/[0.04] hover:text-zinc-900",
+              )}
             >
-              {shortcutLabel}
-            </kbd>
-          </button>
+              <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <input
+              ref={searchInputRef}
+              id={searchInputId}
+              type="search"
+              value={searchValue}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSearchValue(value);
+                // A typed query is the universal search: hand it to the palette
+                // (the same one ⌘K opens) and leave the field empty behind it.
+                if (value.trim().length > 0) {
+                  handedOff.current = true;
+                  onOpenSearch(value);
+                  setSearchValue("");
+                }
+              }}
+              onFocus={() => {
+                handedOff.current = false;
+              }}
+              onBlur={() => {
+                if (searchValue.length > 0 || handedOff.current) return;
+                if (document.querySelector("[aria-modal='true']")) return;
+                collapseSearch();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  collapseSearch();
+                }
+              }}
+              placeholder="Search everything"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Search everything"
+              tabIndex={searchExpanded ? 0 : -1}
+              className={cx(
+                "h-full w-full bg-transparent pl-8 pr-2 text-[13px] text-zinc-800 placeholder:text-zinc-400",
+                "focus:outline-none",
+                searchExpanded ? "opacity-100" : "pointer-events-none opacity-0",
+                "transition-opacity duration-150",
+              )}
+            />
+            {searchExpanded && searchValue.length === 0 ? (
+              <kbd
+                aria-hidden="true"
+                className="pointer-events-none absolute right-1.5 top-1/2 hidden h-[18px] -translate-y-1/2 items-center rounded-[5px] border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-[11px] font-medium tracking-wide text-zinc-500 sm:flex"
+              >
+                {shortcutLabel}
+              </kbd>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Section menu */}

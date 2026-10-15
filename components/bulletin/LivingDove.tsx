@@ -3,7 +3,7 @@
 import { cx } from "@/lib/utils";
 
 /**
- * The living dove — the bulletin board's "no notice selected" empty state.
+ * The living dove — the brand's 35-silhouette mosaic mark, animated in CSS.
  *
  * Distilled from the interactive showcase page's `#doveMosaicGroup`: the same 35
  * interlocking silhouettes (wings, body, head, tail, and the hidden hearts),
@@ -20,8 +20,9 @@ import { cx } from "@/lib/utils";
  *    and scales slightly, through plain `:hover`.
  *
  * Decorative by contract: `aria-hidden`, no title, no focus target, no click
- * behaviour. It only ever renders on `lg`+ — the shell keeps the reader pane
- * hidden until a notice is chosen, so below `lg` the mark is never shown.
+ * behaviour. It is no longer the bulletin reader's empty state (that surface
+ * shows the canonical empty bowl) and nothing renders it today — it stays in
+ * the codebase as the standalone animated mark.
  */
 
 type DovePart = "wing" | "body" | "head" | "tail" | "heart";
@@ -76,6 +77,11 @@ const DOVE_PIECES: readonly DovePiece[] = [
  * The dove alone: a decorative SVG. Size is fixed at ~280px wide (the source
  * viewBox is 500x560, so the height follows the aspect ratio); the fill and the
  * hover/breathe motion all live in CSS.
+ *
+ * **No longer an empty state.** It used to be the bulletin reader's "nothing
+ * selected" placeholder; that surface now shows the canonical empty bowl
+ * (`components/bulletin/BulletinReaderEmptyState`). The mark itself is kept,
+ * unchanged and still exported, for wherever the animated dove is wanted.
  */
 export function LivingDove({ className }: { className?: string }) {
   return (
@@ -94,18 +100,4 @@ export function LivingDove({ className }: { className?: string }) {
   );
 }
 
-/**
- * The reading pane's empty state: the dove, centred, with one quiet line of
- * muted copy beneath it — the same voice and weight as the board's other empty
- * states. Nothing else.
- */
-export function LivingDoveEmptyState() {
-  return (
-    <div className="flex flex-col items-center gap-5 text-center">
-      <LivingDove />
-      <p className="text-[12.5px] leading-5 text-zinc-500">Select a bulletin to read</p>
-    </div>
-  );
-}
-
-export default LivingDoveEmptyState;
+export default LivingDove;

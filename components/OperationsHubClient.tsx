@@ -18,8 +18,8 @@ import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { FeedLoader } from "@/components/bulletin/FeedLoader";
-import { LivingDoveEmptyState } from "@/components/bulletin/LivingDove";
-import { DirectoryGrid } from "@/components/DirectoryGrid";
+import { BulletinReaderEmptyState } from "@/components/bulletin/BulletinReaderEmptyState";
+import { StaffDirectory } from "@/components/directory/StaffDirectory";
 import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
 import { MarkdownReader } from "@/components/MarkdownReader";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
@@ -78,9 +78,9 @@ const BulletinComposer = dynamic(() => import("@/components/bulletin/BulletinCom
  *
  * The knowledge view is the **Knowledge Home** surface (prompt 7c), a
  * component of its own: `KnowledgeHome` owns the full-width clinical surface —
- * its dark header band, the feed, the audience switcher, the Essential SOPs
- * group, and both of its modes. This shell supplies the datasets, the index,
- * the section switch, the selection, and the reader pane.
+ * its dark header band (surface title, search hero, counter), the feed, the
+ * audience switcher, the Essential SOPs group, and both of its modes. This shell
+ * supplies the datasets, the index, the selection, and the reader pane.
  */
 
 export interface BulletinBoardProps {
@@ -115,7 +115,7 @@ export interface OperationsHubClientProps {
   initialArticleSlug?: string | null;
   /**
    * The notice to open on load, from `?bulletin=<id>`. Absent means "nothing
-   * selected" — the reader pane shows the living-dove empty state rather than
+   * selected" — the reader pane shows the empty-bowl empty state rather than
    * defaulting to the newest notice, so the board opens calm and link-shareable.
    */
   initialBulletinId?: string | null;
@@ -559,14 +559,26 @@ const SEARCH_DEBOUNCE_MS = 150;
  * `MasterDetailShell`'s `leadingGroupDivider`). `border-dashed` is the single
  * dashed row that used to ride inside `borders-set`, on its own in a 400×24
  * box; held at a fixed 240px rather than the element's full bleed, so it reads
- * as a whisper rather than a banner. `dark-green` at `opacity-35` keeps it
- * crisp on the Clinical Light canvas, `roughness={false}` keeps Chromium from
- * repainting a displacement filter on every scroll frame, and it carries no
- * `title`, so the icon marks itself `aria-hidden`/`role="presentation"`.
+ * as a whisper rather than a banner.
+ *
+ * Three things make it what it is:
+ *
+ *  - **Hand-drawn.** `roughness` is on, so the shared freehand displacement
+ *    filter of `DoveLewisIcon` applies on top of the row's already irregular
+ *    dash lengths, gaps and baselines: organic, never a CSS `border-dashed`.
+ *  - **Centred in its whitespace.** The wrapper owns the whole gap between the
+ *    two groups as symmetric padding (`py-12`), and the shell drops the leading
+ *    group's own `mb-24` while this divider is present — so the rule sits in the
+ *    middle of the whitespace rather than anchored against either group's edge.
+ *  - **Full strength.** No opacity utility, and the icon carries none of its
+ *    own either: `dark-green` at 100%, crisp and legible beside the rows.
+ *
+ * It carries no `title`, so the icon marks itself `aria-hidden`/
+ * `role="presentation"`, and the wrapper is `aria-hidden` besides.
  */
 const PINNED_FEED_DIVIDER = (
-  <div className="my-3 flex justify-center pointer-events-none select-none" aria-hidden="true">
-    <DoveLewisIcon className="opacity-35 h-auto" color="dark-green" name="border-dashed" roughness={false} width={240} />
+  <div className="flex select-none justify-center py-12 pointer-events-none" aria-hidden="true">
+    <DoveLewisIcon className="h-auto" color="dark-green" name="border-dashed" roughness={true} width={240} />
   </div>
 );
 
@@ -598,10 +610,22 @@ export function OperationsHubClient({
   /**
    * The reading-pane selection, seeded from the URL (`?bulletin=<id>`) and kept
    * in step with it by `selectBulletin` below. Landing with no param selects
-   * nothing — the pane shows the living-dove empty state.
+   * nothing — the pane shows the empty-bowl empty state.
    */
   const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(initialBulletinId);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  /**
+   * The query the header's unfolded search field handed over, if any. Cleared
+   * whenever the palette closes, so reopening it always starts empty unless a
+   * fresh hand-off seeded it.
+   */
+  const [paletteQuery, setPaletteQuery] = useState("");
+
+  /** The header's search field and ⌘K both land here: open universal search. */
+  const openUniversalSearch = useCallback((query?: string) => {
+    setPaletteQuery(query ?? "");
+    setPaletteOpen(true);
+  }, []);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [personRequest, setPersonRequest] = useState<{ memberId: string; nonce: number } | null>(null);
   const pendingAnchor = useRef<string | null>(null);
@@ -893,9 +917,9 @@ export function OperationsHubClient({
   const feedHasMore = !isFiltered && feedCursor !== null;
   /**
    * Whether the *board* holds any notice at all (the loaded pinned section plus
-   * the feed). The living dove is the "nothing selected" state, not the "nothing
-   * posted" state: with no notices at all the board's own empty-bowl state stands
-   * in instead.
+   * the feed). The empty bowl is the "nothing selected" state, not the "nothing
+   * posted" state: with no notices at all the board's own empty state — the same
+   * bowl above a plate and copy — stands in instead.
    */
   const boardHasBulletins = pinnedList.length > 0 || feedList.length > 0;
 
@@ -918,15 +942,17 @@ export function OperationsHubClient({
   );
 
   /* Staff directory */
+  /**
+   * The directory surface filters the roster itself (`lib/directory/roster.ts`)
+   * — it owns its own query field, department dropdown and search semantics, the
+   * same way the Knowledge Home does. The shell keeps only the ranked list the
+   * dead-search telemetry counts, so `searchSurface(…, "staff", …)` and the
+   * directory never disagree about how many people a query reaches.
+   */
   const searchedStaff = useMemo(
     () => rankBy(staff, searchSurface(searchIndex, "staff", effectiveQuery)),
     [staff, searchIndex, effectiveQuery],
   );
-  const filteredStaff = useMemo(
-    () => searchedStaff.filter((member) => matchesDepartment(member.departments, activeDepartment)),
-    [searchedStaff, activeDepartment],
-  );
-  const staffCounts = useMemo(() => buildCounts(searchedStaff), [searchedStaff]);
 
   // Dead-search telemetry: one fire-and-forget log per settled query (>= 3 chars).
   const activeSurface: SearchSurface =
@@ -949,7 +975,7 @@ export function OperationsHubClient({
       <PortalHeader
         activeView={activeView}
         onViewChange={handleViewChange}
-        onOpenSearch={() => setPaletteOpen(true)}
+        onOpenSearch={openUniversalSearch}
         rightSlot={
           viewerRole ? (
             <AuthorAccessMenu
@@ -1038,7 +1064,7 @@ export function OperationsHubClient({
             }
             emptyDetailState={
               boardHasBulletins ? (
-                <LivingDoveEmptyState />
+                <BulletinReaderEmptyState />
               ) : (
                 <EmptyState
                   accent
@@ -1068,7 +1094,6 @@ export function OperationsHubClient({
             staffType={viewerStaffType}
             query={searchQuery}
             onQueryChange={setSearchQuery}
-            onNavigate={handleViewChange}
             listActions={
               isAuthor ? (
                 <Link
@@ -1100,23 +1125,34 @@ export function OperationsHubClient({
         ) : null}
 
         {activeView === "directory" ? (
-          <DirectoryGrid
-            staff={filteredStaff}
-            totalCount={staff.length}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            activeDepartment={activeDepartment}
-            onDepartmentChange={setActiveDepartment}
-            counts={staffCounts}
+          /*
+           * The Staff Directory surface: a full-width clinical surface in the
+           * Knowledge Home's architecture — its own dark hero band with the
+           * brand lockup and section navigation, the one search field on the
+           * page, the department dropdown, the self check-in toggle, and the
+           * HERE TODAY / ALL STAFF sections with inline row expansion. It owns
+           * its own filtering from the whole roster; the shell supplies the
+           * roster, the shared query (so the palette agrees), and the section
+           * switch.
+           */
+          <StaffDirectory
+            staff={staff}
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
             openRequest={personRequest}
+            viewer={viewer}
           />
         ) : null}
       </main>
 
       <CommandPalette
         open={paletteOpen}
-        onOpenChange={setPaletteOpen}
+        onOpenChange={(next) => {
+          setPaletteOpen(next);
+          if (!next) setPaletteQuery("");
+        }}
         index={searchIndex}
+        initialQuery={paletteQuery}
         onOpenResult={handleOpenResult}
       />
 
