@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { ArrowLeft, BookOpen, X } from "lucide-react";
+import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
 import { AudienceSwitcher } from "@/components/knowledge/AudienceSwitcher";
 import { BrandLockup } from "@/components/knowledge/BrandLockup";
 import { DepartmentChips } from "@/components/knowledge/DepartmentChips";
@@ -215,7 +216,15 @@ export function KnowledgeHome({
     return (
       <div className="dw-knowledge flex min-h-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
         <div className="shrink-0 border-b border-zinc-200 bg-white print:hidden">
-          <div className={cx(CONTAINER, "flex items-center py-2")}>
+          {/*
+           * The back control sits on the bar's own left padding, in the same
+           * `px-4 sm:px-6 md:px-8` rhythm as the reader top bar stacked directly
+           * beneath it. It used to ride inside the centered `CONTAINER`
+           * (`mx-auto max-w-5xl`), which stranded it hundreds of pixels in from
+           * the edge on a wide display; the reading column below stays centered,
+           * the chrome does not.
+           */}
+          <div className="flex items-center px-4 py-2 sm:px-6 md:px-8">
             <button
               type="button"
               onClick={() => onSelect(null)}
@@ -537,6 +546,13 @@ function EmptyPanel({
 }) {
   return (
     <div className="flex max-w-xs flex-col items-center gap-2 text-center">
+      {/*
+       * The brand bowl above the copy — the same accent, at the same weight, as
+       * the bulletin board's empty states, so the two surfaces empty out the same
+       * way. The plate and the copy below it are untouched: this is an accent on
+       * the state, not a redesign of it.
+       */}
+      <DoveLewisIcon className="mx-auto mb-3 opacity-55" color="dark-green" name="empty-bowl" roughness={true} size={44} />
       <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-zinc-300/60 bg-white text-zinc-400 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
         <BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />
       </span>

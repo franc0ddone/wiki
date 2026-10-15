@@ -76,14 +76,26 @@ export function ReaderTopBar({
         {/* Breadcrumbs — one truncated line, never a stacked mess.
             A <span>, not a <p>: the global `p { text-wrap: pretty }` rule in
             globals.css is unlayered and would otherwise beat `.truncate`'s
-            layered `white-space: nowrap`, wrapping the crumbs. */}
+            layered `white-space: nowrap`, wrapping the crumbs.
+
+            The segments are joined by a 12px paw mark in dove-green at 60%
+            opacity — a quiet separator, not a brand mark, so it is inline SVG
+            here rather than a `DoveLewisIcon`. The wrapper is `aria-hidden`, so
+            a screen reader hears the trail as `Knowledge base Emergency Sepsis
+            Recognition` with no separator noise. */}
         <nav aria-label="Breadcrumb" className="min-w-0 flex-1 overflow-hidden">
           <span className="block truncate whitespace-nowrap text-[13px] leading-5 text-zinc-500">
             {breadcrumbs.map((crumb, index) => (
               <span key={`${crumb}-${index}`}>
                 {index > 0 ? (
-                  <span aria-hidden="true" className="px-1.5 text-zinc-300">
-                    ·
+                  <span aria-hidden="true" className="mx-1 inline-flex items-center text-[#5F6E00]/60">
+                    <svg viewBox="-20 -26 40 40" width="12" height="12" fill="currentColor" aria-hidden="true">
+                      <ellipse cx="0" cy="6" rx="9" ry="7" />
+                      <circle cx="-11" cy="-6" r="3.5" />
+                      <circle cx="-4" cy="-11" r="3.5" />
+                      <circle cx="4" cy="-11" r="3.5" />
+                      <circle cx="11" cy="-6" r="3.5" />
+                    </svg>
                   </span>
                 ) : null}
                 {index === breadcrumbs.length - 1 ? (

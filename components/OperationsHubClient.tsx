@@ -14,9 +14,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
+import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { FeedLoader } from "@/components/bulletin/FeedLoader";
+import { LivingDoveEmptyState } from "@/components/bulletin/LivingDove";
 import { DirectoryGrid } from "@/components/DirectoryGrid";
 import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
 import { MarkdownReader } from "@/components/MarkdownReader";
@@ -111,6 +113,12 @@ export interface OperationsHubClientProps {
   authoredBulletinIds?: readonly string[];
   /** Open this procedure on load (`/procedures/<slug>` redirects here). */
   initialArticleSlug?: string | null;
+  /**
+   * The notice to open on load, from `?bulletin=<id>`. Absent means "nothing
+   * selected" — the reader pane shows the living-dove empty state rather than
+   * defaulting to the newest notice, so the board opens calm and link-shareable.
+   */
+  initialBulletinId?: string | null;
   /** The viewer's own latest author-access request (present for `staff` only). */
   authorRequest?: RoleRequestSummary | null;
   /** The open author-access queue (present for `clinical_lead`+ only). */
@@ -243,9 +251,33 @@ function MetaItem({
   );
 }
 
-function EmptyState({ icon, title, message }: { icon: ReactNode; title: string; message: string }) {
+/**
+ * The board's empty state.
+ *
+ * `accent` is the one brand mark on this surface, and it is opt-in: the three
+ * states the brief names as "the bulletin empty states" (an empty board, a
+ * filtered-to-zero rail, a search with no hits) all render through the list
+ * empty state, while the reader pane's "No notice selected" placeholder is a
+ * different thing — a rail and its canvas are on screen at the same time, and
+ * two bowls at once would read as noise rather than a whisper. The plate and
+ * the copy are untouched either way.
+ */
+function EmptyState({
+  icon,
+  title,
+  message,
+  accent = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  message: string;
+  accent?: boolean;
+}) {
   return (
     <div className="flex max-w-xs flex-col items-center gap-2 text-center">
+      {accent ? (
+        <DoveLewisIcon className="mx-auto mb-3 opacity-55" color="dark-green" name="empty-bowl" roughness={true} size={44} />
+      ) : null}
       <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-zinc-300/60 bg-white text-zinc-400 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
         {icon}
       </span>
@@ -517,6 +549,27 @@ function rankBy<T extends { id: string }>(items: readonly T[], order: readonly s
 
 const SEARCH_DEBOUNCE_MS = 150;
 
+/**
+ * The board's single brand accent: one dashed rule, drawn between the pinned
+ * section and the feed.
+ *
+ * It is a *boundary* mark, not a rule for the whole rail, so it is only ever
+ * handed to the shell — the shell renders it solely when there is a pinned
+ * group with at least one row *and* a feed beneath it (see
+ * `MasterDetailShell`'s `leadingGroupDivider`). `border-dashed` is the single
+ * dashed row that used to ride inside `borders-set`, on its own in a 400×24
+ * box; held at a fixed 240px rather than the element's full bleed, so it reads
+ * as a whisper rather than a banner. `dark-green` at `opacity-35` keeps it
+ * crisp on the Clinical Light canvas, `roughness={false}` keeps Chromium from
+ * repainting a displacement filter on every scroll frame, and it carries no
+ * `title`, so the icon marks itself `aria-hidden`/`role="presentation"`.
+ */
+const PINNED_FEED_DIVIDER = (
+  <div className="my-3 flex justify-center pointer-events-none select-none" aria-hidden="true">
+    <DoveLewisIcon className="opacity-35 h-auto" color="dark-green" name="border-dashed" roughness={false} width={240} />
+  </div>
+);
+
 export function OperationsHubClient({
   articles,
   board,
@@ -527,6 +580,7 @@ export function OperationsHubClient({
   viewer = null,
   authoredBulletinIds = [],
   initialArticleSlug = null,
+  initialBulletinId = null,
   authorRequest = null,
   roleRequests = [],
 }: OperationsHubClientProps) {
@@ -541,9 +595,12 @@ export function OperationsHubClient({
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
     () => articles.find((article) => article.slug === initialArticleSlug)?.id ?? null,
   );
-  const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(
-    board.pinned[0]?.id ?? board.items[0]?.id ?? null,
-  );
+  /**
+   * The reading-pane selection, seeded from the URL (`?bulletin=<id>`) and kept
+   * in step with it by `selectBulletin` below. Landing with no param selects
+   * nothing — the pane shows the living-dove empty state.
+   */
+  const [selectedBulletinId, setSelectedBulletinId] = useState<string | null>(initialBulletinId);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [personRequest, setPersonRequest] = useState<{ memberId: string; nonce: number } | null>(null);
@@ -582,6 +639,22 @@ export function OperationsHubClient({
   const isFiltered = searchQuery.trim().length > 0 || activeDepartment !== "All";
 
   /**
+   * Selection is mirrored into the URL (`?bulletin=<id>`) so a reading-pane
+   * state is shareable and survives a refresh. `history.replaceState` is
+   * deliberate: the portal is `force-dynamic`, so a `router.replace` would make
+   * every notice click re-run the page's three database reads. This updates the
+   * address bar — and therefore what a reload restores — with no navigation and
+   * no refetch. Other query params are preserved.
+   */
+  const selectBulletin = useCallback((id: string | null) => {
+    setSelectedBulletinId(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("bulletin", id);
+    else url.searchParams.delete("bulletin");
+    window.history.replaceState(null, "", url.toString());
+  }, []);
+
+  /**
    * Re-fetch the board to match the current mode: the whole feed while a filter
    * is active, otherwise the first page. Used after every write.
    */
@@ -592,12 +665,12 @@ export function OperationsHubClient({
         setPinnedList(page.pinned);
         setFeedList(page.items);
         setFeedCursor(page.next_cursor);
-        if (preferId) setSelectedBulletinId(preferId);
+        if (preferId) selectBulletin(preferId);
       } catch {
         // Keep the current list; the mutation itself already reported any error.
       }
     },
-    [isFiltered],
+    [isFiltered, selectBulletin],
   );
 
   /**
@@ -637,21 +710,21 @@ export function OperationsHubClient({
     async (created: Bulletin) => {
       setComposer(null);
       setAuthoredIds((current) => (current.includes(created.id) ? current : [...current, created.id]));
-      setSelectedBulletinId(created.id);
+      selectBulletin(created.id);
       setBulletinRevision((current) => current + 1);
       await refreshBoard(created.id);
     },
-    [refreshBoard],
+    [refreshBoard, selectBulletin],
   );
 
   const handleSaved = useCallback(
     async (saved: Bulletin) => {
       setComposer(null);
-      setSelectedBulletinId(saved.id);
+      selectBulletin(saved.id);
       setBulletinRevision((current) => current + 1);
       await refreshBoard(saved.id);
     },
-    [refreshBoard],
+    [refreshBoard, selectBulletin],
   );
 
   /**
@@ -681,10 +754,10 @@ export function OperationsHubClient({
       }
       setPinnedList((current) => current.filter((entry) => entry.id !== bulletin.id));
       setFeedList((current) => current.filter((entry) => entry.id !== bulletin.id));
-      setSelectedBulletinId(null);
+      selectBulletin(null);
       await refreshBoard();
     },
-    [refreshBoard],
+    [refreshBoard, selectBulletin],
   );
 
   const isAuthor = viewerRole !== null && roleAtLeast(viewerRole, "author");
@@ -710,7 +783,7 @@ export function OperationsHubClient({
 
   const openBulletin = (bulletinId: string) => {
     handleViewChange("bulletins");
-    setSelectedBulletinId(bulletinId);
+    selectBulletin(bulletinId);
   };
 
   const openPerson = (memberId: string) => {
@@ -818,6 +891,13 @@ export function OperationsHubClient({
   );
   /** Another page exists only while browsing — a filter has already loaded them all. */
   const feedHasMore = !isFiltered && feedCursor !== null;
+  /**
+   * Whether the *board* holds any notice at all (the loaded pinned section plus
+   * the feed). The living dove is the "nothing selected" state, not the "nothing
+   * posted" state: with no notices at all the board's own empty-bowl state stands
+   * in instead.
+   */
+  const boardHasBulletins = pinnedList.length > 0 || feedList.length > 0;
 
   /* Knowledge Home (prompt 7c) */
   /**
@@ -899,7 +979,8 @@ export function OperationsHubClient({
             }
             getId={(bulletin) => bulletin.id}
             selectedId={selectedBulletin?.id ?? null}
-            onSelect={setSelectedBulletinId}
+            onSelect={selectBulletin}
+            leadingGroupDivider={PINNED_FEED_DIVIDER}
             listTitle="Bulletin Board"
             listActions={
               isAuthor ? (
@@ -949,17 +1030,23 @@ export function OperationsHubClient({
             detailLabel="Bulletin reader"
             emptyListState={
               <EmptyState
+                accent
                 icon={<Megaphone size={14} strokeWidth={1.75} aria-hidden="true" />}
                 title={noMatchTitle}
                 message={noMatchMessage}
               />
             }
             emptyDetailState={
-              <EmptyState
-                icon={<Megaphone size={14} strokeWidth={1.75} aria-hidden="true" />}
-                title="No notice selected"
-                message="Choose a notice from the list to read it here."
-              />
+              boardHasBulletins ? (
+                <LivingDoveEmptyState />
+              ) : (
+                <EmptyState
+                  accent
+                  icon={<Megaphone size={14} strokeWidth={1.75} aria-hidden="true" />}
+                  title={noMatchTitle}
+                  message={noMatchMessage}
+                />
+              )
             }
           />
         ) : null}

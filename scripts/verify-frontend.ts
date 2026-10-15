@@ -204,6 +204,7 @@ import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinRowBadges } from "@/components/bulletin/BulletinRowBadges";
 import { BulletinActionsMenu } from "@/components/bulletin/PinnedStrip";
 import { BulletinDetail } from "@/components/bulletin/BulletinDetail";
+import { LivingDoveEmptyState } from "@/components/bulletin/LivingDove";
 import { MasterDetailShell } from "@/components/MasterDetailShell";
 import { KnowledgeHome } from "@/components/knowledge/KnowledgeHome";
 import { SopFeedList } from "@/components/knowledge/SopFeedList";
@@ -1187,6 +1188,45 @@ check("the pinned section renders above the feed, and only an empty board shows 
   const nothing = renderRail([], []);
   assert.ok(nothing.includes("NOTHING HERE"));
   assert.ok(!nothing.includes("Pinned"), "an empty rail shows no pinned caption");
+});
+
+check("the living dove empty state is the 35-piece decorative brand mark", () => {
+  const html = renderToStaticMarkup(createElement(LivingDoveEmptyState));
+
+  // Every silhouette of the source mosaic renders, each tagged with its part.
+  assert.equal((html.match(/data-part="/g) ?? []).length, 35, "all 35 silhouettes render");
+  for (const part of ["wing", "body", "head", "tail", "heart"]) {
+    assert.ok(html.includes(`data-part="${part}"`), `the ${part} silhouettes are present`);
+  }
+
+  // Decorative: hidden from assistive tech, and not a focus target or a control.
+  assert.match(html, /aria-hidden="true"/, "the mark is decorative");
+  assert.ok(!html.includes("<button") && !html.includes("<a "), "the mark is not interactive");
+
+  // Motion lives in CSS: the group breathes, each silhouette can highlight.
+  assert.match(html, /class="dw-dove-breathe"/, "the group carries the breathe animation");
+  assert.match(html, /class="dw-dove-piece"/, "each silhouette carries the hover class");
+  assert.ok(!html.includes("requestAnimationFrame"), "no JavaScript animation loop");
+
+  // The quiet caption, and none of the showcase page around the mark.
+  assert.match(html, /Select a bulletin to read/);
+
+  // The stylesheet — not the markup — owns the brand fill.
+  const css = readFileSync(path.join(process.cwd(), "app", "globals.css"), "utf8");
+  assert.match(css, /\.dw-dove-piece\s*\{[^}]*fill:\s*#AFBE23/, "silhouettes use the brand dove green");
+  assert.match(css, /\.dw-dove-piece:hover\s*\{[^}]*fill:\s*#5F6E00/, "hover uses the brand deep green");
+  assert.ok(!css.includes("#B3C12D"), "the retired showcase green is gone");
+});
+
+check("the board opens with no selection, so the reader pane can empty out", () => {
+  // The board no longer preselects the newest notice: `?bulletin=` seeds the
+  // selection, and its absence means "nothing selected" (the dove).
+  const source = readFileSync(path.join(process.cwd(), "components", "OperationsHubClient.tsx"), "utf8");
+  assert.ok(
+    /useState<string \| null>\(initialBulletinId\)/.test(source),
+    "the selection is seeded from the URL param",
+  );
+  assert.ok(!source.includes("pinned[0]?.id"), "the board must not default to the newest notice");
 });
 
 check("the detail states the departments once, and the actions menu is the author's alone", () => {

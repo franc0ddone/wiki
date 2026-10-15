@@ -44,7 +44,7 @@ export const dynamic = "force-dynamic";
 export default async function PortalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ article?: string | string[] }>;
+  searchParams: Promise<{ article?: string | string[]; bulletin?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -74,6 +74,10 @@ export default async function PortalPage({
     : [];
 
   const articleParam = Array.isArray(params.article) ? params.article[0] : params.article;
+  // `?bulletin=<id>` opens the board with that notice already in the reading
+  // pane; absent means "nothing selected" — the pane shows the living-dove
+  // empty state (see `OperationsHubClient`).
+  const bulletinParam = Array.isArray(params.bulletin) ? params.bulletin[0] : params.bulletin;
 
   return (
     <OperationsHubClient
@@ -86,6 +90,7 @@ export default async function PortalPage({
       viewer={{ name: session.user.name ?? "", email: session.user.email ?? "" }}
       authoredBulletinIds={authoredBulletinIds}
       initialArticleSlug={articleParam ?? null}
+      initialBulletinId={bulletinParam ?? null}
       authorRequest={authorRequest}
       roleRequests={roleRequests}
     />

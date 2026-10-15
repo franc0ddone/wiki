@@ -249,6 +249,48 @@ input[type="search"]::-webkit-search-decoration {
   animation: palette-in 140ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
+/* -------------------------------------------------------------- living dove */
+
+/*
+ * The bulletin board's "nothing selected" mark (`components/bulletin/LivingDove`).
+ *
+ * Motion is CSS only — there is no requestAnimationFrame loop — so the mark
+ * costs no JavaScript and cannot jank while the reader scrolls the rail.
+ * `.dw-dove-breathe` carries the whole group on a slow translateY; each
+ * silhouette scales on hover through its own transform. The two compose because
+ * they are different elements — the parent never fights the per-path hover.
+ * `.dw-dove-piece` is the brand dove green; hover darkens toward the brand deep
+ * green. The app-wide `prefers-reduced-motion` rule above already stills both.
+ */
+@keyframes dove-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.dw-dove-breathe {
+  animation: dove-breathe 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.dw-dove-piece {
+  fill: #AFBE23;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    fill 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dw-dove-piece:hover {
+  fill: #5F6E00;
+  transform: scale(1.12);
+}
+
 /* ------------------------------------------------------------------ print */
 
 /*

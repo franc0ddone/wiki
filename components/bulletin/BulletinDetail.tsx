@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { MarkdownReader } from "@/components/MarkdownReader";
+import { DoveLewisIcon } from "@/components/brand/DoveLewisIcon";
 import { ExpiryChip, UrgentChip } from "@/components/bulletin/ExpiryChip";
 import { BulletinHero } from "@/components/bulletin/BulletinHero";
 import { BulletinHeroImage } from "@/components/bulletin/BulletinHeroImage";
@@ -303,6 +304,25 @@ export function BulletinDetail({
     </div>
   );
 
+  /**
+   * The detail view's one accent: the paw trail that closes the hero and opens
+   * the body.
+   *
+   * It sits at the very end of the reader's header block — under the calling
+   * card (and its optional banner, when there is one) and above the first body
+   * block, which is the only boundary in this pane. The trail is drawn 500×80,
+   * so it is held at a fixed 240px: full-bleed it would out-shout the hero it
+   * is meant to follow. `dark-green` at `opacity-35` for contrast on the
+   * Clinical Light canvas, `roughness={false}` so Chromium never repaints a
+   * displacement filter while the notice scrolls, and no `title`, so the icon
+   * marks itself `aria-hidden`/`role="presentation"`.
+   */
+  const heroDivider = (
+    <div className="my-3 flex justify-center pointer-events-none select-none" aria-hidden="true">
+      <DoveLewisIcon className="opacity-35 h-auto" color="dark-green" name="border-paw-trail" roughness={false} width={240} />
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-[72rem] px-4 py-6 sm:px-6 md:px-8 md:py-10">
       <MarkdownReader
@@ -319,6 +339,7 @@ export function BulletinDetail({
               publishedAt={bulletin.created_at}
             />
             {heroImage}
+            {heroDivider}
           </>
         }
         footer={

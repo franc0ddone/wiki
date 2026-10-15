@@ -239,6 +239,14 @@ export interface MasterDetailShellProps<T> {
     items: readonly T[];
     renderItem: (item: T, isSelected: boolean) => ReactNode;
   };
+  /**
+   * An optional accent drawn between the leading group and the feed — one
+   * decorative element, and only when there is something on both sides of it
+   * (a leading group with at least one row, *and* a feed below it). The shell
+   * stays brand-agnostic: the caller passes the node (the bulletin board's paw
+   * trail), so nothing brand-specific is baked in here. Omitted renders nothing.
+   */
+  leadingGroupDivider?: ReactNode;
   /** Rendered below the list inside the same scroll container (e.g. an expired tray). */
   listFooter?: ReactNode;
 
@@ -293,6 +301,7 @@ export function MasterDetailShell<T>({
   listSubtitle,
   listActions,
   leadingGroup,
+  leadingGroupDivider,
   listFooter,
   railTop,
   searchField,
@@ -424,6 +433,16 @@ export function MasterDetailShell<T>({
                   </ul>
                 </section>
               ) : null}
+
+              {/*
+               * The divider sits between the two groups and only ever between
+               * them: with no leading group, or a feed with nothing in it, there
+               * is no boundary to mark and the accent would read as decoration
+               * above an empty state. At most one instance per rail.
+               */}
+              {leadingGroupDivider && (leadingGroup?.items.length ?? 0) > 0 && items.length > 0
+                ? leadingGroupDivider
+                : null}
 
               {items.length > 0 ? (
                 <ul role="list" className="space-y-1.5">
